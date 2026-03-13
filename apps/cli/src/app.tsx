@@ -75,6 +75,12 @@ export const App = () => {
   useEffect(() => {
     const state = getGitState();
     setGitState(state);
+    const scope = getRecommendedScope(state);
+    const options = buildMenuOptions(scope, state);
+    if (options.length === 1) {
+      if (options[0].action === "select-commit") setScreen("select-commit");
+      else if (options[0].action === "select-branch") setScreen("switch-branch");
+    }
   }, []);
 
   const recommendedScope = gitState ? getRecommendedScope(gitState) : null;

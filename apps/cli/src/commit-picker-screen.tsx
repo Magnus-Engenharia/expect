@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { COLORS, COLUMN_PADDING, SEARCH_PLACEHOLDER } from "./constants.js";
+import { COLORS, COLUMN_PADDING, SEARCH_PLACEHOLDER, VISIBLE_COMMIT_COUNT } from "./constants.js";
 import { fetchCommits, type Commit } from "./utils/fetch-commits.js";
 
 interface CommitPickerScreenProps {
@@ -28,6 +28,15 @@ export const CommitPickerScreen = ({ onSelect }: CommitPickerScreenProps) => {
     () => Math.max(...filteredCommits.map((commit) => commit.shortHash.length), 0) + COLUMN_PADDING,
     [filteredCommits],
   );
+
+  const scrollOffset = useMemo(() => {
+    if (filteredCommits.length <= VISIBLE_COMMIT_COUNT) return 0;
+    const half = Math.floor(VISIBLE_COMMIT_COUNT / 2);
+    const maxOffset = filteredCommits.length - VISIBLE_COMMIT_COUNT;
+    return Math.min(maxOffset, Math.max(0, highlightedIndex - half));
+  }, [filteredCommits.length, highlightedIndex]);
+
+  const visibleCommits = filteredCommits.slice(scrollOffset, scrollOffset + VISIBLE_COMMIT_COUNT);
 
   const handleInput = useCallback((value: string) => {
     setSearchQuery(value);
@@ -63,20 +72,23 @@ export const CommitPickerScreen = ({ onSelect }: CommitPickerScreenProps) => {
         borderColor={COLORS.DIVIDER}
       />
 
-      <Box flexDirection="column" marginTop={1}>
-        {filteredCommits.map((commit, index) => (
-          <Text
-            key={commit.hash}
-            color={index === highlightedIndex ? COLORS.SELECTION : COLORS.TEXT}
-          >
-            {index === highlightedIndex ? "➤ " : "  "}
-            <Text color={COLORS.YELLOW}>{commit.shortHash.padEnd(maxHashWidth)}</Text>
-            <Text color={index === highlightedIndex ? COLORS.SELECTION : COLORS.TEXT}>
-              {commit.subject}
+      <Box flexDirection="column" marginTop={1} height={VISIBLE_COMMIT_COUNT} overflow="hidden">
+        {visibleCommits.map((commit, index) => {
+          const actualIndex = index + scrollOffset;
+          return (
+            <Text
+              key={commit.hash}
+              color={actualIndex === highlightedIndex ? COLORS.SELECTION : COLORS.TEXT}
+            >
+              {actualIndex === highlightedIndex ? "➤ " : "  "}
+              <Text color={COLORS.YELLOW}>{commit.shortHash.padEnd(maxHashWidth)}</Text>
+              <Text color={actualIndex === highlightedIndex ? COLORS.SELECTION : COLORS.TEXT}>
+                {commit.subject}
+              </Text>
+              <Text color={COLORS.DIM}> {commit.relativeDate}</Text>
             </Text>
-            <Text color={COLORS.DIM}> {commit.relativeDate}</Text>
-          </Text>
-        ))}
+          );
+        })}
         {filteredCommits.length === 0 && <Text color={COLORS.DIM}>No matching commits</Text>}
       </Box>
 

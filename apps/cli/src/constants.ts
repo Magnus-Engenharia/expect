@@ -8,6 +8,7 @@ export const SWITCH_BRANCH_TIMEOUT_MS = 10000;
 export const COMMIT_LIMIT = 50;
 export const PR_LIMIT = 100;
 export const COLUMN_PADDING = 2;
+export const VISIBLE_COMMIT_COUNT = 15;
 export const SPINNER_INTERVAL_MS = 80;
 
 export const COLORS = {
