@@ -5,6 +5,7 @@ export { snapshot } from "./snapshot";
 export {
   CookieJar,
   detectBrowserProfiles,
+  detectDefaultBrowser,
   extractAllProfileCookies,
   extractCookies,
   extractProfileCookies,

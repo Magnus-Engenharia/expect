@@ -5,7 +5,12 @@ export { extractSafariCookies, parseBinaryCookies } from "./sqlite/safari.js";
 export { CookieJar } from "./jar.js";
 export type { PlaywrightCookie, PuppeteerCookie } from "./jar.js";
 export { detectBrowserProfiles } from "./cdp/detector.js";
-export { extractAllProfileCookies, extractProfileCookies } from "./cdp/extract.js";
+export {
+  extractAllProfileCookies,
+  extractProfileCookies,
+} from "./cdp/extract.js";
+export { browserDisplayNameToKey } from "./utils/browser-name-map.js";
+export { detectDefaultBrowser } from "./utils/detect-default-browser.js";
 export { formatCookieHeader as toCookieHeader } from "./utils/format-cookie-header.js";
 export type {
   Browser,

@@ -140,6 +140,20 @@ interface ExtractProfileOptions {
 }
 ```
 
+## Default Browser Detection
+
+Detects the system default browser without keychain access.
+
+```ts
+import { detectDefaultBrowser } from "@browser-tester/cookies";
+
+const browser = detectDefaultBrowser(); // "chrome" | "arc" | "safari" | ... | null
+```
+
+- **macOS**: reads LaunchServices plist for the HTTPS handler bundle ID
+- **Linux**: `xdg-settings get default-web-browser`
+- **Windows**: registry `UserChoice` ProgId for HTTPS
+
 ## SQLite vs CDP
 
 |                            | SQLite                   | CDP                       |
