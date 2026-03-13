@@ -26,17 +26,16 @@ export const MenuItem = ({
       <Text color={isSelected ? undefined : COLORS.DIM} bold={isSelected}>
         {label}
       </Text>
-      {diffStats ? (
+      {isSelected && diffStats ? (
         <Text>
           {" "}
           <Text color={COLORS.GREEN}>+{diffStats.additions}</Text>{" "}
-          <Text color={COLORS.RED}>-{diffStats.deletions}</Text>{" "}
-          <Text color={COLORS.DIM}>({diffStats.filesChanged} files)</Text>
+          <Text color={COLORS.RED}>-{diffStats.deletions}</Text>
         </Text>
       ) : detail ? (
         <Text color={COLORS.DIM}> {detail}</Text>
       ) : null}
-      {recommended && <Text color={isSelected ? undefined : COLORS.DIM}> (recommended)</Text>}
+      {isSelected && recommended && <Text> (recommended)</Text>}
       {hint && <Text color={COLORS.DIM}> ({hint})</Text>}
     </Text>
   );

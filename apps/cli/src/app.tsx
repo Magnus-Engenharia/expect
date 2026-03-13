@@ -315,18 +315,36 @@ export const App = () => {
   const titleLabel = "browser-tester";
   const actionsLine = " Actions";
 
-  const getMenuItemVisualWidth = (option: ScopeMenuOption, index: number): number => {
+  const getMenuItemMaxWidth = (option: ScopeMenuOption, index: number): number => {
     let width = 2;
     width += option.label.length;
     if (option.diffStats) {
-      width += ` +${option.diffStats.additions} -${option.diffStats.deletions} (${option.diffStats.filesChanged} files)`.length;
+      width += ` +${option.diffStats.additions} -${option.diffStats.deletions}`.length;
     } else if (option.detail) {
       width += ` ${option.detail}`.length;
     }
     if (index === 0 && menuOptions.length > 1) {
       width += " (recommended)".length;
     }
-    if (menuOptions.length === 1 && index === selectedIndex) {
+    if (menuOptions.length === 1) {
+      width += " (press return)".length;
+    }
+    return width;
+  };
+
+  const getMenuItemRenderedWidth = (option: ScopeMenuOption, index: number): number => {
+    const isSelected = index === selectedIndex;
+    let width = 2;
+    width += option.label.length;
+    if (isSelected && option.diffStats) {
+      width += ` +${option.diffStats.additions} -${option.diffStats.deletions}`.length;
+    } else if (option.detail) {
+      width += ` ${option.detail}`.length;
+    }
+    if (isSelected && index === 0 && menuOptions.length > 1) {
+      width += " (recommended)".length;
+    }
+    if (menuOptions.length === 1 && isSelected) {
       width += " (press return)".length;
     }
     return width;
@@ -342,7 +360,7 @@ export const App = () => {
       optionsLine.length,
       autoRunLine.length,
       dots.length + 1,
-      ...menuOptions.map((option, index) => getMenuItemVisualWidth(option, index)),
+      ...menuOptions.map((option, index) => getMenuItemMaxWidth(option, index)),
     ) + FRAME_CONTENT_PADDING;
   const pad = (content: string) => " ".repeat(Math.max(0, inner - content.length));
   const emptyRow = (
@@ -386,7 +404,7 @@ export const App = () => {
         {"│"}
       </Text>
       {menuOptions.map((option, index) => {
-        const itemWidth = getMenuItemVisualWidth(option, index);
+        const itemWidth = getMenuItemRenderedWidth(option, index);
         return (
           <Box key={option.label}>
             <Text color={COLORS.DIM}>{"│"}</Text>

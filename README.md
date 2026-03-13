@@ -1,3 +1,5 @@
+![browser-tester](screenshot.png)
+
 ## 3/13 notes
 
 * @Aiden Bai to finalize the core testing experience for the March 23rd product launch. [1:08:26]
