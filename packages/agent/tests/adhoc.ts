@@ -2,8 +2,8 @@ import { claudeAgent } from "../src/claude.js";
 import { codexAgent } from "../src/codex.js";
 import { LOG_PREVIEW_LENGTH } from "../src/constants.js";
 import { runAgent } from "../src/run-agent.js";
+import { isRecord } from "@browser-tester/utils";
 import type { AgentConfig, ModelMessage } from "../src/types.js";
-import { isRecord } from "../src/utils/is-record.js";
 
 const SEPARATOR_LENGTH = 60;
 

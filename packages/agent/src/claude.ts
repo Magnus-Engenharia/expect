@@ -1,8 +1,8 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AssistantModelMessage, JSONValue, ToolModelMessage } from "ai";
 import { CLAUDE_MAX_TURNS } from "./constants.js";
+import { isRecord } from "@browser-tester/utils";
 import type { AgentConfig } from "./types.js";
-import { isRecord } from "./utils/is-record.js";
 
 export const claudeAgent: AgentConfig = {
   name: "claude",
