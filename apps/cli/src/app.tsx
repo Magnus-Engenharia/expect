@@ -5,7 +5,7 @@ import type {
   BrowserFlowPlan,
   TestTarget,
 } from "@browser-tester/orchestrator";
-import { useColors } from "./theme-context.js";
+import { useColors, useThemeContext } from "./theme-context.js";
 import { MenuItem } from "./menu-item.js";
 import { BranchSwitcherScreen } from "./branch-switcher-screen.js";
 import { CommitPickerScreen } from "./commit-picker-screen.js";
@@ -87,6 +87,7 @@ const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption
 export const App = () => {
   const { stdout } = useStdout();
   const COLORS = useColors();
+  const { theme } = useThemeContext();
   const [gitState, setGitState] = useState<GitState | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [screen, setScreen] = useState<Screen>("main");
@@ -311,7 +312,41 @@ export const App = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <Text color={COLORS.ORANGE}>{"═".repeat(stdout.columns - 2)}</Text>
+      <Text>
+        {(() => {
+          const width = stdout.columns - 2;
+          const stops = [theme.primary, theme.accent, theme.secondary, theme.primary];
+          const segments: { char: string; color: string }[] = [];
+          for (let index = 0; index < width; index++) {
+            const progress = index / Math.max(width - 1, 1);
+            const scaledPosition = progress * (stops.length - 1);
+            const segmentIndex = Math.min(Math.floor(scaledPosition), stops.length - 2);
+            const segmentProgress = scaledPosition - segmentIndex;
+            const fromHex = stops[segmentIndex];
+            const toHex = stops[segmentIndex + 1];
+            const fromRgb = [
+              parseInt(fromHex.slice(1, 3), 16),
+              parseInt(fromHex.slice(3, 5), 16),
+              parseInt(fromHex.slice(5, 7), 16),
+            ];
+            const toRgb = [
+              parseInt(toHex.slice(1, 3), 16),
+              parseInt(toHex.slice(3, 5), 16),
+              parseInt(toHex.slice(5, 7), 16),
+            ];
+            const red = Math.round(fromRgb[0] + (toRgb[0] - fromRgb[0]) * segmentProgress);
+            const green = Math.round(fromRgb[1] + (toRgb[1] - fromRgb[1]) * segmentProgress);
+            const blue = Math.round(fromRgb[2] + (toRgb[2] - fromRgb[2]) * segmentProgress);
+            const hex = `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue.toString(16).padStart(2, "0")}`;
+            segments.push({ char: "━", color: hex });
+          }
+          return segments.map((segment, index) => (
+            <Text key={index} color={segment.color}>
+              {segment.char}
+            </Text>
+          ));
+        })()}
+      </Text>
       <Text bold color={COLORS.TEXT || undefined}>
         browser-tester
       </Text>
@@ -351,10 +386,12 @@ export const App = () => {
       </Box>
 
       <Box marginTop={2}>
-        <Text inverse>
-          {` t theme · b switch branch · ↑↓ nav · current branch: ${gitState.currentBranch}`.padEnd(
-            stdout.columns - 2,
-          )}
+        <Text backgroundColor={theme.primary} color="#000000" bold>
+          {" "}
+          {gitState.currentBranch}{" "}
+        </Text>
+        <Text backgroundColor={theme.border} color={theme.text}>
+          {` t theme · b branch · ↑↓ nav`.padEnd(stdout.columns - 2 - gitState.currentBranch.length - 3)}
         </Text>
       </Box>
     </Box>
