@@ -1,9 +1,9 @@
 {
   "name": "@browser-tester/profile-sync",
   "version": "0.0.1",
+  "private": true,
   "description": "Extract cookies from local browser profiles via CDP",
   "license": "MIT",
-  "private": true,
   "files": [
     "dist"
   ],

@@ -1,16 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import path from "node:path";
-import { BROWSER_CONFIGS, CONFIG_DIR_NAME, CUSTOM_BROWSERS_FILE } from "../constants.js";
-import type { BrowserInfo, BrowserProfile, CustomBrowser, LocalStateProfile } from "../types.js";
-
-const getConfigDir = (): string => {
-  const configDir = path.join(homedir(), CONFIG_DIR_NAME);
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true });
-  }
-  return configDir;
-};
+import { BROWSER_CONFIGS } from "../constants.js";
+import type { BrowserInfo, BrowserProfile, LocalStateProfile } from "../types.js";
 
 const extractNumber = (value: string): number => {
   const match = value.match(/\d+/);
@@ -144,29 +136,6 @@ const detectBrowsersLinux = (): BrowserInfo[] => {
   return browsers;
 };
 
-export const loadCustomBrowsers = (): CustomBrowser[] => {
-  const configPath = path.join(getConfigDir(), CUSTOM_BROWSERS_FILE);
-  try {
-    const content = readFileSync(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
-};
-
-export const saveCustomBrowser = (browser: CustomBrowser): void => {
-  const browsers = loadCustomBrowsers();
-  browsers.push(browser);
-  const configPath = path.join(getConfigDir(), CUSTOM_BROWSERS_FILE);
-  writeFileSync(configPath, JSON.stringify(browsers, null, 2));
-};
-
-export const getCustomUserDataDir = (executablePath: string): string | null => {
-  const customBrowsers = loadCustomBrowsers();
-  const found = customBrowsers.find((browser) => browser.executablePath === executablePath);
-  return found?.userDataDir ?? null;
-};
-
 export const detectBrowserProfiles = (): BrowserProfile[] => {
   const currentPlatform = platform();
   const allProfiles: BrowserProfile[] = [];
@@ -188,13 +157,6 @@ export const detectBrowserProfiles = (): BrowserProfile[] => {
     if (!userDataDir) continue;
 
     const profiles = detectProfilesForBrowser(browser, userDataDir);
-    allProfiles.push(...profiles);
-  }
-
-  const customBrowsers = loadCustomBrowsers();
-  for (const custom of customBrowsers) {
-    const browser: BrowserInfo = { name: custom.name, executablePath: custom.executablePath };
-    const profiles = detectProfilesForBrowser(browser, custom.userDataDir);
     allProfiles.push(...profiles);
   }
 

@@ -30,12 +30,39 @@ export const getWebSocketDebuggerUrl = async (port: number): Promise<string> => 
   throw new Error("unreachable");
 };
 
+const getPageWebSocketUrl = async (port: number): Promise<string> => {
+  const listUrl = `http://localhost:${port}/json`;
+
+  for (let attempt = 0; attempt < CDP_RETRY_COUNT; attempt++) {
+    try {
+      const response = await fetch(listUrl);
+      const targets = (await response.json()) as Array<Record<string, unknown>>;
+      const page = targets.find((target) => target["type"] === "page");
+      const webSocketUrl = (page ?? targets[0])?.["webSocketDebuggerUrl"];
+      if (typeof webSocketUrl === "string" && webSocketUrl.length > 0) {
+        return webSocketUrl;
+      }
+      throw new Error("no page target found in CDP response");
+    } catch (error) {
+      if (attempt === CDP_RETRY_COUNT - 1) {
+        throw new Error(
+          `failed to get page target after ${CDP_RETRY_COUNT} attempts: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      await sleep(CDP_RETRY_DELAY_MS);
+    }
+  }
+
+  throw new Error("unreachable");
+};
+
 const sendCdpCommand = (
   webSocketUrl: string,
   command: Record<string, unknown>,
 ): Promise<CdpResponse> =>
   new Promise((resolve, reject) => {
     const socket = new WebSocket(webSocketUrl);
+    const commandId = command["id"] as number;
 
     socket.on("open", () => {
       socket.send(JSON.stringify(command));
@@ -43,9 +70,11 @@ const sendCdpCommand = (
 
     socket.on("message", (data: WebSocket.Data) => {
       try {
-        const response = JSON.parse(data.toString()) as CdpResponse;
+        const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (parsed["id"] !== commandId) return;
+
         socket.close();
-        resolve(response);
+        resolve(parsed as unknown as CdpResponse);
       } catch (error) {
         socket.close();
         reject(
@@ -61,12 +90,14 @@ const sendCdpCommand = (
     });
   });
 
-export const getCookiesFromBrowser = async (webSocketUrl: string): Promise<CdpRawCookie[]> => {
+export const getCookiesFromBrowser = async (port: number): Promise<CdpRawCookie[]> => {
+  const webSocketUrl = await getPageWebSocketUrl(port);
+
   for (let attempt = 0; attempt < CDP_RETRY_COUNT; attempt++) {
     try {
       const response = await sendCdpCommand(webSocketUrl, {
         id: 1,
-        method: "Storage.getCookies",
+        method: "Network.getAllCookies",
       });
 
       if (response.error) {

@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { getCookiesFromBrowser, getWebSocketDebuggerUrl } from "./cdp/cdp.js";
+import { getCookiesFromBrowser } from "./cdp/cdp.js";
 import { BROWSER_STARTUP_DELAY_MS, CDP_LOCAL_PORT, HEADLESS_CHROME_ARGS } from "./constants.js";
 import type {
   BrowserProfile,
@@ -117,8 +117,7 @@ export const extractProfileCookies = async (
 
     await sleep(BROWSER_STARTUP_DELAY_MS);
 
-    const webSocketUrl = await getWebSocketDebuggerUrl(port);
-    const rawCookies = await getCookiesFromBrowser(webSocketUrl);
+    const rawCookies = await getCookiesFromBrowser(port);
 
     if (rawCookies.length === 0) {
       warnings.push(`no cookies found in profile: ${profile.displayName}`);
@@ -138,10 +137,11 @@ export const extractProfileCookies = async (
       } catch {
         // HACK: process may have already exited
       }
+      await sleep(500);
     }
 
     try {
-      rmSync(tempDir, { recursive: true, force: true });
+      rmSync(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
     } catch {
       // HACK: temp dir cleanup failure is non-fatal
     }

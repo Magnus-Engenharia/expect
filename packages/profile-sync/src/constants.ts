@@ -6,11 +6,10 @@ export const CDP_LOCAL_PORT = 9222;
 export const BROWSER_STARTUP_DELAY_MS = 2_000;
 
 export const HEADLESS_CHROME_ARGS = [
-  "--headless",
+  "--headless=new",
   "--disable-gpu",
   "--no-first-run",
   "--no-default-browser-check",
-  "--no-startup-window",
 ];
 
 interface BrowserConfig {
