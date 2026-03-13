@@ -11,7 +11,6 @@ import {
   getRecommendedScope,
   type GitState,
   type TestScope,
-  type DiffStats,
 } from "./utils/get-git-state.js";
 import { TestingScreen } from "./testing-screen.js";
 import { switchBranch } from "./utils/switch-branch.js";
@@ -26,7 +25,6 @@ interface ScopeMenuOption {
   label: string;
   detail: string;
   action: MenuAction;
-  diffStats?: DiffStats;
 }
 
 const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption[] => {
@@ -37,7 +35,6 @@ const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption
           label: "Test unstaged changes",
           detail: "",
           action: "test-unstaged",
-          diffStats: gitState.diffStats ?? undefined,
         },
       ];
       if (gitState.isOnMain) {
@@ -47,7 +44,6 @@ const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption
           label: "Test entire branch",
           detail: `(${gitState.currentBranch})`,
           action: "test-branch",
-          diffStats: gitState.branchDiffStats ?? undefined,
         });
       }
       return options;
@@ -62,7 +58,6 @@ const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption
           label: "Test entire branch",
           detail: `(${gitState.currentBranch})`,
           action: "test-branch",
-          diffStats: gitState.branchDiffStats ?? undefined,
         },
         { label: "Select a commit to test", detail: "", action: "select-commit" },
       ];
@@ -188,7 +183,6 @@ export const App = () => {
             detail={option.detail}
             isSelected={index === selectedIndex}
             recommended={index === 0 && menuOptions.length > 1}
-            diffStats={option.diffStats}
           />
         ))}
       </Box>
@@ -205,12 +199,18 @@ export const App = () => {
 
       <Box flexDirection="row" justifyContent="space-between" width="100%">
         <Text color={COLORS.DIM}>
-          ↑/↓ navigate · Enter select · [b] switch branch
+          ↑/↓ navigate · <Text color={COLORS.TEXT}>[b]</Text> switch branch
           <Text color={COLORS.TEXT}> {gitState.currentBranch}</Text>
-          {gitState.hasUnstagedChanges && gitState.diffStats
-            ? <Text color={COLORS.DIM}> · {gitState.diffStats.filesChanged} files changed</Text>
-            : <Text color={COLORS.DIM}> · no changes</Text>}
-        </Text>
+          {menuOptions[selectedIndex]?.action === "test-unstaged" && gitState.diffStats
+            ? <>
+                <Text color={COLORS.DIM}> · </Text>
+                <Text color={COLORS.GREEN}>+{gitState.diffStats.additions}</Text>
+                <Text color={COLORS.DIM}> </Text>
+                <Text color={COLORS.RED}>-{gitState.diffStats.deletions}</Text>
+                <Text color={COLORS.DIM}> · {gitState.diffStats.filesChanged} files</Text>
+              </>
+            : null}
+          </Text>
         <Text color={reviewPlan ? COLORS.DIM : COLORS.YELLOW}>
           {reviewPlan ? "⏵⏵" : "⏵⏵"} Automatically begin testing after planning
           <Text color={COLORS.DIM}> (tab)</Text>
