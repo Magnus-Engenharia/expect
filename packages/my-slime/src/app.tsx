@@ -23,28 +23,42 @@ interface ScopeMenuOption {
 
 const hasSwitchBranchTool = (_scope: TestScope): boolean => true;
 
-const getHappyPathOption = (scope: TestScope, gitState: GitState): ScopeMenuOption => {
+const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption[] => {
   switch (scope) {
-    case "unstaged-changes":
-      return {
-        label: "Unstaged changes",
-        detail: "",
-        diffStats: gitState.diffStats ?? undefined,
-      };
+    case "unstaged-changes": {
+      const options: ScopeMenuOption[] = [
+        {
+          label: "Unstaged changes",
+          detail: "",
+          diffStats: gitState.diffStats ?? undefined,
+        },
+      ];
+      if (gitState.isOnMain) {
+        options.push({ label: "Select commit", detail: "" });
+      } else if (gitState.hasBranchCommits) {
+        options.push({
+          label: "Entire branch",
+          detail: `(${gitState.currentBranch})`,
+          diffStats: gitState.branchDiffStats ?? undefined,
+        });
+      }
+      return options;
+    }
     case "select-commit":
+      return [{ label: "Select commit", detail: "" }];
+    case "select-branch":
+      return [{ label: "Select branch", detail: "" }];
     case "entire-branch":
-      return {
-        label: "Entire branch",
-        detail: `(${gitState.currentBranch})`,
-        diffStats: gitState.branchDiffStats ?? undefined,
-      };
+      return [
+        {
+          label: "Entire branch",
+          detail: `(${gitState.currentBranch})`,
+          diffStats: gitState.branchDiffStats ?? undefined,
+        },
+        { label: "Select commit", detail: "" },
+      ];
   }
 };
-
-const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption[] => [
-  getHappyPathOption(scope, gitState),
-  { label: "Select commit", detail: "" },
-];
 
 export const App = () => {
   const [gitState, setGitState] = useState<GitState | null>(null);

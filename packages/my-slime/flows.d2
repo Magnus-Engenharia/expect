@@ -1,0 +1,47 @@
+direction: down
+
+start: Git State
+
+on-main: On main? {
+  shape: diamond
+}
+
+unstaged-main: Unstaged changes? {
+  shape: diamond
+}
+
+unstaged-branch: Unstaged changes? {
+  shape: diamond
+}
+
+has-commits-a: Branch has commits? {
+  shape: diamond
+}
+
+has-commits-b: Branch has commits? {
+  shape: diamond
+}
+
+m1: "➤ Unstaged changes\n  Select commit"
+m2: "➤ Select commit"
+m3: "➤ Unstaged changes\n  Entire branch"
+m4: "➤ Unstaged changes"
+m5: "➤ Entire branch\n  Select commit"
+m6: "➤ Select branch"
+
+start -> on-main
+
+on-main -> unstaged-main: yes
+on-main -> unstaged-branch: no
+
+unstaged-main -> m1: yes
+unstaged-main -> m2: no
+
+unstaged-branch -> has-commits-a: yes
+unstaged-branch -> has-commits-b: no
+
+has-commits-a -> m3: yes
+has-commits-a -> m4: no
+
+has-commits-b -> m5: yes
+has-commits-b -> m6: no

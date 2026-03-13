@@ -10,11 +10,12 @@ export interface GitState {
   currentBranch: string;
   isOnMain: boolean;
   hasUnstagedChanges: boolean;
+  hasBranchCommits: boolean;
   diffStats: DiffStats | null;
   branchDiffStats: DiffStats | null;
 }
 
-export type TestScope = "unstaged-changes" | "select-commit" | "entire-branch";
+export type TestScope = "unstaged-changes" | "select-commit" | "entire-branch" | "select-branch";
 
 const MAIN_BRANCH_NAMES = ["main", "master"];
 const GIT_TIMEOUT_MS = 5000;
@@ -93,20 +94,24 @@ export const getGitState = (): GitState => {
   const hasUnstagedChanges = diffStats !== null;
 
   let branchDiffStats: DiffStats | null = null;
+  let hasBranchCommits = false;
   if (!isOnMain) {
     const mainBranch = getMainBranchName();
     if (mainBranch) {
+      const commitCount = execGit(`git rev-list --count ${mainBranch}..HEAD`);
+      hasBranchCommits = Boolean(commitCount && parseInt(commitCount, 10) > 0);
       const branchShortstat = execGit(`git diff ${mainBranch}...HEAD --shortstat`);
       branchDiffStats = branchShortstat ? parseDiffShortstat(branchShortstat) : null;
     }
   }
 
-  return { currentBranch, isOnMain, hasUnstagedChanges, diffStats, branchDiffStats };
+  return { currentBranch, isOnMain, hasUnstagedChanges, hasBranchCommits, diffStats, branchDiffStats };
 };
 
 export const getRecommendedScope = (gitState: GitState): TestScope => {
   if (gitState.isOnMain) {
     return gitState.hasUnstagedChanges ? "unstaged-changes" : "select-commit";
   }
-  return gitState.hasUnstagedChanges ? "unstaged-changes" : "entire-branch";
+  if (gitState.hasUnstagedChanges) return "unstaged-changes";
+  return gitState.hasBranchCommits ? "entire-branch" : "select-branch";
 };
