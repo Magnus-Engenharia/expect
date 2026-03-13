@@ -22,6 +22,11 @@ export const PR_LIMIT = 100;
 export const COLUMN_PADDING = 2;
 export const VISIBLE_COMMIT_COUNT = 15;
 export const SPINNER_INTERVAL_MS = 80;
+export const TESTING_VISIBLE_LOG_COUNT = 18;
+export const TESTING_TOOL_TEXT_CHAR_LIMIT = 100;
+export const FLOW_DIRECTORY_NAME = "flows";
+export const FLOW_DIRECTORY_INDEX_FILE_NAME = "directory.md";
+export const FLOW_DESCRIPTION_CHAR_LIMIT = 120;
 
 export const COLORS = {
   TEXT: "#cccccc",

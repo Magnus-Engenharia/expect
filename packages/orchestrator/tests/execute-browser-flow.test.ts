@@ -102,6 +102,10 @@ const testPlan: BrowserFlowPlan = {
   assumptions: [],
   riskAreas: ["Onboarding", "Project import"],
   targetUrls: ["/onboarding"],
+  cookieSync: {
+    required: false,
+    reason: "This test can run without an existing signed-in session.",
+  },
   steps: [
     {
       id: "step-01",
@@ -118,6 +122,7 @@ describe("executeBrowserFlow", () => {
   it("streams structured events from model output and browser tool usage", async () => {
     let promptText = "";
     const events: BrowserRunEvent[] = [];
+    const videoOutputPath = "/tmp/browser-tester-run-test/browser-flow.webm";
 
     for await (const event of executeBrowserFlow({
       target: testTarget,
@@ -126,6 +131,7 @@ describe("executeBrowserFlow", () => {
         baseUrl: "http://localhost:3000",
         cookies: true,
       },
+      videoOutputPath,
       model: createExecutionModel((options) => {
         promptText =
           options.prompt[0].role === "user" && options.prompt[0].content[0].type === "text"
@@ -138,12 +144,15 @@ describe("executeBrowserFlow", () => {
 
     expect(promptText).toContain("STEP_START|<step-id>|<step-title>");
     expect(promptText).toContain("Go through onboarding and click Import Projects.");
+    expect(promptText).toContain("call the close tool exactly once");
+    expect(promptText).toContain(videoOutputPath);
     expect(events.some((event) => event.type === "step-started")).toBe(true);
     expect(events.some((event) => event.type === "browser-log")).toBe(true);
     expect(events.some((event) => event.type === "tool-result")).toBe(true);
     expect(events.find((event) => event.type === "run-completed")).toMatchObject({
       type: "run-completed",
       status: "passed",
+      videoPath: videoOutputPath,
     });
   });
 });

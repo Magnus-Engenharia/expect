@@ -1,3 +1,6 @@
+import { accessSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { LanguageModelV3, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { createClaudeModel } from "@browser-tester/agent";
 import { DEFAULT_BROWSER_MCP_SERVER_NAME } from "./constants.js";
@@ -12,11 +15,14 @@ import type {
 } from "./types.js";
 
 const PROVIDER_METADATA_KEY = "browser-tester-agent";
+const VIDEO_OUTPUT_ENV_NAME = "BROWSER_TESTER_VIDEO_OUTPUT_PATH";
+const VIDEO_DIRECTORY_PREFIX = "browser-tester-run-";
+const VIDEO_FILE_NAME = "browser-flow.webm";
 
 const createExecutionModel = (
   options: Pick<
     ExecuteBrowserFlowOptions,
-    "model" | "providerSettings" | "target" | "browserMcpServerName"
+    "model" | "providerSettings" | "target" | "browserMcpServerName" | "videoOutputPath"
   >,
 ): LanguageModelV3 =>
   options.model ??
@@ -27,6 +33,7 @@ const createExecutionModel = (
         ...(options.providerSettings ?? {}),
       },
       options.browserMcpServerName,
+      options.videoOutputPath ? { [VIDEO_OUTPUT_ENV_NAME]: options.videoOutputPath } : undefined,
     ),
   );
 
@@ -49,13 +56,14 @@ const formatPlanSteps = (steps: PlanStep[]): string =>
     .join("\n");
 
 const buildExecutionPrompt = (options: ExecuteBrowserFlowOptions): string => {
-  const { plan, target, environment, browserMcpServerName } = options;
+  const { plan, target, environment, browserMcpServerName, videoOutputPath } = options;
 
   return [
     "You are executing an approved browser test plan.",
     `You have access to browser tools through the MCP server named "${browserMcpServerName ?? DEFAULT_BROWSER_MCP_SERVER_NAME}".`,
     "Follow the approved steps in order. You may adapt to UI details, but do not invent a different goal.",
     "If a step is blocked, explain why and emit the failure marker.",
+    "A browser video recording is enabled for this run.",
     "",
     "Before and after each step, emit these exact status lines on their own lines:",
     'STEP_START|<step-id>|<step-title>',
@@ -64,12 +72,14 @@ const buildExecutionPrompt = (options: ExecuteBrowserFlowOptions): string => {
     'RUN_COMPLETED|passed|<final-summary>',
     'RUN_COMPLETED|failed|<final-summary>',
     "",
+    "Before emitting RUN_COMPLETED, call the close tool exactly once so the browser session flushes the video to disk.",
     "Use the browser tools to open pages, inspect the accessibility tree, interact with the UI, wait when needed, and check browser logs or network requests when helpful.",
     "",
     "Environment:",
     `- Base URL: ${environment?.baseUrl ?? "not provided"}`,
     `- Headed mode preference: ${environment?.headed === true ? "headed" : "headless or not specified"}`,
     `- Reuse browser cookies: ${environment?.cookies === true ? "yes" : "no or not specified"}`,
+    `- Video output path: ${videoOutputPath ?? "not configured"}`,
     "",
     "Testing target context:",
     `- Scope: ${target.scope}`,
@@ -91,6 +101,22 @@ const buildExecutionPrompt = (options: ExecuteBrowserFlowOptions): string => {
 };
 
 const createTimestamp = (): number => Date.now();
+
+const createVideoOutputPath = (): string => {
+  const videoDirectory = mkdtempSync(join(tmpdir(), VIDEO_DIRECTORY_PREFIX));
+  return join(videoDirectory, VIDEO_FILE_NAME);
+};
+
+const resolveVideoPath = (videoOutputPath: string | undefined): string | undefined => {
+  if (!videoOutputPath) return undefined;
+
+  try {
+    accessSync(videoOutputPath);
+    return videoOutputPath;
+  } catch {
+    return videoOutputPath;
+  }
+};
 
 const buildStepMap = (steps: PlanStep[]): Map<string, PlanStep> =>
   new Map(steps.map((step) => [step.id, step]));
@@ -192,15 +218,18 @@ export const executeBrowserFlow = async function* (
   options: ExecuteBrowserFlowOptions,
 ): AsyncGenerator<BrowserRunEvent> {
   const browserMcpServerName = options.browserMcpServerName ?? DEFAULT_BROWSER_MCP_SERVER_NAME;
+  const videoOutputPath = options.videoOutputPath ?? createVideoOutputPath();
   const model = createExecutionModel({
     model: options.model,
     providerSettings: options.providerSettings,
     target: options.target,
     browserMcpServerName,
+    videoOutputPath,
   });
   const prompt = buildExecutionPrompt({
     ...options,
     browserMcpServerName,
+    videoOutputPath,
   });
 
   yield {
@@ -237,6 +266,7 @@ export const executeBrowserFlow = async function* (
           yield {
             ...event,
             sessionId: streamState.sessionId,
+            videoPath: resolveVideoPath(videoOutputPath),
           };
         } else {
           yield event;
@@ -315,6 +345,7 @@ export const executeBrowserFlow = async function* (
           yield {
             ...trailingEvent,
             sessionId: streamState.sessionId,
+            videoPath: resolveVideoPath(videoOutputPath),
           };
           return;
         }
@@ -331,5 +362,6 @@ export const executeBrowserFlow = async function* (
     status: "passed",
     summary: "Run completed.",
     sessionId: streamState.sessionId,
+    videoPath: resolveVideoPath(videoOutputPath),
   };
 };

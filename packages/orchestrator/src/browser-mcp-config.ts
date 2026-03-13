@@ -13,13 +13,23 @@ export const getBrowserMcpEntrypoint = (): string => {
 export const buildBrowserMcpSettings = (
   providerSettings: AgentProviderSettings | undefined,
   browserMcpServerName: string = DEFAULT_BROWSER_MCP_SERVER_NAME,
+  serverEnv?: Record<string, string>,
 ): AgentProviderSettings => ({
   ...(providerSettings ?? {}),
   mcpServers: {
     ...(providerSettings?.mcpServers ?? {}),
     [browserMcpServerName]: {
+      ...(providerSettings?.mcpServers?.[browserMcpServerName] ?? {}),
       command: process.execPath,
       args: [getBrowserMcpEntrypoint()],
+      ...(providerSettings?.mcpServers?.[browserMcpServerName]?.env || serverEnv
+        ? {
+            env: {
+              ...(providerSettings?.mcpServers?.[browserMcpServerName]?.env ?? {}),
+              ...(serverEnv ?? {}),
+            },
+          }
+        : {}),
     },
   },
 });

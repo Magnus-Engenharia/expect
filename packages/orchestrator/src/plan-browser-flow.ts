@@ -23,6 +23,11 @@ const planStepSchema = z.object({
   changedFileEvidence: z.array(z.string().min(1)).default([]),
 });
 
+const cookieSyncSchema = z.object({
+  required: z.boolean(),
+  reason: z.string().min(1),
+});
+
 const browserFlowPlanSchema = z.object({
   title: z.string().min(1),
   rationale: z.string().min(1),
@@ -30,6 +35,7 @@ const browserFlowPlanSchema = z.object({
   assumptions: z.array(z.string().min(1)).default([]),
   riskAreas: z.array(z.string().min(1)).default([]),
   targetUrls: z.array(z.string().min(1)).default([]),
+  cookieSync: cookieSyncSchema,
   steps: z.array(planStepSchema).min(1).max(PLANNER_MAX_STEP_COUNT),
 });
 
@@ -102,11 +108,14 @@ const buildPlanningPrompt = (options: PlanBrowserFlowOptions): string => {
     "- Blend the requested journey with code-change-derived risk areas.",
     "- Focus on realistic browser steps that a browser agent can execute.",
     "- Include assumptions when the journey depends on unknown data or authentication.",
+    "- Decide whether syncing browser cookies is required to execute the flow reliably.",
+    "- Set cookieSync.required to true when the flow likely needs an authenticated user session, account state, org access, or non-public app data.",
+    "- Set cookieSync.required to false for public or clearly unauthenticated flows, and explain the decision in cookieSync.reason.",
     "- Keep the plan concise and high signal.",
     "- Use a maximum of 8 steps.",
     "",
     "Return a JSON object with this exact shape:",
-    '{"title":"string","rationale":"string","targetSummary":"string","assumptions":["string"],"riskAreas":["string"],"targetUrls":["string"],"steps":[{"id":"optional string","title":"string","instruction":"string","expectedOutcome":"string","routeHint":"optional string","changedFileEvidence":["string"]}]}',
+    '{"title":"string","rationale":"string","targetSummary":"string","assumptions":["string"],"riskAreas":["string"],"targetUrls":["string"],"cookieSync":{"required":true,"reason":"string"},"steps":[{"id":"optional string","title":"string","instruction":"string","expectedOutcome":"string","routeHint":"optional string","changedFileEvidence":["string"]}]}',
   ].join("\n");
 };
 

@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { z } from "zod/v4";
 import type { Browser as PlaywrightBrowser, BrowserContext, Page } from "playwright";
 import {
@@ -32,9 +34,12 @@ interface BrowserSession {
   page: Page;
   consoleMessages: ConsoleEntry[];
   networkRequests: NetworkEntry[];
+  videoOutputPath?: string;
+  savedVideoPath?: string | null;
 }
 
 let session: BrowserSession | null = null;
+const VIDEO_OUTPUT_ENV_NAME = "BROWSER_TESTER_VIDEO_OUTPUT_PATH";
 
 const setupPageTracking = (page: Page, browserSession: BrowserSession) => {
   page.on("console", (message) => {
@@ -66,6 +71,47 @@ const setupPageTracking = (page: Page, browserSession: BrowserSession) => {
 const requirePage = (): Page => {
   if (!session) throw new Error("No browser open. Call the 'open' tool first.");
   return session.page;
+};
+
+const saveSessionVideo = async (
+  browserSession: BrowserSession,
+  outputPath?: string,
+): Promise<string | null> => {
+  const resolvedOutputPath = outputPath ?? browserSession.videoOutputPath;
+  if (!resolvedOutputPath) return null;
+  if (browserSession.savedVideoPath) return browserSession.savedVideoPath;
+
+  mkdirSync(dirname(resolvedOutputPath), { recursive: true });
+  const savedVideoPath = await saveVideo(browserSession.page, resolvedOutputPath);
+  browserSession.savedVideoPath = savedVideoPath;
+  return savedVideoPath;
+};
+
+const closeSession = async (outputPath?: string): Promise<string | null> => {
+  if (!session) return null;
+
+  const activeSession = session;
+  session = null;
+  const savedVideoPath = await saveSessionVideo(activeSession, outputPath);
+  await activeSession.browser.close();
+  return savedVideoPath;
+};
+
+let cleanupRegistered = false;
+
+const registerProcessCleanup = () => {
+  if (cleanupRegistered) return;
+  cleanupRegistered = true;
+
+  const handleShutdown = () => {
+    void closeSession().finally(() => {
+      process.exit(0);
+    });
+  };
+
+  process.once("SIGINT", handleShutdown);
+  process.once("SIGTERM", handleShutdown);
+  process.once("beforeExit", () => closeSession());
 };
 
 const textResult = (text: string) => ({
@@ -118,13 +164,23 @@ export const createBrowserMcpServer = () => {
         return textResult(`Navigated to ${url}`);
       }
 
+      const videoOutputPath = process.env[VIDEO_OUTPUT_ENV_NAME];
       const pageResult = await createPage(url, {
         headed,
         cookies,
         waitUntil,
+        video: videoOutputPath ? { dir: dirname(videoOutputPath) } : undefined,
       });
       const { browser, context, page } = pageResult;
-      session = { browser, context, page, consoleMessages: [], networkRequests: [] };
+      session = {
+        browser,
+        context,
+        page,
+        consoleMessages: [],
+        networkRequests: [],
+        videoOutputPath,
+        savedVideoPath: null,
+      };
       setupPageTracking(page, session);
       return textResult(`Opened ${url}`);
     },
@@ -326,13 +382,12 @@ export const createBrowserMcpServer = () => {
       },
     },
     async ({ outputPath }) => {
-      const page = requirePage();
-      const result = await saveVideo(page, outputPath);
+      if (!session) return textResult("No browser open.");
+      const result = await closeSession(outputPath);
       if (!result)
         return textResult(
           "No video recording active. Open the page with video recording enabled first.",
         );
-      session = null;
       return textResult(`Video saved to ${result}`);
     },
   );
@@ -773,8 +828,10 @@ export const createBrowserMcpServer = () => {
     },
     async () => {
       if (!session) return textResult("No browser open.");
-      await session.browser.close();
-      session = null;
+      const savedVideoPath = await closeSession();
+      if (savedVideoPath) {
+        return textResult(`Browser closed. Video saved to ${savedVideoPath}`);
+      }
       return textResult("Browser closed.");
     },
   );
@@ -783,6 +840,7 @@ export const createBrowserMcpServer = () => {
 };
 
 export const startBrowserMcpServer = async () => {
+  registerProcessCleanup();
   const server = createBrowserMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

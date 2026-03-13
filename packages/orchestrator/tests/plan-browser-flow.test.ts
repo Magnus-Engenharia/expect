@@ -23,6 +23,10 @@ const createPlannerModel = (
             assumptions: ["The user can access onboarding."],
             riskAreas: ["Project import", "Onboarding progression"],
             targetUrls: ["/onboarding"],
+            cookieSync: {
+              required: true,
+              reason: "The flow depends on an authenticated workspace session.",
+            },
             steps: [
               {
                 title: "Open onboarding",
@@ -111,8 +115,10 @@ describe("planBrowserFlow", () => {
     expect(promptText).toContain("src/onboarding.tsx");
     expect(promptText).toContain("Base URL: http://localhost:3000");
     expect(promptText).toContain("...truncated...");
+    expect(promptText).toContain("cookieSync.required");
     expect(plan.steps[0].id).toBe("step-01");
     expect(plan.userInstruction).toContain("Import Projects");
+    expect(plan.cookieSync.required).toBe(true);
   });
 
   it("prioritizes product files over docs and artifacts in planner context", async () => {

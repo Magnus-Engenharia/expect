@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { BrowserEnvironmentHints, BrowserFlowPlan, BrowserRunEvent, TestTarget } from "@browser-tester/orchestrator";
-import { COLORS } from "./constants.js";
+import { COLORS, TESTING_TOOL_TEXT_CHAR_LIMIT, TESTING_VISIBLE_LOG_COUNT } from "./constants.js";
 import { Spinner } from "./spinner.js";
 import { executeApprovedPlan } from "./utils/browser-agent.js";
 
@@ -12,34 +12,178 @@ interface TestingScreenProps {
   onExit: () => void;
 }
 
-const formatRunEvent = (event: BrowserRunEvent): string | null => {
+interface TestingLine {
+  text: string;
+  color: string;
+}
+
+const BROWSER_TOOL_PREFIX = "mcp__browser__";
+
+const truncateText = (value: string, limit: number): string =>
+  value.length <= limit ? value : `${value.slice(0, Math.max(0, limit - 1))}…`;
+
+const parseToolInput = (input: string): Record<string, unknown> | null => {
+  try {
+    const parsedValue = JSON.parse(input);
+    if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) return null;
+    return parsedValue;
+  } catch {
+    return null;
+  }
+};
+
+const readString = (input: Record<string, unknown> | null, key: string): string | null => {
+  const value = input?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+};
+
+const readNumber = (input: Record<string, unknown> | null, key: string): number | null => {
+  const value = input?.[key];
+  return typeof value === "number" ? value : null;
+};
+
+const readPathOrUrl = (input: Record<string, unknown> | null, key: string): string | null => {
+  const value = readString(input, key);
+  if (!value) return null;
+
+  try {
+    const parsedUrl = new URL(value);
+    return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` || parsedUrl.origin;
+  } catch {
+    return value;
+  }
+};
+
+const formatBrowserToolCall = (toolName: string, input: string): string | null => {
+  if (!toolName.startsWith(BROWSER_TOOL_PREFIX)) return null;
+
+  const action = toolName.slice(BROWSER_TOOL_PREFIX.length);
+  const parsedInput = parseToolInput(input);
+
+  switch (action) {
+    case "open":
+      return `Open ${readPathOrUrl(parsedInput, "url") ?? "page"}`;
+    case "snapshot":
+      return "Capture page snapshot";
+    case "click":
+      return `Click ${readString(parsedInput, "ref") ?? "element"}`;
+    case "fill":
+      return `Fill ${readString(parsedInput, "ref") ?? "input"}`;
+    case "type":
+      return `Type into ${readString(parsedInput, "ref") ?? "input"}`;
+    case "select":
+      return `Select ${truncateText(readString(parsedInput, "value") ?? "option", 24)}`;
+    case "hover":
+      return `Hover ${readString(parsedInput, "ref") ?? "element"}`;
+    case "wait": {
+      const selector = readString(parsedInput, "selector");
+      const url = readPathOrUrl(parsedInput, "url");
+      const timeout = readNumber(parsedInput, "timeout");
+      const loadState = readString(parsedInput, "loadState");
+      if (selector) return `Wait for ${selector}`;
+      if (url) return `Wait for ${url}`;
+      if (loadState) return `Wait for ${loadState}`;
+      if (timeout !== null) return `Wait ${timeout}ms`;
+      return "Wait";
+    }
+    case "read_console_messages":
+      return "Inspect console";
+    case "read_network_requests":
+      return "Inspect network";
+    case "get_page_text":
+      return "Read page text";
+    case "javascript":
+      return "Run browser script";
+    case "navigate":
+      return `Navigate ${readString(parsedInput, "action") ?? ""}`.trim();
+    case "scroll":
+      return `Scroll ${readString(parsedInput, "direction") ?? "page"}`;
+    case "press_key":
+      return `Press ${readString(parsedInput, "key") ?? "key"}`;
+    case "screenshot":
+      return "Take screenshot";
+    case "annotated_screenshot":
+      return "Take annotated screenshot";
+    case "save_video":
+      return "Save browser video";
+    case "close":
+      return "Close browser";
+    default:
+      return truncateText(action.replaceAll("_", " "), TESTING_TOOL_TEXT_CHAR_LIMIT);
+  }
+};
+
+const shouldShowToolResult = (event: Extract<BrowserRunEvent, { type: "tool-result" }>): boolean =>
+  event.isError ||
+  event.toolName === `${BROWSER_TOOL_PREFIX}save_video` ||
+  event.toolName === `${BROWSER_TOOL_PREFIX}close`;
+
+const formatRunEvent = (event: BrowserRunEvent): TestingLine | null => {
   switch (event.type) {
     case "run-started":
-      return `Starting ${event.planTitle}`;
+      return {
+        text: `Starting ${event.planTitle}`,
+        color: COLORS.PURPLE,
+      };
     case "step-started":
-      return `→ ${event.stepId} ${event.title}`;
+      return {
+        text: `→ ${event.stepId} ${event.title}`,
+        color: COLORS.SELECTION,
+      };
     case "step-completed":
-      return `  ✓ ${event.stepId} ${event.summary}`;
+      return {
+        text: `✓ ${event.stepId} ${truncateText(event.summary, TESTING_TOOL_TEXT_CHAR_LIMIT)}`,
+        color: COLORS.GREEN,
+      };
     case "assertion-failed":
-      return `  ✗ ${event.stepId} ${event.message}`;
+      return {
+        text: `✗ ${event.stepId} ${truncateText(event.message, TESTING_TOOL_TEXT_CHAR_LIMIT)}`,
+        color: COLORS.RED,
+      };
+    case "tool-call": {
+      const toolCallText = formatBrowserToolCall(event.toolName, event.input);
+      if (!toolCallText) return null;
+      return {
+        text: `• ${toolCallText}`,
+        color: COLORS.DIM,
+      };
+    }
+    case "tool-result":
+      if (!shouldShowToolResult(event)) return null;
+      return {
+        text: truncateText(event.result, TESTING_TOOL_TEXT_CHAR_LIMIT),
+        color: event.isError ? COLORS.RED : COLORS.DIM,
+      };
     case "browser-log":
-      return `    browser:${event.action} ${event.message}`;
     case "text":
-      return event.text;
+    case "thinking":
+      return null;
     case "error":
-      return `Error: ${event.message}`;
+      return {
+        text: `Error: ${truncateText(event.message, TESTING_TOOL_TEXT_CHAR_LIMIT)}`,
+        color: COLORS.RED,
+      };
     case "run-completed":
-      return `Run ${event.status}: ${event.summary}`;
+      return {
+        text: `Run ${event.status}: ${truncateText(event.summary, TESTING_TOOL_TEXT_CHAR_LIMIT)}`,
+        color: event.status === "passed" ? COLORS.GREEN : COLORS.RED,
+      };
     default:
       return null;
   }
 };
 
 export const TestingScreen = ({ target, plan, environment, onExit }: TestingScreenProps) => {
-  const [lines, setLines] = useState<string[]>([]);
+  const [lines, setLines] = useState<TestingLine[]>([]);
   const [running, setRunning] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [videoPath, setVideoPath] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const visibleLines = useMemo(
+    () => lines.slice(-TESTING_VISIBLE_LOG_COUNT),
+    [lines],
+  );
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -53,6 +197,13 @@ export const TestingScreen = ({ target, plan, environment, onExit }: TestingScre
           environment,
           signal: abortController.signal,
         })) {
+          if (event.type === "run-completed") {
+            setVideoPath(event.videoPath ?? null);
+            setCurrentStep(null);
+          }
+          if (event.type === "step-started") {
+            setCurrentStep(`${event.stepId} ${event.title}`);
+          }
           const line = formatRunEvent(event);
           if (line) {
             setLines((previous) => [...previous, line]);
@@ -63,7 +214,7 @@ export const TestingScreen = ({ target, plan, environment, onExit }: TestingScre
         }
       } catch (caughtError) {
         if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
-          setLines((previous) => [...previous, "Cancelled."]);
+          setLines((previous) => [...previous, { text: "Cancelled.", color: COLORS.YELLOW }]);
         } else {
           const errorMessage = caughtError instanceof Error ? caughtError.message : "Unknown error";
           setError(errorMessage);
@@ -92,6 +243,7 @@ export const TestingScreen = ({ target, plan, environment, onExit }: TestingScre
       <Text bold color={COLORS.TEXT}>
         Executing browser plan
       </Text>
+      <Text color={COLORS.DIM}>{plan.title}</Text>
       <Text color={COLORS.DIM}>{target.displayName}</Text>
 
       <Box
@@ -105,11 +257,27 @@ export const TestingScreen = ({ target, plan, environment, onExit }: TestingScre
       />
 
       <Box flexDirection="column" marginTop={1}>
-        {lines.map((line, index) => (
-          <Text key={index} color={line.startsWith("  ✓") ? COLORS.GREEN : COLORS.TEXT}>
-            {line}
+        <Text color={currentStep ? COLORS.SELECTION : COLORS.DIM}>
+          {currentStep ? `Current step: ${currentStep}` : "Waiting for first step..."}
+        </Text>
+        <Text color={COLORS.DIM}>
+          Browser actions are summarized below to reduce agent noise.
+        </Text>
+      </Box>
+
+      <Box
+        flexDirection="column"
+        marginTop={1}
+        borderStyle="round"
+        borderColor={COLORS.BORDER}
+        paddingX={1}
+      >
+        {visibleLines.map((line, index) => (
+          <Text key={`${index}-${line.text}`} color={line.color}>
+            {line.text}
           </Text>
         ))}
+        {visibleLines.length === 0 ? <Text color={COLORS.DIM}>No activity yet.</Text> : null}
       </Box>
 
       {running && (
@@ -120,9 +288,12 @@ export const TestingScreen = ({ target, plan, environment, onExit }: TestingScre
 
       {!running && !error && (
         <Box marginTop={1}>
-          <Text color={COLORS.GREEN} bold>
-            Done
-          </Text>
+          <Box flexDirection="column">
+            <Text color={COLORS.GREEN} bold>
+              Done
+            </Text>
+            {videoPath ? <Text color={COLORS.DIM}>Video saved to {videoPath}</Text> : null}
+          </Box>
         </Box>
       )}
 

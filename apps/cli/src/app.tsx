@@ -20,6 +20,7 @@ import { TestingScreen } from "./testing-screen.js";
 import { switchBranch } from "./utils/switch-branch.js";
 import type { Commit } from "./utils/fetch-commits.js";
 import { generateBrowserPlan, type TestAction } from "./utils/browser-agent.js";
+import { saveFlow } from "./utils/save-flow.js";
 
 type Screen =
   | "main"
@@ -109,7 +110,7 @@ export const App = () => {
         setResolvedTarget(target);
         setGeneratedPlan(plan);
         setBrowserEnvironment(environment);
-        setScreen(autoRunAfterPlanning ? "testing" : "review-plan");
+        setScreen(autoRunAfterPlanning && !plan.cookieSync.required ? "testing" : "review-plan");
       })
       .catch((caughtError) => {
         if (isCancelled) return;
@@ -266,11 +267,20 @@ export const App = () => {
     );
   }
 
-  if (screen === "review-plan" && generatedPlan) {
+  if (screen === "review-plan" && generatedPlan && resolvedTarget) {
     return (
       <PlanReviewScreen
         plan={generatedPlan}
+        environment={browserEnvironment ?? {}}
         onChange={setGeneratedPlan}
+        onEnvironmentChange={setBrowserEnvironment}
+        onSave={(plan) =>
+          saveFlow({
+            target: resolvedTarget,
+            plan,
+            environment: browserEnvironment ?? {},
+          })
+        }
         onApprove={(approvedPlan) => {
           setGeneratedPlan(approvedPlan);
           setScreen("testing");

@@ -57,6 +57,11 @@ export interface PlanStep {
   changedFileEvidence?: string[];
 }
 
+export interface BrowserFlowCookieSync {
+  required: boolean;
+  reason: string;
+}
+
 export interface BrowserFlowPlan {
   title: string;
   rationale: string;
@@ -65,6 +70,7 @@ export interface BrowserFlowPlan {
   assumptions: string[];
   riskAreas: string[];
   targetUrls: string[];
+  cookieSync: BrowserFlowCookieSync;
   steps: PlanStep[];
 }
 
@@ -89,6 +95,7 @@ export interface ExecuteBrowserFlowOptions {
   providerSettings?: AgentProviderSettings;
   model?: LanguageModelV3;
   browserMcpServerName?: string;
+  videoOutputPath?: string;
   signal?: AbortSignal;
 }
 
@@ -153,6 +160,7 @@ export interface BrowserRunCompletedEvent extends BrowserRunBaseEvent {
   status: "passed" | "failed";
   summary: string;
   sessionId?: string;
+  videoPath?: string;
 }
 
 export interface BrowserRunErrorEvent extends BrowserRunBaseEvent {

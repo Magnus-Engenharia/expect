@@ -2,21 +2,36 @@ import { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { COLORS } from "./constants.js";
-import type { BrowserFlowPlan } from "@browser-tester/orchestrator";
+import type { BrowserEnvironmentHints, BrowserFlowPlan } from "@browser-tester/orchestrator";
+import type { SaveFlowResult } from "./utils/save-flow.js";
 
 interface PlanReviewScreenProps {
   plan: BrowserFlowPlan;
+  environment: BrowserEnvironmentHints;
   onApprove: (plan: BrowserFlowPlan) => void;
   onChange: (plan: BrowserFlowPlan) => void;
+  onEnvironmentChange: (environment: BrowserEnvironmentHints) => void;
+  onSave: (plan: BrowserFlowPlan) => Promise<SaveFlowResult>;
 }
 
-export const PlanReviewScreen = ({ plan, onApprove, onChange }: PlanReviewScreenProps) => {
+export const PlanReviewScreen = ({
+  plan,
+  environment,
+  onApprove,
+  onChange,
+  onEnvironmentChange,
+  onSave,
+}: PlanReviewScreenProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const selectedStep = useMemo(() => plan.steps[selectedIndex] ?? null, [plan.steps, selectedIndex]);
   const editingStep = editingIndex === null ? null : plan.steps[editingIndex] ?? null;
+  const cookiesEnabled = environment.cookies === true;
 
   useInput((input, key) => {
     if (editingStep) {
@@ -47,6 +62,27 @@ export const PlanReviewScreen = ({ plan, onApprove, onChange }: PlanReviewScreen
       setEditingIndex(selectedIndex);
       setEditingValue(selectedStep.instruction);
     }
+    if (input === "c" && plan.cookieSync.required) {
+      onEnvironmentChange({
+        ...environment,
+        cookies: !cookiesEnabled,
+      });
+    }
+    if (input === "s" && !saving) {
+      setSaveError(null);
+      setSaveMessage(null);
+      setSaving(true);
+      void onSave(plan)
+        .then((result) => {
+          setSaveMessage(`Saved ${result.flowPath} and updated ${result.directoryPath}`);
+        })
+        .catch((caughtError) => {
+          setSaveError(caughtError instanceof Error ? caughtError.message : "Failed to save flow.");
+        })
+        .finally(() => {
+          setSaving(false);
+        });
+    }
     if (input === "a") {
       onApprove(plan);
     }
@@ -74,6 +110,18 @@ export const PlanReviewScreen = ({ plan, onApprove, onChange }: PlanReviewScreen
         <Text color={COLORS.DIM}>Target: {plan.targetSummary}</Text>
       </Box>
 
+      {saveMessage ? (
+        <Box marginTop={1}>
+          <Text color={COLORS.GREEN}>{saveMessage}</Text>
+        </Box>
+      ) : null}
+
+      {saveError ? (
+        <Box marginTop={1}>
+          <Text color={COLORS.RED}>{saveError}</Text>
+        </Box>
+      ) : null}
+
       {plan.assumptions.length > 0 ? (
         <Box flexDirection="column" marginTop={1}>
           <Text color={COLORS.YELLOW}>Assumptions</Text>
@@ -82,6 +130,22 @@ export const PlanReviewScreen = ({ plan, onApprove, onChange }: PlanReviewScreen
               - {assumption}
             </Text>
           ))}
+        </Box>
+      ) : null}
+
+      {plan.cookieSync.required ? (
+        <Box
+          flexDirection="column"
+          marginTop={1}
+          borderStyle="round"
+          borderColor={cookiesEnabled ? COLORS.GREEN : COLORS.YELLOW}
+          paddingX={1}
+        >
+          <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.YELLOW}>Cookie sync required</Text>
+          <Text color={COLORS.DIM}>{plan.cookieSync.reason}</Text>
+          <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.TEXT}>
+            Sync local browser cookies: {cookiesEnabled ? "On" : "Off"}
+          </Text>
         </Box>
       ) : null}
 
@@ -119,9 +183,19 @@ export const PlanReviewScreen = ({ plan, onApprove, onChange }: PlanReviewScreen
         </Box>
       ) : (
         <Box marginTop={1}>
-          <Text color={COLORS.DIM}>↑/↓ navigate · e edit step · a approve and run · Esc back</Text>
+          <Text color={COLORS.DIM}>
+            ↑/↓ navigate · e edit step
+            {plan.cookieSync.required ? " · c toggle cookie sync" : ""}
+            {" · "}s save flow · a approve and run · Esc back
+          </Text>
         </Box>
       )}
+
+      {saving ? (
+        <Box marginTop={1}>
+          <Text color={COLORS.DIM}>Saving flow...</Text>
+        </Box>
+      ) : null}
     </Box>
   );
 };
