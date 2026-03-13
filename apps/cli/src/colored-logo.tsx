@@ -10,11 +10,11 @@ type Result = "pass" | "fail" | "skip";
 type Cell = Result | null | "empty";
 type SlotState = "idle" | "thinking" | "resolved";
 
-const GRID_COLUMNS = 4;
+const GRID_COLUMNS = 8;
 const GRID: Cell[] = [
-  "empty", null,   "fail", "empty",
-  "skip",  "pass", null,   "fail",
-  "empty", "fail", "pass", "empty",
+  "pass", "fail", null,   "empty", "empty", null,   "skip", "skip",
+  "pass", null,   "fail", "pass",  "fail",  "skip", null,   "pass",
+  null,   "pass", "empty","empty", "empty", "empty","fail", "pass",
 ];
 
 const THINK_DURATION_MS: Record<Result, number> = {
@@ -29,11 +29,14 @@ const RESULT_ICON: Record<Result, string> = {
   skip: "–",
 };
 
-const RESULT_COLOR: Record<Result, string> = {
-  pass: COLORS.GREEN,
-  fail: COLORS.RED,
-  skip: COLORS.YELLOW,
+const COLOR_SHADES: Record<Result, string[]> = {
+  pass: ["#2ecc71", "#34d058", "#43e067"],
+  fail: ["#ff3b30", "#e8362c", "#ff5147"],
+  skip: ["#e5c07b", "#d4b06a", "#f0cb86"],
 };
+
+const getColorForIndex = (cell: Result, index: number): string =>
+  COLOR_SHADES[cell][index % COLOR_SHADES[cell].length];
 
 const findNextResultIndex = (from: number): number => {
   for (let index = from; index < GRID.length; index++) {
@@ -107,7 +110,7 @@ export const ColoredLogo = () => {
 
             if (done || index < activeIndex) {
               return (
-                <Text key={index} color={RESULT_COLOR[cell]}>
+                <Text key={index} color={getColorForIndex(cell, index)}>
                   {RESULT_ICON[cell]}
                 </Text>
               );
@@ -115,7 +118,7 @@ export const ColoredLogo = () => {
 
             if (index === activeIndex && slotState === "thinking") {
               return (
-                <Text key={index} color={RESULT_COLOR[cell]}>
+                <Text key={index} color={getColorForIndex(cell, index)}>
                   {THINKING_CHARS[shimmerFrame]}
                 </Text>
               );

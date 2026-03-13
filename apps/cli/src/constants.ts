@@ -1,3 +1,5 @@
+export const VERSION = "0.0.1";
+
 export const SELECTED_INDICATOR = "➤";
 
 export const SEARCH_PLACEHOLDER = "Search ...";
@@ -14,9 +16,9 @@ export const SPINNER_INTERVAL_MS = 80;
 export const COLORS = {
   TEXT: "#cccccc",
   DIM: "#666666",
-  GREEN: "#6abf69",
+  GREEN: "#34d058",
   SELECTION: "#a0aeef",
-  RED: "#f44747",
+  RED: "#ff3b30",
   BORDER: "#555555",
   DIVIDER: "#444444",
   YELLOW: "#e5c07b",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { COLORS } from "./constants.js";
+import { COLORS, VERSION } from "./constants.js";
 import { MenuItem } from "./menu-item.js";
 import { BranchSwitcherScreen } from "./branch-switcher-screen.js";
 import { CommitPickerScreen } from "./commit-picker-screen.js";
@@ -170,9 +170,12 @@ export const App = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={2} paddingY={1}>
-      <ColoredLogo />
-      <Box marginTop={1}>
-        <Text color={COLORS.TEXT}>AI-powered browser testing for your changes</Text>
+      <Text color={COLORS.DIM}>browser-tester v{VERSION}</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor={COLORS.BORDER} paddingX={2} paddingY={1}>
+        <ColoredLogo />
+        <Box marginTop={1}>
+          <Text color={COLORS.TEXT}>AI-powered browser testing for your changes</Text>
+        </Box>
       </Box>
 
       <Box flexDirection="column" marginTop={2} gap={1}>
