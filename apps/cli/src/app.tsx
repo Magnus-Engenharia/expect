@@ -176,7 +176,9 @@ export const App = () => {
   return (
     <Box flexDirection="column" width="100%" paddingX={2} paddingY={1}>
       <ColoredLogo />
-      <Text color={COLORS.DIM}>AI-powered browser testing for your changes</Text>
+      <Box marginTop={1}>
+        <Text color={COLORS.TEXT}>AI-powered browser testing for your changes</Text>
+      </Box>
 
       <Box marginTop={2}>
         <Text color={COLORS.DIM}>
