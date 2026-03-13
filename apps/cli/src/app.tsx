@@ -375,14 +375,16 @@ export const App = () => {
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
       <Text color={COLORS.DIM}>
         {"╭"}
-        {"─".repeat(Math.floor((inner - titleLabel.length - 2) / 2))}
+        {"─".repeat(Math.floor((inner - titleLabel.length - 4) / 2))}
+        {"·"}
         {" "}
         <Text bold color={COLORS.TEXT || undefined}>
           {titleLabel}
         </Text>
         <Text color={COLORS.DIM}>
           {" "}
-          {"─".repeat(Math.ceil((inner - titleLabel.length - 2) / 2))}
+          {"·"}
+          {"─".repeat(Math.ceil((inner - titleLabel.length - 4) / 2))}
         </Text>
         {"╮"}
       </Text>
