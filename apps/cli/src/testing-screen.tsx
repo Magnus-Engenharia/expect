@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { COLORS } from "./constants.js";
 import { Spinner } from "./spinner.js";
-import { mockAgentStream, type TestAction } from "./utils/mock-agent-stream.js";
+import { agentStream, type TestAction } from "./utils/mock-agent-stream.js";
 import type { Commit } from "./utils/fetch-commits.js";
 import type { GitState } from "./utils/get-git-state.js";
 
@@ -31,14 +31,23 @@ export const TestingScreen = ({ action, commit, gitState, onExit }: TestingScree
 
     const run = async () => {
       try {
-        const stream = mockAgentStream({
+        const stream = agentStream({
           action,
           gitState,
           commit,
           signal: abortController.signal,
         });
-        for await (const message of stream) {
-          setLines((previous) => [...previous, message]);
+        let buffer = "";
+        for await (const chunk of stream) {
+          buffer += chunk;
+          const parts = buffer.split("\n");
+          buffer = parts.pop() ?? "";
+          if (parts.length > 0) {
+            setLines((previous) => [...previous, ...parts]);
+          }
+        }
+        if (buffer.length > 0) {
+          setLines((previous) => [...previous, buffer]);
         }
       } catch (caughtError) {
         if (caughtError instanceof DOMException && caughtError.name === "AbortError") {

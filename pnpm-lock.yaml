@@ -26,9 +26,15 @@ importers:
 
   apps/cli:
     dependencies:
+      '@browser-tester/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
+      ai:
+        specifier: ^6.0.116
+        version: 6.0.116(zod@3.24.4)
       ink:
         specifier: ^6.0.0
         version: 6.8.0(@types/react@19.2.14)(react@19.2.4)

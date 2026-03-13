@@ -1,76 +1,43 @@
-import { MOCK_STREAM_MIN_DELAY_MS, MOCK_STREAM_MAX_DELAY_MS } from "../constants.js";
+import { streamText } from "ai";
+import { createClaudeModel } from "@browser-tester/agent";
 import type { Commit } from "./fetch-commits.js";
 import type { GitState } from "./get-git-state.js";
 
 export type TestAction = "test-unstaged" | "test-branch" | "select-commit";
 
-interface MockStreamOptions {
+interface AgentStreamOptions {
   action: TestAction;
   gitState: GitState;
   commit?: Commit;
   signal?: AbortSignal;
 }
 
-const delay = (signal?: AbortSignal): Promise<void> => {
-  const duration =
-    MOCK_STREAM_MIN_DELAY_MS +
-    Math.random() * (MOCK_STREAM_MAX_DELAY_MS - MOCK_STREAM_MIN_DELAY_MS);
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(resolve, duration);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timeoutId);
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
-  });
-};
-
-const buildMessages = (options: MockStreamOptions): string[] => {
+const buildPrompt = (options: AgentStreamOptions): string => {
   const { action, gitState, commit } = options;
 
-  let analyzeMessage: string;
   switch (action) {
     case "test-unstaged":
-      analyzeMessage = `Analyzing unstaged changes (${gitState.diffStats?.filesChanged ?? 0} files)...`;
-      break;
+      return `Test the unstaged changes in this repository. There are ${gitState.diffStats?.filesChanged ?? 0} files changed on branch ${gitState.currentBranch}. Run the browser tests and report results.`;
     case "test-branch":
-      analyzeMessage = `Analyzing branch ${gitState.currentBranch}...`;
-      break;
+      return `Test all changes on branch ${gitState.currentBranch}. Run the browser tests and report results.`;
     case "select-commit":
-      analyzeMessage = commit
-        ? `Analyzing commit ${commit.shortHash} (${commit.subject})...`
-        : "Analyzing selected commit...";
-      break;
+      return commit
+        ? `Test the changes in commit ${commit.shortHash} ("${commit.subject}"). Run the browser tests and report results.`
+        : "Test the selected commit. Run the browser tests and report results.";
   }
-
-  return [
-    analyzeMessage,
-    "Reading repository structure...",
-    "Creating test plan...",
-    "",
-    "Test plan:",
-    "  1. Verify page loads correctly",
-    "  2. Test interactive elements",
-    "  3. Check responsive layout",
-    "",
-    "Running test 1/3: page load...",
-    "  ✓ Test 1/3 passed",
-    "Running test 2/3: interactive elements...",
-    "  ✓ Test 2/3 passed",
-    "Running test 3/3: responsive layout...",
-    "  ✓ Test 3/3 passed",
-    "",
-    "All tests passed (3/3)",
-  ];
 };
 
-export async function* mockAgentStream(options: MockStreamOptions): AsyncGenerator<string> {
-  const messages = buildMessages(options);
-  for (const message of messages) {
-    await delay(options.signal);
-    yield message;
+export const agentStream = async function* (options: AgentStreamOptions): AsyncGenerator<string> {
+  const model = createClaudeModel({ cwd: process.cwd() });
+  const prompt = buildPrompt(options);
+
+  const result = streamText({
+    model,
+    prompt,
+    abortSignal: options.signal,
+  });
+
+  for await (const chunk of result.textStream) {
+    yield chunk;
   }
-}
+};
