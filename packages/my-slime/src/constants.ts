@@ -47,7 +47,6 @@ export const REMOTE_NAME = "millionco/ami";
 export const FETCH_DELAY_MS = 2000;
 
 export const TYPEWRITER_TICK_MS = 8;
-export const DETAIL_TYPEWRITER_TICK_MS = 5;
 export const TYPEWRITER_SHADES = ["#333333", "#666666", "#999999", "#cccccc"] as const;
 
 export const SEARCH_PLACEHOLDER = "Search branches ...";
