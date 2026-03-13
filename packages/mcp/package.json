@@ -1,5 +1,5 @@
 {
-  "name": "@browser-tester/orchestrator",
+  "name": "@browser-tester/mcp",
   "version": "0.0.1",
   "private": true,
   "files": [
@@ -19,25 +19,30 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./start": {
+      "import": {
+        "default": "./dist/start.js"
+      },
+      "require": {
+        "default": "./dist/start.cjs"
+      }
     }
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "oxlint && tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "lint": "oxlint && tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^3.0.8",
-    "@browser-tester/agent": "workspace:*",
-    "@browser-tester/mcp": "workspace:*",
+    "@browser-tester/browser": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "playwright": "^1.52.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.7.0",
-    "vitest": "^4.0.18"
+    "typescript": "^5.7.0"
   }
 }

@@ -2,13 +2,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
 import type { Browser as PlaywrightBrowser, BrowserContext, Page } from "playwright";
-import { createPage } from "./create-page";
-import { snapshot } from "./snapshot";
-import { annotatedScreenshot } from "./annotated-screenshot";
-import { diffSnapshots } from "./diff";
-import { saveVideo } from "./save-video";
-import type { SnapshotResult } from "./types";
-import { waitForNavigationSettle } from "./utils/wait-for-settle";
+import {
+  createPage,
+  snapshot,
+  annotatedScreenshot,
+  diffSnapshots,
+  saveVideo,
+  waitForNavigationSettle,
+} from "@browser-tester/browser";
+import type { SnapshotResult } from "@browser-tester/browser";
 
 interface ConsoleEntry {
   type: string;

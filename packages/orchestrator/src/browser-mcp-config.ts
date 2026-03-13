@@ -6,8 +6,8 @@ import type { AgentProviderSettings } from "@browser-tester/agent";
 const require = createRequire(join(process.cwd(), "package.json"));
 
 export const getBrowserMcpEntrypoint = (): string => {
-  const browserPackageEntrypoint = require.resolve("@browser-tester/browser");
-  return join(dirname(browserPackageEntrypoint), "mcp-server.js");
+  const mcpPackageEntrypoint = require.resolve("@browser-tester/mcp");
+  return join(dirname(mcpPackageEntrypoint), "start.js");
 };
 
 export const buildBrowserMcpSettings = (
