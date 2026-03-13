@@ -5,6 +5,9 @@ export { snapshot } from "./snapshot";
 export {
   CookieJar,
   detectBrowserProfiles,
+  extractAllProfileCookies,
+  extractCookies,
+  extractProfileCookies,
   toCookieHeader,
 } from "@browser-tester/cookies";
 export type {
@@ -12,13 +15,14 @@ export type {
   BrowserInfo,
   BrowserProfile,
   Cookie,
+  ExtractOptions,
+  ExtractProfileOptions,
   ExtractResult,
 } from "@browser-tester/cookies";
 export type {
   AriaRole,
   CreatePageOptions,
   CreatePageResult,
-  InjectCookiesOptions,
   RefEntry,
   RefMap,
   SnapshotOptions,

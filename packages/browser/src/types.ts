@@ -1,4 +1,4 @@
-import type { Browser, BrowserProfile, Cookie } from "@browser-tester/cookies";
+import type { Cookie } from "@browser-tester/cookies";
 import type { Browser as PlaywrightBrowser, BrowserContext, Locator, Page } from "playwright";
 
 export type AriaRole = Parameters<Page["getByRole"]>[0];
@@ -31,21 +31,10 @@ export interface ParsedAriaLine {
   name: string;
 }
 
-export interface InjectCookiesOptions {
-  url?: string;
-  browsers?: Browser[];
-  names?: string[];
-  includeExpired?: boolean;
-  timeoutMs?: number;
-  profile?: BrowserProfile;
-  port?: number;
-  cookies?: Cookie[];
-}
-
 export interface CreatePageOptions {
   headed?: boolean;
   executablePath?: string;
-  cookies?: boolean | InjectCookiesOptions;
+  cookies?: boolean | Cookie[];
   waitUntil?: "load" | "domcontentloaded" | "networkidle" | "commit";
 }
 

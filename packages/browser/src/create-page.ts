@@ -1,3 +1,4 @@
+import { extractCookies } from "@browser-tester/cookies";
 import { chromium } from "playwright";
 import { HEADLESS_CHROMIUM_ARGS } from "./constants";
 import { injectCookies } from "./inject-cookies";
@@ -17,9 +18,10 @@ export const createPage = async (
     const context = await browser.newContext();
 
     if (options.cookies) {
-      const cookieOptions =
-        options.cookies === true ? { url } : { url, ...options.cookies };
-      await injectCookies(context, cookieOptions);
+      const cookies = Array.isArray(options.cookies)
+        ? options.cookies
+        : (await extractCookies({ url })).cookies;
+      await injectCookies(context, cookies);
     }
 
     const page = await context.newPage();
