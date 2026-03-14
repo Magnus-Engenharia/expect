@@ -12,6 +12,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
   const approvePlan = useAppStore((state) => state.approvePlan);
   const generatedPlan = useAppStore((state) => state.generatedPlan);
   const savedFlowSummaries = useAppStore((state) => state.savedFlowSummaries);
+  const mainMenuOnAction = useAppStore((state) => state.mainMenuOnAction);
 
   switch (screen) {
     case "main": {
@@ -31,6 +32,14 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
         });
       }
       hints.push({ key: "↑↓", label: "nav" });
+      if (mainMenuOnAction) {
+        hints.push({
+          key: "enter",
+          label: "submit",
+          color: COLORS.PRIMARY,
+          cta: true,
+        });
+      }
       return hints;
     }
     case "switch-branch":
@@ -111,13 +120,12 @@ export const Modeline = () => {
   const keybinds = segments.filter((segment) => !segment.cta);
   const actions = segments.filter((segment) => segment.cta);
 
-  const branchLabel = ` ${gitState.currentBranch} `;
   const keybindText = getHintText(keybinds);
   const actionPills = actions
     .map((action) => ` ${action.key} ${action.label} `)
     .join("   ");
   const actionWidth = actions.length > 0 ? stringWidth(actionPills) : 0;
-  const rightWidth = stringWidth(branchLabel) + stringWidth(keybindText);
+  const rightWidth = stringWidth(keybindText);
   const gap = Math.max(0, columns - actionWidth - rightWidth - 2);
 
   return (
@@ -134,7 +142,9 @@ export const Modeline = () => {
               </Text>
             ) : (
               <Text>
-                <Text color={theme.primary} bold>{action.key}</Text>
+                <Text color={theme.primary} bold>
+                  {action.key}
+                </Text>
                 <Text color={theme.textMuted}> {action.label}</Text>
               </Text>
             )}
@@ -148,7 +158,6 @@ export const Modeline = () => {
             mutedColor={theme.textMuted}
           />
         ) : null}
-        <Text color={theme.textMuted}>{branchLabel}</Text>
       </Box>
     </Box>
   );

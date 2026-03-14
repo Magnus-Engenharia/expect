@@ -12,7 +12,10 @@ import {
   type TestAction,
 } from "./utils/browser-agent.js";
 import { getGitState, type GitState } from "./utils/get-git-state.js";
-import { listSavedFlows, type SavedFlowSummary } from "./utils/list-saved-flows.js";
+import {
+  listSavedFlows,
+  type SavedFlowSummary,
+} from "./utils/list-saved-flows.js";
 import type { LoadedSavedFlow } from "./utils/load-saved-flow.js";
 import type { EnvironmentOverrides } from "./utils/test-run-config.js";
 
@@ -43,7 +46,9 @@ interface AppStore {
   planOrigin: "generated" | "saved" | null;
   savedFlowSummaries: SavedFlowSummary[];
   pendingSavedFlow: LoadedSavedFlow | null;
+  mainMenuOnAction: boolean;
 
+  setMainMenuOnAction: (value: boolean) => void;
   loadGitState: () => void;
   loadSavedFlows: () => Promise<void>;
   goBack: () => void;
@@ -100,7 +105,9 @@ export const useAppStore = create<AppStore>((set) => ({
   planOrigin: null,
   savedFlowSummaries: [],
   pendingSavedFlow: null,
+  mainMenuOnAction: true,
 
+  setMainMenuOnAction: (value) => set({ mainMenuOnAction: value }),
   loadGitState: () => set({ gitState: getGitState() }),
 
   loadSavedFlows: async () => {
@@ -111,7 +118,10 @@ export const useAppStore = create<AppStore>((set) => ({
   goBack: () =>
     set((state) => {
       if (state.screen === "review-plan") {
-        return { screen: state.planOrigin === "saved" ? "saved-flow-picker" : "flow-input" };
+        return {
+          screen:
+            state.planOrigin === "saved" ? "saved-flow-picker" : "flow-input",
+        };
       }
       if (state.screen === "planning") {
         return { screen: "flow-input" };
@@ -137,7 +147,8 @@ export const useAppStore = create<AppStore>((set) => ({
       return {};
     }),
 
-  navigateTo: (screen) => set((state) => ({ screen, previousScreen: state.screen })),
+  navigateTo: (screen) =>
+    set((state) => ({ screen, previousScreen: state.screen })),
 
   selectAction: (action) =>
     set({
@@ -155,7 +166,10 @@ export const useAppStore = create<AppStore>((set) => ({
           testAction: "select-commit",
           selectedCommit: commit,
           generatedPlan: state.pendingSavedFlow.plan,
-          resolvedTarget: resolveBrowserTarget({ action: "select-commit", commit }),
+          resolvedTarget: resolveBrowserTarget({
+            action: "select-commit",
+            commit,
+          }),
           browserEnvironment: {
             ...getBrowserEnvironment(state.environmentOverrides),
             ...state.pendingSavedFlow.environment,
@@ -221,7 +235,8 @@ export const useAppStore = create<AppStore>((set) => ({
       screen: "planning",
     }),
 
-  toggleAutoRun: () => set((state) => ({ autoRunAfterPlanning: !state.autoRunAfterPlanning })),
+  toggleAutoRun: () =>
+    set((state) => ({ autoRunAfterPlanning: !state.autoRunAfterPlanning })),
 
   completePlanning: (result) =>
     set((state) => ({
@@ -229,7 +244,9 @@ export const useAppStore = create<AppStore>((set) => ({
       generatedPlan: result.plan,
       browserEnvironment: result.environment,
       screen:
-        state.autoRunAfterPlanning && !result.plan.cookieSync.required ? "testing" : "review-plan",
+        state.autoRunAfterPlanning && !result.plan.cookieSync.required
+          ? "testing"
+          : "review-plan",
     })),
 
   failPlanning: (error) => set({ planningError: error }),
