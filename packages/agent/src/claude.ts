@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { Struct } from "effect";
 import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
@@ -133,21 +134,10 @@ export const createClaudeModel = (settings: AgentProviderSettings = {}): Languag
   },
 });
 
-const INHERITED_ENV_VARS_TO_STRIP = ["CLAUDECODE"];
+const INHERITED_ENV_VARS_TO_STRIP = ["CLAUDECODE"] as const;
 
-const buildSubprocessEnv = (settingsEnv?: Record<string, string>): Record<string, string> => {
-  const base: Record<string, string> = settingsEnv
-    ? { ...settingsEnv }
-    : Object.fromEntries(
-        Object.entries(process.env).filter(
-          (entry): entry is [string, string] => entry[1] !== undefined,
-        ),
-      );
-  for (const key of INHERITED_ENV_VARS_TO_STRIP) {
-    delete base[key];
-  }
-  return base;
-};
+const buildSubprocessEnv = (settingsEnv?: Record<string, string>): Record<string, string> =>
+  Struct.omit(settingsEnv ?? (process.env as Record<string, string>), ...INHERITED_ENV_VARS_TO_STRIP);
 
 const buildQueryOptions = (
   settings: AgentProviderSettings,
