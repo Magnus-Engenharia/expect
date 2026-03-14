@@ -16,9 +16,9 @@ export const ScreenHeading = ({ title, subtitle }: ScreenHeadingProps) => {
   const rightContent = subtitle ? `${subtitle} ` : "";
   const leftWidth = stringWidth(leftContent);
   const rightWidth = stringWidth(rightContent);
-  const gapWidth = Math.max(0, columns - leftWidth - rightWidth);
-
-  const emptyRow = " ".repeat(columns);
+  const availableWidth = columns - 2;
+  const gapWidth = Math.max(0, availableWidth - leftWidth - rightWidth);
+  const emptyRow = " ".repeat(availableWidth);
 
   return (
     <Box flexDirection="column">

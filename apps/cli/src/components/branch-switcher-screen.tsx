@@ -144,7 +144,7 @@ export const BranchSwitcherScreen = () => {
   const isCurrentTabLoading = activeTab === "remote" && isLoadingRemote;
 
   return (
-    <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
+    <Box flexDirection="column" width="100%" paddingX={1} paddingTop={2} paddingBottom={1}>
       <ScreenHeading title="Switch branch" />
       <Box>
         <Clickable
