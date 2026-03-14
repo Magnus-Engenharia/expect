@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useStdoutDimensions } from "../hooks/use-stdout-dimensions.js";
 import figures from "figures";
-import TextInput from "ink-text-input";
+import { TextInput } from "./ui/text-input.js";
 import {
   BRANCH_NAME_COLUMN_WIDTH,
   BRANCH_AUTHOR_COLUMN_WIDTH,
@@ -231,7 +231,13 @@ export const BranchSwitcherScreen = () => {
               const remoteBranch = typeof item === "string" ? null : item;
 
               return (
-                <Clickable key={branchName} onClick={() => { setHighlightedIndex(actualIndex); storeSwitchBranch(branchName); }}>
+                <Clickable
+                  key={branchName}
+                  onClick={() => {
+                    setHighlightedIndex(actualIndex);
+                    storeSwitchBranch(branchName);
+                  }}
+                >
                   <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
                     {isSelected ? `${figures.pointer} ` : "  "}
                   </Text>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "./ui/text-input.js";
 import { useColors } from "./theme-context.js";
 import { stripMouseSequences } from "../hooks/mouse-context.js";
 import type { TestAction } from "../utils/browser-agent.js";
@@ -22,7 +22,7 @@ export const FlowInputScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useInput((_input, key) => {
-    if (!key.return) return;
+    if (!key.return || key.shift) return;
     if (!value.trim()) {
       setErrorMessage("Describe the user flow you want the browser agent to test.");
       return;
@@ -40,17 +40,11 @@ export const FlowInputScreen = () => {
         subtitle={ACTION_LABELS[testAction]}
       />
 
-      <Box marginTop={1} flexDirection="column">
-        <Text color={COLORS.TEXT}>
-          Example: Go through onboarding at /onboarding, click Import Projects, and verify the
-          imported project list appears.
-        </Text>
-      </Box>
-
-      <Box marginTop={2} borderStyle="round" borderColor={COLORS.BORDER} paddingX={2}>
+      <Box marginTop={1} borderStyle="round" borderColor={COLORS.BORDER} paddingX={2}>
         <TextInput
           focus
-          placeholder="Describe the flow ..."
+          multiline
+          placeholder="Go through onboarding at /onboarding, click Import Projects, and verify the imported project list appears."
           value={value}
           onChange={(nextValue) => {
             setValue(stripMouseSequences(nextValue));

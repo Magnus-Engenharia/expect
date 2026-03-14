@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useStdoutDimensions } from "../hooks/use-stdout-dimensions.js";
 import figures from "figures";
-import TextInput from "ink-text-input";
+import { TextInput } from "./ui/text-input.js";
 import { execSync } from "child_process";
 import { GIT_TIMEOUT_MS, type CommitSummary } from "@browser-tester/supervisor";
 import {
