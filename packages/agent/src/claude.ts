@@ -133,6 +133,22 @@ export const createClaudeModel = (settings: AgentProviderSettings = {}): Languag
   },
 });
 
+const INHERITED_ENV_VARS_TO_STRIP = ["CLAUDECODE"];
+
+const buildSubprocessEnv = (settingsEnv?: Record<string, string>): Record<string, string> => {
+  const base: Record<string, string> = settingsEnv
+    ? { ...settingsEnv }
+    : Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      );
+  for (const key of INHERITED_ENV_VARS_TO_STRIP) {
+    delete base[key];
+  }
+  return base;
+};
+
 const buildQueryOptions = (
   settings: AgentProviderSettings,
   abortController: AbortController,
@@ -149,10 +165,10 @@ const buildQueryOptions = (
       settings.permissionMode === "bypassPermissions" ? true : undefined,
     permissionMode: settings.permissionMode ?? "bypassPermissions",
     abortController,
+    env: buildSubprocessEnv(settings.env),
     ...(settings.effort && supportsEffort ? { effort: settings.effort } : {}),
     ...(systemPrompt ? { appendSystemPrompt: systemPrompt } : {}),
     ...(settings.sessionId ? { resume: settings.sessionId } : {}),
-    ...(settings.env ? { env: settings.env } : {}),
     ...(settings.mcpServers ? { mcpServers: settings.mcpServers } : {}),
     ...(explicitExecutablePath ? { pathToClaudeCodeExecutable: explicitExecutablePath } : {}),
     ...(settings.tools !== undefined ? { tools: settings.tools } : {}),
