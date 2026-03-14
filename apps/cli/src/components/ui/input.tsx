@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Text, useInput } from "ink";
 import chalk from "chalk";
 
-interface TextInputProps {
+interface InputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onSubmit?: (value: string) => void;
@@ -55,7 +55,7 @@ const resolveOffsetFromLineColumn = (lines: string[], lineIndex: number, column:
   return offset + Math.min(column, lines[lineIndex]!.length);
 };
 
-export const TextInput = ({
+export const Input = ({
   value: originalValue,
   placeholder = "",
   focus = true,
@@ -65,7 +65,7 @@ export const TextInput = ({
   multiline = false,
   onChange,
   onSubmit,
-}: TextInputProps) => {
+}: InputProps) => {
   const [state, setState] = useState({
     cursorOffset: (originalValue || "").length,
     cursorWidth: 0,

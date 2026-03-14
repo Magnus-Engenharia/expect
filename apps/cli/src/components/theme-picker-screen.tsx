@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import figures from "figures";
 import { THEMES, type ThemeDefinition } from "../themes.js";
 import { useColors, useThemeContext } from "./theme-context.js";
 import { Clickable } from "./ui/clickable.js";
+import { ListItem } from "./ui/list-item.js";
 import { THEME_PICKER_VISIBLE_COUNT } from "../constants.js";
 import { saveThemeName } from "../utils/load-theme.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
@@ -111,16 +111,17 @@ export const ThemePickerScreen = () => {
           if (!theme) return null;
           const isSelected = actualIndex === selectedIndex;
           return (
-            <Clickable key={name} onClick={() => setSelectedIndex(actualIndex)}>
-              <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
-                {isSelected ? `${figures.pointer} ` : "  "}
-              </Text>
+            <ListItem
+              key={name}
+              isSelected={isSelected}
+              onClick={() => setSelectedIndex(actualIndex)}
+            >
               <ThemeSwatch theme={theme} />
               <Text> </Text>
               <Text color={isSelected ? undefined : COLORS.DIM} bold={isSelected}>
                 {theme.name}
               </Text>
-            </Clickable>
+            </ListItem>
           );
         })}
       </Box>

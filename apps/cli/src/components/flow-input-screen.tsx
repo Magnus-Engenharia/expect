@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { TextInput } from "./ui/text-input.js";
+import { Input } from "./ui/input.js";
 import { useColors } from "./theme-context.js";
 import { stripMouseSequences } from "../hooks/mouse-context.js";
 import type { TestAction } from "../utils/browser-agent.js";
@@ -41,7 +41,7 @@ export const FlowInputScreen = () => {
       />
 
       <Box marginTop={1} borderStyle="round" borderColor={COLORS.BORDER} paddingX={2}>
-        <TextInput
+        <Input
           focus
           multiline
           placeholder="Go through onboarding at /onboarding, click Import Projects, and verify the imported project list appears."

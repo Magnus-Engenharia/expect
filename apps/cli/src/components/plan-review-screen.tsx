@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import figures from "figures";
-import { TextInput } from "./ui/text-input.js";
+import { Input } from "./ui/input.js";
 import { useColors } from "./theme-context.js";
 import { stripMouseSequences } from "../hooks/mouse-context.js";
 import { Clickable } from "./ui/clickable.js";
@@ -314,7 +314,7 @@ export const PlanReviewScreen = () => {
           </Text>
           <Box marginTop={0}>
             <Text color={COLORS.DIM}>/</Text>
-            <TextInput
+            <Input
               focus
               value={editingValue}
               onChange={(nextValue) => setEditingValue(stripMouseSequences(nextValue))}
