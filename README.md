@@ -3,7 +3,7 @@
 ben:
 
 - plan review UX
-- surface states from Claude Code
+- surface tool calls from Claude Code during plan creation
 - images/videos screenshots in CLI
 - create final output report UI
 
@@ -14,6 +14,9 @@ nisarg:
 
 rasmus:
 
+- editing plan doesn't work
+- prompts / nothing is saved 
+  - when user goes through the flow of writing tasks to try out, nothing is saved, not the prompt, not the tests results, nothing.
 - test out alternatives to get intuition (agent-browser)
 - make packages/cookies and packages/browser robust
   - error states are surfaced up correctly instead of randomly swallowed
@@ -22,6 +25,7 @@ rasmus:
     - browser benchmarking (latency, memory, cpu, etc.)
   - investigate cookies and prevent keychain prompt spamming
   - your discretion: migrate the package code to someting more elegant (Effect)
+- Browser video zooming / show cursor (UX / UI kinda low prio)
 
 aiden:
 
