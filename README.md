@@ -14,6 +14,7 @@ nisarg:
 
 rasmus:
 
+- doesn't work using `CLAUDECODE=1`
 - editing plan doesn't work
 - prompts / nothing is saved 
   - when user goes through the flow of writing tasks to try out, nothing is saved, not the prompt, not the tests results, nothing.
