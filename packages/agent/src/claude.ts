@@ -134,11 +134,6 @@ export const createClaudeModel = (settings: AgentProviderSettings = {}): Languag
   },
 });
 
-const INHERITED_ENV_VARS_TO_STRIP = ["CLAUDECODE"] as const;
-
-const buildSubprocessEnv = (settingsEnv?: Record<string, string>): Record<string, string> =>
-  Struct.omit(settingsEnv ?? (process.env as Record<string, string>), ...INHERITED_ENV_VARS_TO_STRIP);
-
 const buildQueryOptions = (
   settings: AgentProviderSettings,
   abortController: AbortController,
@@ -147,6 +142,8 @@ const buildQueryOptions = (
   const resolvedModel = settings.model ?? "claude-opus-4-6";
   const supportsEffort = !resolvedModel.toLowerCase().includes("sonnet");
   const explicitExecutablePath = resolveClaudeExecutablePath();
+  // HACK: strip env vars that cause coding agents to crash when invoked from within another coding agent
+  const env = Struct.omit(settings.env ?? (process.env as Record<string, string>), "CLAUDECODE");
   const queryOptions = {
     model: resolvedModel,
     maxTurns: settings.maxTurns ?? DEFAULT_CLAUDE_MAX_TURNS,
@@ -155,7 +152,7 @@ const buildQueryOptions = (
       settings.permissionMode === "bypassPermissions" ? true : undefined,
     permissionMode: settings.permissionMode ?? "bypassPermissions",
     abortController,
-    env: buildSubprocessEnv(settings.env),
+    env,
     ...(settings.effort && supportsEffort ? { effort: settings.effort } : {}),
     ...(systemPrompt ? { appendSystemPrompt: systemPrompt } : {}),
     ...(settings.sessionId ? { resume: settings.sessionId } : {}),
