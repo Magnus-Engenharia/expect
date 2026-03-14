@@ -16,7 +16,7 @@ export interface GitState {
   branchDiffStats: DiffStats | null;
 }
 
-export type TestScope = "unstaged-changes" | "select-commit" | "entire-branch" | "select-branch";
+export type TestScope = "unstaged-changes" | "entire-branch" | "default";
 
 export const getGitState = (): GitState => {
   const cwd = process.cwd();
@@ -44,9 +44,7 @@ export const getGitState = (): GitState => {
 };
 
 export const getRecommendedScope = (gitState: GitState): TestScope => {
-  if (gitState.isOnMain) {
-    return gitState.hasUnstagedChanges ? "unstaged-changes" : "select-commit";
-  }
   if (gitState.hasUnstagedChanges) return "unstaged-changes";
-  return gitState.hasBranchCommits ? "entire-branch" : "select-branch";
+  if (!gitState.isOnMain && gitState.hasBranchCommits) return "entire-branch";
+  return "default";
 };

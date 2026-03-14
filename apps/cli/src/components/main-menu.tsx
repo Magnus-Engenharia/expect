@@ -15,7 +15,7 @@ import {
 } from "../constants.js";
 import { useAppStore } from "../store.js";
 
-type MenuAction = "test-unstaged" | "test-branch" | "select-commit" | "select-branch";
+type MenuAction = "test-unstaged" | "test-branch" | "select-commit";
 
 interface ScopeMenuOption {
   label: string;
@@ -25,41 +25,28 @@ interface ScopeMenuOption {
 }
 
 const buildMenuOptions = (scope: TestScope, gitState: GitState): ScopeMenuOption[] => {
-  switch (scope) {
-    case "unstaged-changes": {
-      const options: ScopeMenuOption[] = [
-        {
-          label: "Test unstaged changes",
-          detail: "",
-          action: "test-unstaged",
-          diffStats: gitState.diffStats,
-        },
-      ];
-      if (gitState.isOnMain) {
-        options.push({ label: "Select a commit to test", detail: "", action: "select-commit" });
-      } else if (gitState.hasBranchCommits) {
-        options.push({
-          label: "Test entire branch",
-          detail: `(${gitState.currentBranch})`,
-          action: "test-branch",
-        });
-      }
-      return options;
-    }
-    case "select-commit":
-      return [{ label: "Select a commit to test", detail: "", action: "select-commit" }];
-    case "select-branch":
-      return [{ label: "Select a branch to test", detail: "", action: "select-branch" }];
-    case "entire-branch":
-      return [
-        {
-          label: "Test entire branch",
-          detail: `(${gitState.currentBranch})`,
-          action: "test-branch",
-        },
-        { label: "Select a commit to test", detail: "", action: "select-commit" },
-      ];
+  const options: ScopeMenuOption[] = [];
+
+  if (scope === "unstaged-changes") {
+    options.push({
+      label: "Test unstaged changes",
+      detail: "",
+      action: "test-unstaged",
+      diffStats: gitState.diffStats,
+    });
   }
+
+  if (scope === "entire-branch" || (scope === "unstaged-changes" && !gitState.isOnMain && gitState.hasBranchCommits)) {
+    options.push({
+      label: "Test entire branch",
+      detail: `(${gitState.currentBranch})`,
+      action: "test-branch",
+    });
+  }
+
+  options.push({ label: "Select a commit to test", detail: "", action: "select-commit" });
+
+  return options;
 };
 
 export const MainMenu = () => {
@@ -78,18 +65,13 @@ export const MainMenu = () => {
   const recommendedScope = getRecommendedScope(gitState);
   const menuOptions = buildMenuOptions(recommendedScope, gitState);
   const selectedOption = menuOptions[selectedIndex] ?? null;
-  const canReuseSavedFlow =
-    savedFlowSummaries.length > 0 &&
-    Boolean(selectedOption) &&
-    selectedOption.action !== "select-branch";
+  const canReuseSavedFlow = savedFlowSummaries.length > 0 && Boolean(selectedOption);
 
   const activateOption = useCallback(
     (option: ScopeMenuOption) => {
       if (option.action === "select-commit") {
         navigateTo("select-commit");
-      } else if (option.action === "select-branch") {
-        navigateTo("switch-branch");
-      } else if (option.action === "test-unstaged" || option.action === "test-branch") {
+      } else {
         selectAction(option.action);
       }
     },
