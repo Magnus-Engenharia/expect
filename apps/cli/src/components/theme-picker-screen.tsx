@@ -7,6 +7,7 @@ import { THEME_PICKER_VISIBLE_COUNT } from "../constants.js";
 import { saveThemeName } from "../utils/load-theme.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
 import { useAppStore } from "../store.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 
 type VariantFilter = "light" | "dark";
 
@@ -78,13 +79,10 @@ export const ThemePickerScreen = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Select theme
-      </Text>
-      <Text color={COLORS.DIM}>
-        {filteredThemeNames.length} themes <Text color={COLORS.TEXT}>[{filterLabel}]</Text> (
-        <Text color={COLORS.TEXT}>{"\u21E5"} tab</Text> to filter)
-      </Text>
+      <ScreenHeading
+        title="Select theme"
+        subtitle={`${filteredThemeNames.length} themes · ${filterLabel}`}
+      />
 
       <Box
         marginTop={1}

@@ -17,6 +17,7 @@ import { truncateText } from "../utils/truncate-text.js";
 import { visualPadEnd } from "../utils/visual-pad-end.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
 import { useAppStore } from "../store.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 
 type PrFilter = "all" | "open" | "draft" | "merged" | "no-pr";
 
@@ -137,24 +138,10 @@ export const BranchSwitcherScreen = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Switch branch
-      </Text>
-      <Text color={COLORS.DIM}>
-        <Text color={activeTab === "local" ? COLORS.TEXT : COLORS.DIM} bold={activeTab === "local"}>
-          local
-        </Text>
-        <Text color={COLORS.DIM}> · </Text>
-        <Text
-          color={activeTab === "remote" ? COLORS.TEXT : COLORS.DIM}
-          bold={activeTab === "remote"}
-        >
-          remote
-        </Text>
-        <Text color={COLORS.DIM}>
-          {"  "}({currentList.length}){searchQuery ? ` matching "${searchQuery}"` : ""}
-        </Text>
-      </Text>
+      <ScreenHeading
+        title="Switch branch"
+        subtitle={`${activeTab} · ${currentList.length} branches${searchQuery ? ` matching "${searchQuery}"` : ""}`}
+      />
 
       {activeTab === "remote" && (
         <Box marginTop={1}>

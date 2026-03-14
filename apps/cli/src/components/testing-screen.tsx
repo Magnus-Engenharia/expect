@@ -6,6 +6,7 @@ import { TESTING_TOOL_TEXT_CHAR_LIMIT, TESTING_VISIBLE_LOG_COUNT } from "../cons
 import { useColors, type Colors } from "./theme-context.js";
 import { Spinner } from "./ui/spinner.js";
 import { useAppStore } from "../store.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 import { truncateText } from "../utils/truncate-text.js";
 import {
   formatBrowserToolCall,
@@ -151,22 +152,8 @@ export const TestingScreen = () => {
   if (!target || !plan || !environment) return null;
 
   return (
-    <Box flexDirection="column" width="100%" paddingX={2} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Executing browser plan
-      </Text>
-      <Text color={COLORS.DIM}>{plan.title}</Text>
-      <Text color={COLORS.DIM}>{target.displayName}</Text>
-
-      <Box
-        marginTop={1}
-        borderStyle="single"
-        borderTop
-        borderBottom={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={COLORS.DIVIDER}
-      />
+    <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
+      <ScreenHeading title="Executing browser plan" subtitle={`${plan.title} · ${target.displayName}`} />
 
       <Box flexDirection="column" marginTop={1}>
         <Text color={currentStep ? COLORS.SELECTION : COLORS.DIM}>

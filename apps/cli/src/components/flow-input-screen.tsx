@@ -4,6 +4,7 @@ import TextInput from "ink-text-input";
 import { useColors } from "./theme-context.js";
 import type { TestAction } from "../utils/browser-agent.js";
 import { useAppStore } from "../store.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 
 const ACTION_LABELS: Record<TestAction, string> = {
   "test-unstaged": "unstaged changes",
@@ -32,21 +33,8 @@ export const FlowInputScreen = () => {
   if (!testAction) return null;
 
   return (
-    <Box flexDirection="column" width="100%" paddingX={2} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Describe the browser flow to test
-      </Text>
-      <Text color={COLORS.DIM}>Target: {ACTION_LABELS[testAction]}</Text>
-
-      <Box
-        marginTop={1}
-        borderStyle="single"
-        borderTop
-        borderBottom={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={COLORS.DIVIDER}
-      />
+    <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
+      <ScreenHeading title="Describe the browser flow to test" subtitle={ACTION_LABELS[testAction]} />
 
       <Box marginTop={1} flexDirection="column">
         <Text color={COLORS.TEXT}>

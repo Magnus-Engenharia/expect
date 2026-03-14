@@ -4,6 +4,7 @@ import { SAVED_FLOW_PICKER_VISIBLE_COUNT } from "../constants.js";
 import { useColors } from "./theme-context.js";
 import { useAppStore } from "../store.js";
 import { loadSavedFlow } from "../utils/load-saved-flow.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 
 const ACTION_LABELS = {
   "test-unstaged": "unstaged changes",
@@ -67,21 +68,8 @@ export const SavedFlowPickerScreen = () => {
   if (!testAction) return null;
 
   return (
-    <Box flexDirection="column" width="100%" paddingX={2} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Reuse saved flow
-      </Text>
-      <Text color={COLORS.DIM}>Target: {ACTION_LABELS[testAction]}</Text>
-
-      <Box
-        marginTop={1}
-        borderStyle="single"
-        borderTop
-        borderBottom={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={COLORS.DIVIDER}
-      />
+    <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
+      <ScreenHeading title="Reuse saved flow" subtitle={ACTION_LABELS[testAction]} />
 
       <Box
         flexDirection="column"

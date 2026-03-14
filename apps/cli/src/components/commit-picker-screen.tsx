@@ -18,6 +18,7 @@ import { truncateText } from "../utils/truncate-text.js";
 import { visualPadEnd } from "../utils/visual-pad-end.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
 import { useAppStore } from "../store.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 
 interface CommitWithMeta extends CommitSummary {
   author: string;
@@ -112,14 +113,10 @@ export const CommitPickerScreen = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        {pendingSavedFlow ? "Select a commit for the saved flow" : "Recent commits"}
-      </Text>
-      <Text color={COLORS.DIM}>
-        {filteredCommits.length} commits
-        {searchQuery ? ` matching "${searchQuery}"` : ""}
-      </Text>
-      {pendingSavedFlow ? <Text color={COLORS.DIM}>{pendingSavedFlow.title}</Text> : null}
+      <ScreenHeading
+        title={pendingSavedFlow ? "Select a commit for the saved flow" : "Recent commits"}
+        subtitle={`${filteredCommits.length} commits${searchQuery ? ` matching "${searchQuery}"` : ""}${pendingSavedFlow ? ` · ${pendingSavedFlow.title}` : ""}`}
+      />
 
       <Box marginTop={1} flexDirection="column">
         <Text color={COLORS.DIM}>

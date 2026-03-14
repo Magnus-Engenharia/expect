@@ -15,7 +15,7 @@ export interface ThemeDefinition {
   borderSubtle: string;
 }
 
-export const DEFAULT_DARK_THEME_NAME = "modus-vivendi-tinted";
+export const DEFAULT_DARK_THEME_NAME = "monokai-dark";
 
 export const THEMES: Record<string, ThemeDefinition> = {
   "doric-almond": {
@@ -1473,5 +1473,37 @@ export const THEMES: Record<string, ThemeDefinition> = {
     border: "#d0d0c0",
     borderActive: "#5f7f8f",
     borderSubtle: "#e0e0d0",
+  },
+  "nano-dark": {
+    name: "N Λ N O Dark",
+    variant: "dark",
+    primary: "#D08770",
+    secondary: "#81A1C1",
+    accent: "#81A1C1",
+    error: "#BF616A",
+    warning: "#EBCB8B",
+    success: "#A3BE8C",
+    info: "#88C0D0",
+    text: "#ECEFF4",
+    textMuted: "#677691",
+    border: "#434C5E",
+    borderActive: "#81A1C1",
+    borderSubtle: "#3B4252",
+  },
+  "nano-light": {
+    name: "N Λ N O Light",
+    variant: "light",
+    primary: "#FF6F00",
+    secondary: "#673AB7",
+    accent: "#673AB7",
+    error: "#FF6F00",
+    warning: "#FF6F00",
+    success: "#009688",
+    info: "#673AB7",
+    text: "#000000",
+    textMuted: "#B0BEC5",
+    border: "#ECEFF1",
+    borderActive: "#673AB7",
+    borderSubtle: "#FAFAFA",
   },
 };

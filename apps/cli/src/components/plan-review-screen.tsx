@@ -7,6 +7,7 @@ import { saveFlow } from "../utils/save-flow.js";
 import { useAppStore } from "../store.js";
 import { truncateText } from "../utils/truncate-text.js";
 import { useStdoutDimensions } from "../hooks/use-stdout-dimensions.js";
+import { ScreenHeading } from "./ui/screen-heading.js";
 import {
   COMMIT_SELECTOR_WIDTH,
   STEP_ID_COLUMN_WIDTH,
@@ -179,20 +180,17 @@ export const PlanReviewScreen = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <Text bold color={COLORS.TEXT}>
-        Review browser plan
-      </Text>
-      <Text color={COLORS.DIM}>{plan.title}</Text>
+      <ScreenHeading title="Review browser plan" subtitle={plan.title} />
 
       <Box flexDirection="column" marginTop={1}>
         {sectionLabel("details", "Details")}
         {!collapsed["details"] ? (
           <Box flexDirection="column" marginLeft={4}>
             <Text color={COLORS.DIM}>
-              <Text color={COLORS.TEXT}>rationale</Text>  {plan.rationale}
+              {"rationale  "}<Text color={COLORS.TEXT}>{plan.rationale}</Text>
             </Text>
             <Text color={COLORS.DIM}>
-              <Text color={COLORS.TEXT}>target</Text>     {plan.targetSummary}
+              {"target     "}<Text color={COLORS.TEXT}>{plan.targetSummary}</Text>
             </Text>
           </Box>
         ) : null}
@@ -204,7 +202,7 @@ export const PlanReviewScreen = () => {
           {!collapsed["assumptions"]
             ? plan.assumptions.map((assumption) => (
                 <Text key={assumption} color={COLORS.DIM}>
-                  {"    "}- {assumption}
+                  {"    "}<Text color={COLORS.TEXT}>{assumption}</Text>
                 </Text>
               ))
             : null}
@@ -216,10 +214,13 @@ export const PlanReviewScreen = () => {
           {sectionLabel("cookies", "Cookie sync")}
           {!collapsed["cookies"] ? (
             <Box flexDirection="column" marginLeft={4}>
-              <Text color={COLORS.DIM}>{plan.cookieSync.reason}</Text>
-              <Text>
-                <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.DIM} bold={cookiesEnabled}>
-                  sync local cookies: {cookiesEnabled ? "on" : "off"}
+              <Text color={COLORS.DIM}>
+                {"reason  "}<Text color={COLORS.TEXT}>{plan.cookieSync.reason}</Text>
+              </Text>
+              <Text color={COLORS.DIM}>
+                {"sync    "}
+                <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.TEXT} bold={cookiesEnabled}>
+                  {cookiesEnabled ? "on" : "off"}
                 </Text>
                 <Text color={COLORS.DIM}> (c to toggle)</Text>
               </Text>
@@ -270,15 +271,13 @@ export const PlanReviewScreen = () => {
                   </Text>
                   {selected ? (
                     <>
-                      <Text>
+                      <Text color={COLORS.DIM}>
                         {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
-                        <Text color={COLORS.TEXT}>instruction</Text>
-                        <Text color={COLORS.DIM}>  {step.instruction}</Text>
+                        {"instruction  "}<Text color={COLORS.TEXT}>{step.instruction}</Text>
                       </Text>
-                      <Text>
+                      <Text color={COLORS.DIM}>
                         {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
-                        <Text color={COLORS.TEXT}>expected</Text>
-                        <Text color={COLORS.DIM}>     {step.expectedOutcome}</Text>
+                        {"expected     "}<Text color={COLORS.TEXT}>{step.expectedOutcome}</Text>
                       </Text>
                     </>
                   ) : null}
