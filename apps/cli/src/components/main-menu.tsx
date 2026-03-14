@@ -96,11 +96,12 @@ export const MainMenu = () => {
     [navigateTo, selectAction]
   );
 
+  const totalItems = menuOptions.length + 1;
+  const autoRunIndex = menuOptions.length;
+
   useInput((input, key) => {
     if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
-      setSelectedIndex((previous) =>
-        Math.min(menuOptions.length - 1, previous + 1)
-      );
+      setSelectedIndex((previous) => Math.min(totalItems - 1, previous + 1));
     }
     if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIndex((previous) => Math.max(0, previous - 1));
@@ -127,8 +128,12 @@ export const MainMenu = () => {
       }
     }
 
-    if (key.return && menuOptions.length > 0) {
-      activateOption(menuOptions[selectedIndex]);
+    if (key.return) {
+      if (selectedIndex === autoRunIndex) {
+        toggleAutoRun();
+      } else if (menuOptions.length > 0) {
+        activateOption(menuOptions[selectedIndex]);
+      }
     }
   });
 
@@ -227,19 +232,27 @@ export const MainMenu = () => {
           Options
         </Text>
         <Clickable onClick={toggleAutoRun}>
-          <Text
-            color={autoRunAfterPlanning ? COLORS.TEXT : COLORS.DIM}
-            bold={autoRunAfterPlanning}
-          >
-            {"  "}auto-run after planning (
-            <Text color={COLORS.TEXT}>⇥ tab</Text>):{" "}
-            <Text
-              color={autoRunAfterPlanning ? COLORS.GREEN : COLORS.DIM}
-              bold={autoRunAfterPlanning}
-            >
-              {autoRunAfterPlanning ? "yes" : "no"}
+          {selectedIndex === autoRunIndex ? (
+            <Text>
+              <Text color={COLORS.ORANGE}>{figures.pointer} </Text>
+              <Text backgroundColor={COLORS.ORANGE} color="#000000" bold>
+                {" "}
+                auto-run after planning: {autoRunAfterPlanning
+                  ? "yes"
+                  : "no"}{" "}
+              </Text>
             </Text>
-          </Text>
+          ) : (
+            <Text color={autoRunAfterPlanning ? COLORS.TEXT : COLORS.DIM}>
+              {"  "}auto-run after planning:{" "}
+              <Text
+                color={autoRunAfterPlanning ? COLORS.GREEN : COLORS.DIM}
+                bold={autoRunAfterPlanning}
+              >
+                {autoRunAfterPlanning ? "yes" : "no"}
+              </Text>
+            </Text>
+          )}
         </Clickable>
       </Box>
     </Box>

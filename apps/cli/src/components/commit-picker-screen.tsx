@@ -30,7 +30,9 @@ interface CommitWithMeta extends CommitSummary {
 
 const FIELD_SEPARATOR = "---FIELD---";
 
-const fetchCommitsWithMeta = (limit: number = COMMIT_LIMIT): CommitWithMeta[] => {
+const fetchCommitsWithMeta = (
+  limit: number = COMMIT_LIMIT
+): CommitWithMeta[] => {
   try {
     const format = ["%H", "%h", "%s", "%an", "%cr"].join(FIELD_SEPARATOR);
     const output = execSync(`git log --format="${format}" -n ${limit}`, {
@@ -44,7 +46,8 @@ const fetchCommitsWithMeta = (limit: number = COMMIT_LIMIT): CommitWithMeta[] =>
       .split("\n")
       .filter(Boolean)
       .map((line) => {
-        const [hash, shortHash, subject, author, relativeDate] = line.split(FIELD_SEPARATOR);
+        const [hash, shortHash, subject, author, relativeDate] =
+          line.split(FIELD_SEPARATOR);
         return { hash, shortHash, subject, author, relativeDate };
       });
   } catch {
@@ -68,15 +71,19 @@ export const CommitPickerScreen = () => {
       (commit) =>
         commit.subject.toLowerCase().includes(lowercaseQuery) ||
         commit.shortHash.toLowerCase().includes(lowercaseQuery) ||
-        commit.author.toLowerCase().includes(lowercaseQuery),
+        commit.author.toLowerCase().includes(lowercaseQuery)
     );
   })();
 
-  const { highlightedIndex, setHighlightedIndex, scrollOffset, handleNavigation } =
-    useScrollableList({
-      itemCount: filteredCommits.length,
-      visibleCount: VISIBLE_COMMIT_COUNT,
-    });
+  const {
+    highlightedIndex,
+    setHighlightedIndex,
+    scrollOffset,
+    handleNavigation,
+  } = useScrollableList({
+    itemCount: filteredCommits.length,
+    visibleCount: VISIBLE_COMMIT_COUNT,
+  });
 
   const subjectColumnWidth =
     columns -
@@ -86,14 +93,17 @@ export const CommitPickerScreen = () => {
     COMMIT_DATE_COLUMN_WIDTH -
     TABLE_COLUMN_GAP;
 
-  const visibleCommits = filteredCommits.slice(scrollOffset, scrollOffset + VISIBLE_COMMIT_COUNT);
+  const visibleCommits = filteredCommits.slice(
+    scrollOffset,
+    scrollOffset + VISIBLE_COMMIT_COUNT
+  );
 
   const handleSearchChange = useCallback(
     (value: string) => {
       setSearchQuery(stripMouseSequences(value));
       setHighlightedIndex(0);
     },
-    [setHighlightedIndex],
+    [setHighlightedIndex]
   );
 
   useInput((input, key) => {
@@ -117,8 +127,14 @@ export const CommitPickerScreen = () => {
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
       <ScreenHeading
-        title={pendingSavedFlow ? "Select a commit for the saved flow" : "Recent commits"}
-        subtitle={`${filteredCommits.length} commits${searchQuery ? ` matching "${searchQuery}"` : ""}${pendingSavedFlow ? ` · ${pendingSavedFlow.title}` : ""}`}
+        title={
+          pendingSavedFlow
+            ? "Select a commit for the saved flow"
+            : "Select a commit to test"
+        }
+        subtitle={`${filteredCommits.length} commits${
+          searchQuery ? ` matching "${searchQuery}"` : ""
+        }${pendingSavedFlow ? ` · ${pendingSavedFlow.title}` : ""}`}
       />
 
       <Box marginTop={1} flexDirection="column">
@@ -131,15 +147,20 @@ export const CommitPickerScreen = () => {
         </Text>
       </Box>
 
-      <Box flexDirection="column" height={VISIBLE_COMMIT_COUNT} overflow="hidden">
+      <Box
+        flexDirection="column"
+        height={VISIBLE_COMMIT_COUNT}
+        overflow="hidden"
+      >
         {visibleCommits.map((commit, index) => {
           const actualIndex = index + scrollOffset;
           const isSelected = actualIndex === highlightedIndex;
           const truncatedSubject = truncateText(
             commit.subject,
-            subjectColumnWidth - (isSelected ? 4 : 1),
+            subjectColumnWidth - (isSelected ? 4 : 1)
           );
-          const subjectGap = subjectColumnWidth - truncatedSubject.length - (isSelected ? 2 : 0);
+          const subjectGap =
+            subjectColumnWidth - truncatedSubject.length - (isSelected ? 2 : 0);
           return (
             <Clickable key={commit.hash} onClick={() => selectCommit(commit)}>
               <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
@@ -151,7 +172,8 @@ export const CommitPickerScreen = () => {
               {isSelected ? (
                 <>
                   <Text backgroundColor={COLORS.ORANGE} color="#000000" bold>
-                    {" "}{truncatedSubject}{" "}
+                    {" "}
+                    {truncatedSubject}{" "}
                   </Text>
                   <Text>{"".padEnd(Math.max(0, subjectGap))}</Text>
                 </>
@@ -163,7 +185,7 @@ export const CommitPickerScreen = () => {
               <Text color={COLORS.CYAN}>
                 {visualPadEnd(
                   truncateText(commit.author, COMMIT_AUTHOR_COLUMN_WIDTH - 1),
-                  COMMIT_AUTHOR_COLUMN_WIDTH,
+                  COMMIT_AUTHOR_COLUMN_WIDTH
                 )}
               </Text>
               <Text color={COLORS.DIM}>
@@ -172,10 +194,16 @@ export const CommitPickerScreen = () => {
             </Clickable>
           );
         })}
-        {filteredCommits.length === 0 && <Text color={COLORS.DIM}>No matching commits</Text>}
+        {filteredCommits.length === 0 && (
+          <Text color={COLORS.DIM}>No matching commits</Text>
+        )}
       </Box>
 
-      <SearchBar isSearching={isSearching} query={searchQuery} onChange={handleSearchChange} />
+      <SearchBar
+        isSearching={isSearching}
+        query={searchQuery}
+        onChange={handleSearchChange}
+      />
     </Box>
   );
 };
