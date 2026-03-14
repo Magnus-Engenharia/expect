@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import figures from "figures";
 import { THEMES, type ThemeDefinition } from "../themes.js";
 import { useColors, useThemeContext } from "./theme-context.js";
+import { Clickable } from "./ui/clickable.js";
 import { THEME_PICKER_VISIBLE_COUNT } from "../constants.js";
 import { saveThemeName } from "../utils/load-theme.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
@@ -38,6 +39,7 @@ export const ThemePickerScreen = () => {
 
   const {
     highlightedIndex: selectedIndex,
+    setHighlightedIndex: setSelectedIndex,
     scrollOffset,
     handleNavigation,
   } = useScrollableList({
@@ -84,6 +86,18 @@ export const ThemePickerScreen = () => {
         title="Select theme"
         subtitle={`${filteredThemeNames.length} themes · ${filterLabel}`}
       />
+      <Box>
+        <Clickable
+          fullWidth={false}
+          onClick={() => setVariantFilter((previous) => (previous === "light" ? "dark" : "light"))}
+        >
+          <Text color={COLORS.TEXT}>[{filterLabel}]</Text>
+        </Clickable>
+        <Text color={COLORS.DIM}>
+          {" "}
+          (<Text color={COLORS.TEXT}>{"\u21E5"} tab</Text> to filter)
+        </Text>
+      </Box>
 
       <Box
         marginTop={1}
@@ -97,7 +111,7 @@ export const ThemePickerScreen = () => {
           if (!theme) return null;
           const isSelected = actualIndex === selectedIndex;
           return (
-            <Text key={name}>
+            <Clickable key={name} onClick={() => setSelectedIndex(actualIndex)}>
               <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
                 {isSelected ? `${figures.pointer} ` : "  "}
               </Text>
@@ -106,7 +120,7 @@ export const ThemePickerScreen = () => {
               <Text color={isSelected ? undefined : COLORS.DIM} bold={isSelected}>
                 {theme.name}
               </Text>
-            </Text>
+            </Clickable>
           );
         })}
       </Box>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useColors } from "./theme-context.js";
+import { stripMouseSequences } from "../hooks/mouse-context.js";
 import type { TestAction } from "../utils/browser-agent.js";
 import { useAppStore } from "../store.js";
 import { ScreenHeading } from "./ui/screen-heading.js";
@@ -52,7 +53,7 @@ export const FlowInputScreen = () => {
           placeholder="Describe the flow ..."
           value={value}
           onChange={(nextValue) => {
-            setValue(nextValue);
+            setValue(stripMouseSequences(nextValue));
             if (errorMessage) setErrorMessage(null);
           }}
         />

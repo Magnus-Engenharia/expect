@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { MouseProvider } from "../hooks/mouse-context.js";
 import { useColors } from "./theme-context.js";
 import { BranchSwitcherScreen } from "./branch-switcher-screen.js";
 import { CommitPickerScreen } from "./commit-picker-screen.js";
@@ -12,7 +13,7 @@ import { TestingScreen } from "./testing-screen.js";
 import { ThemePickerScreen } from "./theme-picker-screen.js";
 import { MainMenu } from "./main-menu.js";
 import { Modeline } from "./modeline.js";
-import { SourceInspector } from "../../ink-grab/index.js";
+import { InkGrab } from "../../ink-grab/index.js";
 import { generateBrowserPlan } from "../utils/browser-agent.js";
 import { useAppStore } from "../store.js";
 
@@ -129,13 +130,15 @@ export const App = () => {
   };
 
   return (
-    <SourceInspector>
-      <Box flexDirection="column" width="100%">
-        <Box flexGrow={1}>{renderScreen()}</Box>
-        <Box paddingX={1}>
-          <Modeline />
+    <InkGrab>
+      <MouseProvider>
+        <Box flexDirection="column" width="100%">
+          <Box flexGrow={1}>{renderScreen()}</Box>
+          <Box paddingX={1}>
+            <Modeline />
+          </Box>
         </Box>
-      </Box>
-    </SourceInspector>
+      </MouseProvider>
+    </InkGrab>
   );
 };

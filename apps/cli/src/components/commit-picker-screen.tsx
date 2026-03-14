@@ -11,9 +11,12 @@ import {
   COMMIT_DATE_COLUMN_WIDTH,
   COMMIT_LIMIT,
   COMMIT_SELECTOR_WIDTH,
+  TABLE_COLUMN_GAP,
   VISIBLE_COMMIT_COUNT,
 } from "../constants.js";
 import { useColors } from "./theme-context.js";
+import { stripMouseSequences } from "../hooks/mouse-context.js";
+import { Clickable } from "./ui/clickable.js";
 import { truncateText } from "../utils/truncate-text.js";
 import { visualPadEnd } from "../utils/visual-pad-end.js";
 import { useScrollableList } from "../hooks/use-scrollable-list.js";
@@ -60,12 +63,12 @@ export const CommitPickerScreen = () => {
 
   const filteredCommits = (() => {
     if (!searchQuery) return commits;
-    const lower = searchQuery.toLowerCase();
+    const lowercaseQuery = searchQuery.toLowerCase();
     return commits.filter(
       (commit) =>
-        commit.subject.toLowerCase().includes(lower) ||
-        commit.shortHash.toLowerCase().includes(lower) ||
-        commit.author.toLowerCase().includes(lower),
+        commit.subject.toLowerCase().includes(lowercaseQuery) ||
+        commit.shortHash.toLowerCase().includes(lowercaseQuery) ||
+        commit.author.toLowerCase().includes(lowercaseQuery),
     );
   })();
 
@@ -81,13 +84,13 @@ export const CommitPickerScreen = () => {
     COMMIT_HASH_COLUMN_WIDTH -
     COMMIT_AUTHOR_COLUMN_WIDTH -
     COMMIT_DATE_COLUMN_WIDTH -
-    2;
+    TABLE_COLUMN_GAP;
 
   const visibleCommits = filteredCommits.slice(scrollOffset, scrollOffset + VISIBLE_COMMIT_COUNT);
 
   const handleSearchChange = useCallback(
     (value: string) => {
-      setSearchQuery(value);
+      setSearchQuery(stripMouseSequences(value));
       setHighlightedIndex(0);
     },
     [setHighlightedIndex],
@@ -133,7 +136,7 @@ export const CommitPickerScreen = () => {
           const actualIndex = index + scrollOffset;
           const isSelected = actualIndex === highlightedIndex;
           return (
-            <Text key={commit.hash}>
+            <Clickable key={commit.hash} onClick={() => selectCommit(commit)}>
               <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
                 {isSelected ? `${figures.pointer} ` : "  "}
               </Text>
@@ -155,7 +158,7 @@ export const CommitPickerScreen = () => {
               <Text color={COLORS.DIM}>
                 {truncateText(commit.relativeDate, COMMIT_DATE_COLUMN_WIDTH)}
               </Text>
-            </Text>
+            </Clickable>
           );
         })}
         {filteredCommits.length === 0 && <Text color={COLORS.DIM}>No matching commits</Text>}

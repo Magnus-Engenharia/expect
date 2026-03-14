@@ -3,89 +3,182 @@ import { useStdoutDimensions } from "../hooks/use-stdout-dimensions.js";
 import stringWidth from "string-width";
 import { useThemeContext } from "./theme-context.js";
 import { STATUSBAR_BRANCH_PADDING, STATUSBAR_TRAILING_PADDING } from "../constants.js";
+import { Clickable } from "./ui/clickable.js";
 import { useAppStore, type Screen } from "../store.js";
 
-interface KeyHint {
+interface HintSegment {
   key: string;
   label: string;
+  onClick?: () => void;
 }
 
-const SCREEN_HINTS: Record<Screen, KeyHint[]> = {
-  main: [
-    { key: "t", label: "theme" },
-    { key: "b", label: "branch" },
-    { key: "↑↓", label: "nav" },
-  ],
-  "switch-branch": [
-    { key: "↑↓", label: "nav" },
-    { key: "tab", label: "local/remote" },
-    { key: "/", label: "search" },
-    { key: "enter", label: "select" },
-    { key: "esc", label: "back" },
-  ],
-  "select-commit": [
-    { key: "↑↓", label: "nav" },
-    { key: "enter", label: "select" },
-    { key: "/", label: "search" },
-    { key: "esc", label: "back" },
-  ],
-  "saved-flow-picker": [
-    { key: "↑↓", label: "nav" },
-    { key: "enter", label: "select" },
-    { key: "esc", label: "back" },
-  ],
-  "flow-input": [
-    { key: "enter", label: "submit" },
-    { key: "esc", label: "back" },
-  ],
-  planning: [{ key: "esc", label: "cancel" }],
-  "review-plan": [
-    { key: "↑↓", label: "nav" },
-    { key: "tab", label: "fold" },
-    { key: "e", label: "edit" },
-    { key: "s", label: "save" },
-    { key: "a", label: "approve" },
-    { key: "esc", label: "back" },
-  ],
-  testing: [],
-  theme: [
-    { key: "↑↓", label: "nav" },
-    { key: "tab", label: "light/dark" },
-    { key: "enter", label: "select" },
-    { key: "esc", label: "cancel" },
-  ],
+const HINT_SEPARATOR = "   ";
+
+interface HintBarProps {
+  segments: HintSegment[];
+  backgroundColor: string;
+  color: string;
+  mutedColor: string;
+}
+
+const HintContent = ({
+  segment,
+  backgroundColor,
+  color,
+  mutedColor,
+}: {
+  segment: HintSegment;
+  backgroundColor: string;
+  color: string;
+  mutedColor: string;
+}) => (
+  <>
+    <Text backgroundColor={backgroundColor} color={color} bold>
+      {segment.key}
+    </Text>
+    <Text backgroundColor={backgroundColor} color={mutedColor}>
+      {" "}
+      {segment.label}
+    </Text>
+  </>
+);
+
+const HintBar = ({ segments, backgroundColor, color, mutedColor }: HintBarProps) => (
+  <Box>
+    <Text backgroundColor={backgroundColor} color={color}>
+      {" "}
+    </Text>
+    {segments.map((segment, index) => (
+      <Box key={segment.key + segment.label}>
+        {segment.onClick ? (
+          <Clickable fullWidth={false} onClick={segment.onClick}>
+            <HintContent
+              segment={segment}
+              backgroundColor={backgroundColor}
+              color={color}
+              mutedColor={mutedColor}
+            />
+          </Clickable>
+        ) : (
+          <HintContent
+            segment={segment}
+            backgroundColor={backgroundColor}
+            color={color}
+            mutedColor={mutedColor}
+          />
+        )}
+        {index < segments.length - 1 && (
+          <Text backgroundColor={backgroundColor} color={mutedColor}>
+            {HINT_SEPARATOR}
+          </Text>
+        )}
+      </Box>
+    ))}
+  </Box>
+);
+
+const useHintSegments = (screen: Screen): HintSegment[] => {
+  const navigateTo = useAppStore((state) => state.navigateTo);
+  const goBack = useAppStore((state) => state.goBack);
+  const approvePlan = useAppStore((state) => state.approvePlan);
+  const generatedPlan = useAppStore((state) => state.generatedPlan);
+  const savedFlowSummaries = useAppStore((state) => state.savedFlowSummaries);
+
+  switch (screen) {
+    case "main": {
+      const hints: HintSegment[] = [
+        { key: "t", label: "theme", onClick: () => navigateTo("theme") },
+        { key: "b", label: "branch", onClick: () => navigateTo("switch-branch") },
+      ];
+      if (savedFlowSummaries.length > 0) {
+        hints.push({
+          key: "r",
+          label: "reuse flow",
+          onClick: () => navigateTo("saved-flow-picker"),
+        });
+      }
+      hints.push({ key: "↑↓", label: "nav" });
+      return hints;
+    }
+    case "switch-branch":
+      return [
+        { key: "↑↓", label: "nav" },
+        { key: "tab", label: "local/remote" },
+        { key: "/", label: "search" },
+        { key: "enter", label: "select" },
+        { key: "esc", label: "back", onClick: goBack },
+      ];
+    case "select-commit":
+      return [
+        { key: "↑↓", label: "nav" },
+        { key: "enter", label: "select" },
+        { key: "/", label: "search" },
+        { key: "esc", label: "back", onClick: goBack },
+      ];
+    case "saved-flow-picker":
+      return [
+        { key: "↑↓", label: "nav" },
+        { key: "enter", label: "select" },
+        { key: "esc", label: "back", onClick: goBack },
+      ];
+    case "flow-input":
+      return [
+        { key: "enter", label: "submit" },
+        { key: "esc", label: "back", onClick: goBack },
+      ];
+    case "planning":
+      return [{ key: "esc", label: "cancel", onClick: goBack }];
+    case "review-plan":
+      return [
+        { key: "↑↓", label: "nav" },
+        { key: "tab", label: "fold" },
+        { key: "e", label: "edit" },
+        { key: "s", label: "save" },
+        {
+          key: "a",
+          label: "approve",
+          onClick: () => {
+            if (generatedPlan) approvePlan(generatedPlan);
+          },
+        },
+        { key: "esc", label: "back", onClick: goBack },
+      ];
+    case "testing":
+      return [];
+    case "theme":
+      return [
+        { key: "↑↓", label: "nav" },
+        { key: "tab", label: "light/dark" },
+        { key: "enter", label: "select" },
+        { key: "esc", label: "cancel", onClick: goBack },
+      ];
+    default:
+      return [];
+  }
 };
 
-const MAIN_HINTS_WITH_REUSE: KeyHint[] = [
-  { key: "t", label: "theme" },
-  { key: "b", label: "branch" },
-  { key: "r", label: "reuse flow" },
-  { key: "↑↓", label: "nav" },
-];
-
-const hintsToString = (hints: KeyHint[]): string =>
-  hints.map((hint) => `${hint.key} ${hint.label}`).join("   ");
+const getHintText = (segments: HintSegment[]): string =>
+  segments.length > 0
+    ? ` ${segments.map((segment) => `${segment.key} ${segment.label}`).join(HINT_SEPARATOR)}`
+    : "";
 
 export const Modeline = () => {
   const [columns] = useStdoutDimensions();
   const { theme } = useThemeContext();
   const gitState = useAppStore((state) => state.gitState);
   const screen = useAppStore((state) => state.screen);
-  const savedFlowSummaries = useAppStore((state) => state.savedFlowSummaries);
+  const segments = useHintSegments(screen);
 
   if (!gitState) return null;
 
-  const hints =
-    screen === "main" && savedFlowSummaries.length > 0
-      ? MAIN_HINTS_WITH_REUSE
-      : (SCREEN_HINTS[screen] ?? []);
+  const remaining =
+    columns -
+    STATUSBAR_BRANCH_PADDING -
+    stringWidth(gitState.currentBranch) -
+    STATUSBAR_TRAILING_PADDING;
 
-  const hintsString = hintsToString(hints);
-  const usedWidth =
-    STATUSBAR_BRANCH_PADDING +
-    stringWidth(gitState.currentBranch) +
-    (hints.length > 0 ? 1 + stringWidth(hintsString) : 0);
-  const trailingPad = Math.max(0, columns - usedWidth - STATUSBAR_TRAILING_PADDING);
+  const hintText = getHintText(segments);
+  const padding = remaining - stringWidth(hintText);
 
   return (
     <Box>
@@ -93,18 +186,16 @@ export const Modeline = () => {
         {" "}
         {gitState.currentBranch}{" "}
       </Text>
-      <Text backgroundColor={theme.border}>
-        {hints.length > 0 ? " " : ""}
-        {hints.map((hint, index) => (
-          <Text key={hint.key + hint.label}>
-            {index > 0 ? "   " : ""}
-            <Text color={theme.text} bold>
-              {hint.key}
-            </Text>
-            <Text color={theme.textMuted}> {hint.label}</Text>
-          </Text>
-        ))}
-        {" ".repeat(trailingPad)}
+      {segments.length > 0 ? (
+        <HintBar
+          segments={segments}
+          backgroundColor={theme.border}
+          color={theme.text}
+          mutedColor={theme.textMuted}
+        />
+      ) : null}
+      <Text backgroundColor={theme.border} color={theme.text}>
+        {" ".repeat(Math.max(0, padding))}
       </Text>
     </Box>
   );

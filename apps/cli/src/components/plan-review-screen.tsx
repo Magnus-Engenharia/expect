@@ -3,6 +3,8 @@ import { Box, Text, useInput } from "ink";
 import figures from "figures";
 import TextInput from "ink-text-input";
 import { useColors } from "./theme-context.js";
+import { stripMouseSequences } from "../hooks/mouse-context.js";
+import { Clickable } from "./ui/clickable.js";
 import { saveFlow } from "../utils/save-flow.js";
 import { useAppStore } from "../store.js";
 import { truncateText } from "../utils/truncate-text.js";
@@ -216,13 +218,19 @@ export const PlanReviewScreen = () => {
                 {"reason  "}
                 <Text color={COLORS.TEXT}>{plan.cookieSync.reason}</Text>
               </Text>
-              <Text color={COLORS.DIM}>
-                {"sync    "}
-                <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.TEXT} bold={cookiesEnabled}>
-                  {cookiesEnabled ? "on" : "off"}
+              <Clickable
+                onClick={() =>
+                  updateEnvironment({ ...(environment ?? {}), cookies: !cookiesEnabled })
+                }
+              >
+                <Text color={COLORS.DIM}>
+                  {"sync    "}
+                  <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.TEXT} bold={cookiesEnabled}>
+                    {cookiesEnabled ? "on" : "off"}
+                  </Text>
+                  <Text color={COLORS.DIM}> (c to toggle)</Text>
                 </Text>
-                <Text color={COLORS.DIM}> (c to toggle)</Text>
-              </Text>
+              </Clickable>
             </Box>
           ) : null}
         </Box>
@@ -253,36 +261,46 @@ export const PlanReviewScreen = () => {
             {plan.steps.map((step, index) => {
               const selected = isItemSelected({ kind: "step", stepIndex: index });
               return (
-                <Box key={step.id} flexDirection="column" marginTop={0}>
-                  <Text>
-                    <Text color={selected ? COLORS.ORANGE : COLORS.DIM}>
-                      {selected ? "  ❯ " : "    "}
-                    </Text>
-                    <Text color={COLORS.PURPLE} bold={selected}>
-                      {step.id.padEnd(STEP_ID_COLUMN_WIDTH)}
-                    </Text>
-                    <Text color={selected ? COLORS.TEXT : COLORS.DIM} bold={selected}>
-                      {truncateText(step.title, titleColumnWidth - 1).padEnd(titleColumnWidth)}
-                    </Text>
-                    <Text color={COLORS.CYAN}>
-                      {truncateText(step.routeHint || "—", STEP_ROUTE_COLUMN_WIDTH)}
-                    </Text>
-                  </Text>
-                  {selected ? (
-                    <>
-                      <Text color={COLORS.DIM}>
-                        {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
-                        {"instruction  "}
-                        <Text color={COLORS.TEXT}>{step.instruction}</Text>
+                <Clickable
+                  key={step.id}
+                  onClick={() => {
+                    const itemIndex = items.findIndex(
+                      (item) => item.kind === "step" && item.stepIndex === index,
+                    );
+                    if (itemIndex >= 0) setSelectedIndex(itemIndex);
+                  }}
+                >
+                  <Box flexDirection="column" marginTop={0}>
+                    <Text>
+                      <Text color={selected ? COLORS.ORANGE : COLORS.DIM}>
+                        {selected ? "  ❯ " : "    "}
                       </Text>
-                      <Text color={COLORS.DIM}>
-                        {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
-                        {"expected     "}
-                        <Text color={COLORS.TEXT}>{step.expectedOutcome}</Text>
+                      <Text color={COLORS.PURPLE} bold={selected}>
+                        {step.id.padEnd(STEP_ID_COLUMN_WIDTH)}
                       </Text>
-                    </>
-                  ) : null}
-                </Box>
+                      <Text color={selected ? COLORS.TEXT : COLORS.DIM} bold={selected}>
+                        {truncateText(step.title, titleColumnWidth - 1).padEnd(titleColumnWidth)}
+                      </Text>
+                      <Text color={COLORS.CYAN}>
+                        {truncateText(step.routeHint || "—", STEP_ROUTE_COLUMN_WIDTH)}
+                      </Text>
+                    </Text>
+                    {selected ? (
+                      <>
+                        <Text color={COLORS.DIM}>
+                          {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
+                          {"instruction  "}
+                          <Text color={COLORS.TEXT}>{step.instruction}</Text>
+                        </Text>
+                        <Text color={COLORS.DIM}>
+                          {"".padEnd(COMMIT_SELECTOR_WIDTH + STEP_ID_COLUMN_WIDTH + 2)}
+                          {"expected     "}
+                          <Text color={COLORS.TEXT}>{step.expectedOutcome}</Text>
+                        </Text>
+                      </>
+                    ) : null}
+                  </Box>
+                </Clickable>
               );
             })}
           </>
@@ -296,7 +314,11 @@ export const PlanReviewScreen = () => {
           </Text>
           <Box marginTop={0}>
             <Text color={COLORS.DIM}>/</Text>
-            <TextInput focus value={editingValue} onChange={setEditingValue} />
+            <TextInput
+              focus
+              value={editingValue}
+              onChange={(nextValue) => setEditingValue(stripMouseSequences(nextValue))}
+            />
           </Box>
         </Box>
       ) : null}

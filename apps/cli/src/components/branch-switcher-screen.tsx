@@ -8,8 +8,11 @@ import {
   BRANCH_AUTHOR_COLUMN_WIDTH,
   BRANCH_VISIBLE_COUNT,
   COMMIT_SELECTOR_WIDTH,
+  TABLE_COLUMN_GAP,
 } from "../constants.js";
 import { useColors } from "./theme-context.js";
+import { stripMouseSequences } from "../hooks/mouse-context.js";
+import { Clickable } from "./ui/clickable.js";
 import { getLocalBranches } from "@browser-tester/supervisor";
 import { fetchRemoteBranches, type RemoteBranch } from "../utils/fetch-remote-branches.js";
 import { Spinner } from "./ui/spinner.js";
@@ -50,8 +53,8 @@ export const BranchSwitcherScreen = () => {
 
   const filteredLocalBranches = (() => {
     if (!searchQuery) return localBranches;
-    const lower = searchQuery.toLowerCase();
-    return localBranches.filter((branch) => branch.toLowerCase().includes(lower));
+    const lowercaseQuery = searchQuery.toLowerCase();
+    return localBranches.filter((branch) => branch.toLowerCase().includes(lowercaseQuery));
   })();
 
   const filteredRemoteBranches = (() => {
@@ -61,8 +64,8 @@ export const BranchSwitcherScreen = () => {
       return branch.prStatus === activeFilter;
     });
     if (searchQuery) {
-      const lower = searchQuery.toLowerCase();
-      result = result.filter((branch) => branch.name.toLowerCase().includes(lower));
+      const lowercaseQuery = searchQuery.toLowerCase();
+      result = result.filter((branch) => branch.name.toLowerCase().includes(lowercaseQuery));
     }
     return result;
   })();
@@ -76,13 +79,17 @@ export const BranchSwitcherScreen = () => {
     });
 
   const prColumnWidth =
-    columns - COMMIT_SELECTOR_WIDTH - BRANCH_NAME_COLUMN_WIDTH - BRANCH_AUTHOR_COLUMN_WIDTH - 2;
+    columns -
+    COMMIT_SELECTOR_WIDTH -
+    BRANCH_NAME_COLUMN_WIDTH -
+    BRANCH_AUTHOR_COLUMN_WIDTH -
+    TABLE_COLUMN_GAP;
 
   const visibleItems = currentList.slice(scrollOffset, scrollOffset + BRANCH_VISIBLE_COUNT);
 
   const handleSearchChange = useCallback(
     (value: string) => {
-      setSearchQuery(value);
+      setSearchQuery(stripMouseSequences(value));
       setHighlightedIndex(0);
     },
     [setHighlightedIndex],
@@ -138,10 +145,43 @@ export const BranchSwitcherScreen = () => {
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
-      <ScreenHeading
-        title="Switch branch"
-        subtitle={`${activeTab} · ${currentList.length} branches${searchQuery ? ` matching "${searchQuery}"` : ""}`}
-      />
+      <ScreenHeading title="Switch branch" />
+      <Box>
+        <Clickable
+          fullWidth={false}
+          onClick={() => {
+            setActiveTab("local");
+            setHighlightedIndex(0);
+            setSearchQuery("");
+          }}
+        >
+          <Text
+            color={activeTab === "local" ? COLORS.TEXT : COLORS.DIM}
+            bold={activeTab === "local"}
+          >
+            local
+          </Text>
+        </Clickable>
+        <Text color={COLORS.DIM}> · </Text>
+        <Clickable
+          fullWidth={false}
+          onClick={() => {
+            setActiveTab("remote");
+            setHighlightedIndex(0);
+            setSearchQuery("");
+          }}
+        >
+          <Text
+            color={activeTab === "remote" ? COLORS.TEXT : COLORS.DIM}
+            bold={activeTab === "remote"}
+          >
+            remote
+          </Text>
+        </Clickable>
+        <Text color={COLORS.DIM}>
+          {"  "}({currentList.length}){searchQuery ? ` matching "${searchQuery}"` : ""}
+        </Text>
+      </Box>
 
       {activeTab === "remote" && (
         <Box marginTop={1}>
@@ -157,12 +197,20 @@ export const BranchSwitcherScreen = () => {
                 "no-pr": COLORS.YELLOW,
               };
               return (
-                <Text key={filter}>
-                  <Text color={isActive ? filterColors[filter] : COLORS.DIM}>
-                    {isActive ? `[${filter}]` : filter}
-                  </Text>
+                <Box key={filter}>
+                  <Clickable
+                    fullWidth={false}
+                    onClick={() => {
+                      setActiveFilter(filter);
+                      setHighlightedIndex(0);
+                    }}
+                  >
+                    <Text color={isActive ? filterColors[filter] : COLORS.DIM}>
+                      {isActive ? `[${filter}]` : filter}
+                    </Text>
+                  </Clickable>
                   <Text color={COLORS.DIM}>{separator}</Text>
-                </Text>
+                </Box>
               );
             })}
           </Text>
@@ -183,7 +231,7 @@ export const BranchSwitcherScreen = () => {
               const remoteBranch = typeof item === "string" ? null : item;
 
               return (
-                <Text key={branchName}>
+                <Clickable key={branchName} onClick={() => { setHighlightedIndex(actualIndex); storeSwitchBranch(branchName); }}>
                   <Text color={isSelected ? COLORS.ORANGE : COLORS.DIM}>
                     {isSelected ? `${figures.pointer} ` : "  "}
                   </Text>
@@ -221,7 +269,7 @@ export const BranchSwitcherScreen = () => {
                       )}
                     </>
                   )}
-                </Text>
+                </Clickable>
               );
             })}
             {currentList.length === 0 && <Text color={COLORS.DIM}>No matching branches</Text>}

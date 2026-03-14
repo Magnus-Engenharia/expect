@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { render } from "ink";
 import { App } from "./components/app.js";
-import { VERSION } from "./constants.js";
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, VERSION } from "./constants.js";
 import { ThemeProvider } from "./components/theme-context.js";
 import { loadThemeName } from "./utils/load-theme.js";
 import { isRunningInAgent } from "./utils/is-running-in-agent.js";
@@ -16,6 +16,8 @@ const program = new Command()
 
 const renderApp = () => {
   const initialTheme = loadThemeName() ?? undefined;
+  process.stdout.write(ALT_SCREEN_ON);
+  process.on("exit", () => process.stdout.write(ALT_SCREEN_OFF));
   render(
     <ThemeProvider initialTheme={initialTheme}>
       <App />

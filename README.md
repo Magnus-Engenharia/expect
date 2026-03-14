@@ -1,3 +1,68 @@
+## todo
+
+ben:
+
+- plan review UX
+- surface states from Claude Code
+- images/videos screenshots in CLI
+- create final output report UI
+
+nisarg:
+
+- fixing agent/browser latency
+- product nits
+
+rasmus:
+
+- test out alternatives to get intuition (agent-browser)
+- make packages/cookies and packages/browser robust
+  - error states are surfaced up correctly instead of randomly swallowed
+  - need to be efficient (study different approaches to how to manage browser stuff good)
+    - https://github.com/pasky/chrome-cdp-skill/tree/main?tab=readme-ov-file#why-not-chrome-devtools-mcp
+    - browser benchmarking (latency, memory, cpu, etc.)
+  - investigate cookies and prevent keychain prompt spamming
+  - your discretion: migrate the package code to someting more elegant (Effect)
+
+aiden:
+
+- fix clicking states
+- refactor our frontend stuff to have reusable components
+- add onboarding stuff (website, helptext)
+
+---
+
+names:
+
+- browser-control
+- testie
+- control-freak
+- browser-doctor
+- tests.dev
+- repair.dev
+- validate.dev
+- gem.dev
+
+## CLI Development
+
+### Link globally
+
+```bash
+pnpm install --no-frozen-lockfile
+cd apps/cli
+pnpm link-global
+```
+
+This builds the CLI and registers the `testie` command globally. After linking, you can run `testie` from anywhere.
+
+### Run dev
+
+```bash
+cd apps/cli
+pnpm dev
+```
+
+This starts `tsup` in watch mode, rebuilding on file changes. If you've already linked globally, the `testie` command will pick up changes automatically.
+
 ## 3/13 notes
 
 ### Testing the browser CLI
