@@ -67,6 +67,10 @@ const PlanStepRow = ({
         </Text>
         <Box flexDirection="column" marginLeft={SECTION_INDENT}>
           <Text color={COLORS.DIM}>
+            {"      "}
+            {step.instruction}
+          </Text>
+          <Text color={COLORS.DIM}>
             {"      expected "}
             <Text color={COLORS.GREEN}>{step.expectedOutcome}</Text>
           </Text>
