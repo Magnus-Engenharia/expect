@@ -71,8 +71,29 @@ export const MainMenu = () => {
     focus === "input" && value === "" && FLOW_PRESETS.length > 0;
   const currentSuggestion = FLOW_PRESETS[suggestionIndex % FLOW_PRESETS.length];
 
+  const focusAreas: FocusArea[] = ["branch", "input", "auto-run"];
+  const focusNext = () => {
+    const currentIndex = focusAreas.indexOf(focus);
+    const next = focusAreas[currentIndex + 1];
+    if (next) setFocus(next);
+  };
+  const focusPrevious = () => {
+    const currentIndex = focusAreas.indexOf(focus);
+    const previous = focusAreas[currentIndex - 1];
+    if (previous) setFocus(previous);
+  };
+
   useInput(
-    (_input, key) => {
+    (input, key) => {
+      if ((key.tab && !key.shift) || (key.ctrl && input === "n")) {
+        focusNext();
+        return;
+      }
+      if ((key.tab && key.shift) || (key.ctrl && input === "p")) {
+        focusPrevious();
+        return;
+      }
+
       if (focus === "branch") {
         if (key.downArrow) {
           setFocus("input");
@@ -88,6 +109,9 @@ export const MainMenu = () => {
           setFocus("input");
           return;
         }
+        if (key.downArrow) {
+          return;
+        }
         if (key.return) {
           toggleAutoRun();
           return;
@@ -98,7 +122,20 @@ export const MainMenu = () => {
   );
 
   useInput(
-    (_input, key) => {
+    (input, key) => {
+      if (key.tab && !key.shift && showSuggestion && currentSuggestion) {
+        setValue(currentSuggestion);
+        setInputKey((previous) => previous + 1);
+        return;
+      }
+      if ((key.tab && !key.shift) || (key.ctrl && input === "n")) {
+        focusNext();
+        return;
+      }
+      if ((key.tab && key.shift) || (key.ctrl && input === "p")) {
+        focusPrevious();
+        return;
+      }
       if (!showSuggestion) return;
       if (key.rightArrow) {
         setSuggestionIndex((previous) => (previous + 1) % FLOW_PRESETS.length);
@@ -110,10 +147,6 @@ export const MainMenu = () => {
             (previous - 1 + FLOW_PRESETS.length) % FLOW_PRESETS.length
         );
         return;
-      }
-      if (key.tab && currentSuggestion) {
-        setValue(currentSuggestion);
-        setInputKey((previous) => previous + 1);
       }
     },
     { isActive: focus === "input" }
@@ -147,7 +180,9 @@ export const MainMenu = () => {
         </Box>
       </Clickable>
 
-      <Box marginTop={1} flexDirection="column">
+      <Text color={COLORS.DIM}>{"  ↑↓ tab  navigate sections"}</Text>
+
+      <Box marginTop={0} flexDirection="column">
         <Text color={COLORS.DIM}>Describe what to test</Text>
         <Box
           borderStyle="round"
