@@ -234,7 +234,11 @@ export const PlanReviewScreen = () => {
       setSelectedIndex((previous) => Math.min(items.length - 1, previous + 1));
     }
     if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
-      setSelectedIndex((previous) => Math.max(0, previous - 1));
+      if (selectedIndex === 0) {
+        setTopFocus("input");
+      } else {
+        setSelectedIndex((previous) => Math.max(0, previous - 1));
+      }
     }
 
     if (key.tab && !key.shift && currentItem?.kind === "section") {
@@ -305,10 +309,10 @@ export const PlanReviewScreen = () => {
           setTopFocus(null);
           setInputValue(flowInstruction);
         }
-        if (key.shift && key.tab) {
+        if ((key.shift && key.tab) || key.upArrow) {
           setTopFocus("branch");
         }
-        if (key.tab && !key.shift) {
+        if ((key.tab && !key.shift) || key.downArrow) {
           setTopFocus(null);
         }
       }
@@ -316,7 +320,7 @@ export const PlanReviewScreen = () => {
         if (key.escape) {
           setTopFocus(null);
         }
-        if (key.tab && !key.shift) {
+        if ((key.tab && !key.shift) || key.downArrow) {
           setTopFocus("input");
         }
         if (key.return) {
