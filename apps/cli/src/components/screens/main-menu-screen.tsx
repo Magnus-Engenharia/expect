@@ -91,23 +91,12 @@ export const MainMenu = () => {
       }
 
       if (focus === "branch") {
-        if (key.downArrow) {
-          setFocus("input");
-          return;
-        }
         if (key.return) {
           navigateTo("select-pr");
           return;
         }
       }
       if (focus === "auto-run") {
-        if (key.upArrow) {
-          setFocus("input");
-          return;
-        }
-        if (key.downArrow) {
-          return;
-        }
         if (key.return) {
           toggleAutoRun();
           return;
@@ -154,7 +143,7 @@ export const MainMenu = () => {
         <Text bold color={COLORS.TEXT}>
           browser-tester
         </Text>
-        <Text color={COLORS.DIM}>arrow keys or tab to navigate sections</Text>
+        <Text color={COLORS.DIM}>tab to navigate sections</Text>
       </Box>
 
       <Text color={COLORS.DIM}>Branch / PR</Text>
@@ -191,8 +180,6 @@ export const MainMenu = () => {
             }  [tab]`}
             value={value}
             onSubmit={submit}
-            onUpArrowAtTop={() => setFocus("branch")}
-            onDownArrowAtBottom={() => setFocus("auto-run")}
             onChange={(nextValue) => {
               setValue(stripMouseSequences(nextValue));
               if (errorMessage) setErrorMessage(null);

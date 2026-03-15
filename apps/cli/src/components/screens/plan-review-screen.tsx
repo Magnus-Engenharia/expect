@@ -234,15 +234,14 @@ export const PlanReviewScreen = () => {
       setSelectedIndex((previous) => Math.min(items.length - 1, previous + 1));
     }
     if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
-      if (selectedIndex === 0) {
-        setTopFocus("input");
-      } else {
-        setSelectedIndex((previous) => Math.max(0, previous - 1));
-      }
+      setSelectedIndex((previous) => Math.max(0, previous - 1));
     }
 
-    if (key.tab && currentItem?.kind === "section") {
+    if (key.tab && !key.shift && currentItem?.kind === "section") {
       toggleSection(currentItem.section);
+    }
+    if (key.shift && key.tab) {
+      setTopFocus("input");
     }
 
     if (input === "e" && currentItem?.kind === "step") {
@@ -306,12 +305,18 @@ export const PlanReviewScreen = () => {
           setTopFocus(null);
           setInputValue(flowInstruction);
         }
+        if (key.shift && key.tab) {
+          setTopFocus("branch");
+        }
+        if (key.tab && !key.shift) {
+          setTopFocus(null);
+        }
       }
       if (branchFocused) {
         if (key.escape) {
           setTopFocus(null);
         }
-        if (key.downArrow) {
+        if (key.tab && !key.shift) {
           setTopFocus("input");
         }
         if (key.return) {
@@ -374,8 +379,6 @@ export const PlanReviewScreen = () => {
                   multiline
                   value={inputValue}
                   onSubmit={handleInputSubmit}
-                  onUpArrowAtTop={() => setTopFocus("branch")}
-                  onDownArrowAtBottom={() => setTopFocus(null)}
                   onChange={(nextValue) =>
                     setInputValue(stripMouseSequences(nextValue))
                   }
