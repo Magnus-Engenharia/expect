@@ -14,5 +14,6 @@ export default defineConfig({
   esbuildPlugins: [reactCompilerPlugin()],
   esbuildOptions(options) {
     options.inject = [...(options.inject ?? []), "./ink-grab/inject-hook.js"];
+    options.supported = { ...options.supported, "import-meta": true };
   },
 });
