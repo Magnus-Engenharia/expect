@@ -23,9 +23,9 @@ const BLOCK_TEXTURE_PATHS: Record<
     front: "/textures/oak_log_side.png",
   },
   oak_planks: {
-    top: "/textures/oak_planks.png",
-    side: "/textures/oak_planks.png",
-    front: "/textures/oak_planks.png",
+    top: "/textures/oak_planks_flat.png",
+    side: "/textures/oak_planks_flat.png",
+    front: "/textures/oak_planks_flat.png",
   },
 };
 
