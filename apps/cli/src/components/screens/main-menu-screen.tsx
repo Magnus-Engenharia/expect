@@ -7,7 +7,7 @@ import type { DiffStats } from "@browser-tester/supervisor";
 import { type GitState } from "../../utils/get-git-state.js";
 import { useAppStore } from "../../store.js";
 
-type MenuAction = "test-branch" | "select-pr";
+type MenuAction = "test-branch" | "select-pr" | "custom-test";
 
 interface ScopeMenuOption {
   label: string;
@@ -31,6 +31,12 @@ const buildMenuOptions = (gitState: GitState): ScopeMenuOption[] => {
     label: "Select a PR or branch to test",
     detail: "",
     action: "select-pr",
+  });
+
+  options.push({
+    label: "Describe a custom test",
+    detail: "",
+    action: "custom-test",
   });
 
   return options;
@@ -61,8 +67,10 @@ export const MainMenu = () => {
     (option: ScopeMenuOption) => {
       if (option.action === "select-pr") {
         navigateTo("select-pr");
-      } else {
-        selectAction(option.action);
+      } else if (option.action === "custom-test") {
+        selectAction("test-unstaged");
+      } else if (option.action === "test-branch") {
+        selectAction("test-branch");
       }
     },
     [navigateTo, selectAction]
