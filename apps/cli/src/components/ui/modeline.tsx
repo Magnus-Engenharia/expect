@@ -13,8 +13,6 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
   const approvePlan = useAppStore((state) => state.approvePlan);
   const generatedPlan = useAppStore((state) => state.generatedPlan);
   const savedFlowSummaries = useAppStore((state) => state.savedFlowSummaries);
-  const mainMenuOnAction = useAppStore((state) => state.mainMenuOnAction);
-
   switch (screen) {
     case "main": {
       const hints: HintSegment[] = [
@@ -28,14 +26,12 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
         });
       }
       hints.push({ key: "↑↓", label: "nav" });
-      if (mainMenuOnAction) {
-        hints.push({
-          key: "enter",
-          label: "submit",
-          color: COLORS.PRIMARY,
-          cta: true,
-        });
-      }
+      hints.push({
+        key: "enter",
+        label: "submit",
+        color: COLORS.PRIMARY,
+        cta: true,
+      });
       return hints;
     }
     case "select-pr":
