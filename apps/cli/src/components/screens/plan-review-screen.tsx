@@ -37,18 +37,25 @@ type EditingState = StepEditingState | AssumptionsEditingState | null;
 
 interface PlanStepRowProps {
   step: BrowserFlowPlan["steps"][number];
+  stepNumber: number;
   selected: boolean;
   onClick: () => void;
 }
 
-const PlanStepRow = ({ step, selected, onClick }: PlanStepRowProps) => {
+const PlanStepRow = ({
+  step,
+  stepNumber,
+  selected,
+  onClick,
+}: PlanStepRowProps) => {
   const COLORS = useColors();
-  const bullet = selected ? "●" : "○";
 
   return (
     <Clickable onClick={onClick}>
       <Text>
-        <Text color={selected ? COLORS.PRIMARY : COLORS.DIM}>{bullet} </Text>
+        <Text color={selected ? COLORS.PRIMARY : COLORS.DIM}>
+          {String(stepNumber).padStart(2, " ")}.{" "}
+        </Text>
         <Text color={selected ? COLORS.PRIMARY : COLORS.TEXT} bold={selected}>
           {step.title}
         </Text>
@@ -569,6 +576,7 @@ export const PlanReviewScreen = () => {
                 <PlanStepRow
                   key={step.id}
                   step={step}
+                  stepNumber={index + 1}
                   selected={selected}
                   onClick={() => {
                     const itemIndex = items.findIndex(
