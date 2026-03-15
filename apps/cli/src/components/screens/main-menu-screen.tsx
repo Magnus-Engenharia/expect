@@ -24,7 +24,6 @@ const buildMenuOptions = (gitState: GitState): ScopeMenuOption[] => {
       label: "Test current branch",
       detail: `(${gitState.branchCommitCount} commits)`,
       action: "test-branch",
-      diffStats: gitState.branchDiffStats,
     });
   }
 
