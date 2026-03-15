@@ -40,7 +40,7 @@ export const Collapsible = ({
         </Text>
       </Clickable>
       {open ? (
-        <Box flexDirection="column" marginLeft={2}>
+        <Box flexDirection="column" marginLeft={6}>
           {children}
         </Box>
       ) : null}
