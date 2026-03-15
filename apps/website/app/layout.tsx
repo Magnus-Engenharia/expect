@@ -10,9 +10,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "testie — browser testing for coding agents",
+  title: "testie",
   description:
-    "Let coding agents test your code in a real browser. One command scans your changes, generates a test plan, and runs it live.",
+    "change your code → testie tests it in a real browser. no playwright scripts, no selectors to maintain, just your git diff.",
 };
 
 export default function RootLayout({

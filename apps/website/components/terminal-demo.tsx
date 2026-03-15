@@ -12,23 +12,27 @@ import {
 
 interface DemoLine {
   text: string;
-  style: "prompt" | "input" | "output" | "accent";
+  style: "prompt" | "input" | "output" | "accent" | "success" | "fail";
   pauseAfter?: number;
 }
 
 const DEMO_SCRIPT: DemoLine[] = [
-  { text: "$ npx template", style: "prompt" },
+  { text: "$ testie unstaged", style: "prompt" },
   { text: "", style: "output", pauseAfter: DEMO_LINE_PAUSE_MS },
-  { text: "◆ What do you want to build?", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
-  { text: "  A dashboard with auth and real-time charts", style: "input" },
+  { text: "◆ 3 changed files detected", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
+  { text: "  src/cart.tsx  src/checkout.tsx  src/api/orders.ts", style: "input" },
   { text: "", style: "output", pauseAfter: DEMO_LINE_PAUSE_MS },
-  { text: "◆ What framework are you using?", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
-  { text: "  Next.js with App Router", style: "input" },
+  { text: "◆ Planning browser tests...", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
+  { text: "  1. Add item to cart", style: "input" },
+  { text: "  2. Navigate to checkout", style: "input" },
+  { text: "  3. Complete purchase", style: "input" },
   { text: "", style: "output", pauseAfter: DEMO_LINE_PAUSE_MS },
-  { text: "◆ Do you need a database?", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
-  { text: "  Yes — Postgres with Drizzle ORM", style: "input" },
+  { text: "◆ Running against http://localhost:3000", style: "accent", pauseAfter: DEMO_PROMPT_PAUSE_MS },
+  { text: "  ✓ Add item to cart", style: "success" },
+  { text: "  ✓ Navigate to checkout", style: "success" },
+  { text: "  ✗ Complete purchase — submit button not found", style: "fail", pauseAfter: DEMO_PROMPT_PAUSE_MS },
   { text: "", style: "output", pauseAfter: DEMO_LINE_PAUSE_MS },
-  { text: "✓ Plan generated — 47 steps across 12 files", style: "accent" },
+  { text: "◆ 2 passed, 1 failed", style: "accent" },
 ];
 
 const LINE_STYLES: Record<DemoLine["style"], string> = {
@@ -36,6 +40,8 @@ const LINE_STYLES: Record<DemoLine["style"], string> = {
   input: "text-muted-foreground",
   output: "",
   accent: "text-foreground",
+  success: "text-emerald-600 dark:text-emerald-400",
+  fail: "text-red-500 dark:text-red-400",
 };
 
 export const TerminalDemo = () => {
@@ -117,9 +123,8 @@ export const TerminalDemo = () => {
         <div className="size-2 rounded-full bg-foreground/15" />
         <div className="size-2 rounded-full bg-foreground/15" />
         <div className="size-2 rounded-full bg-foreground/15" />
-
       </div>
-      <div className="flex h-[240px] flex-col-reverse overflow-y-auto p-3 font-mono text-xs leading-5">
+      <div className="flex h-[280px] flex-col-reverse overflow-y-auto p-3 font-mono text-xs leading-5">
         <div>
           <AnimatePresence initial={false}>
             {visibleLines.map((text, index) => {

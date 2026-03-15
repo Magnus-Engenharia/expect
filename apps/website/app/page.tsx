@@ -6,6 +6,7 @@ import { ActionButtons } from "@/components/action-buttons";
 import { DemoContainer } from "@/components/demo-container";
 import { TerminalDemo } from "@/components/terminal-demo";
 import { ThemeToggle } from "@/components/theme-toggle";
+
 const Home = () => {
   return (
     <div className="flex min-h-svh flex-col items-center">
@@ -23,18 +24,15 @@ const Home = () => {
           <Link href="#" className="text-muted-foreground transition-none hover:text-foreground">
             Docs
           </Link>
-          <Link href="#" className="text-muted-foreground transition-none hover:text-foreground">
-            Install
-          </Link>
         </div>
         <div className="flex items-center gap-3.75">
           <Link
-            href="https://github.com/AidenYBai/testie"
+            href="https://github.com/millionco/testie"
             className="text-muted-foreground transition-none hover:text-foreground"
           >
             GitHub
           </Link>
-          <Link href="#" className="text-muted-foreground transition-none hover:text-foreground">
+          <Link href="https://x.com/AidenYBai" className="text-muted-foreground transition-none hover:text-foreground">
             X
           </Link>
           <ThemeToggle />

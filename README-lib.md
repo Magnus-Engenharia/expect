@@ -117,7 +117,7 @@ testie --base-url http://localhost:5173 --headed
 ## Contributing
 
 ```bash
-git clone https://github.com/AidenYBai/testie
+git clone https://github.com/millionco/testie
 cd testie
 pnpm install --no-frozen-lockfile
 cd apps/cli

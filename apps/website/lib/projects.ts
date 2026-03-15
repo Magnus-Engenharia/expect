@@ -11,16 +11,15 @@ interface Project {
 export const PROJECTS: Project[] = [
   {
     title: "testie",
-    description:
-      "Let coding agents test your code in a real browser. One command scans your changes, generates a test plan, and runs it against a live browser.",
+    description: "change your code → testie tests it in a real browser",
     features: [
-      "Tests unstaged changes or branch diffs automatically",
-      "Generates and executes test plans in a real browser",
-      "Works headlessly inside any coding agent",
+      "no playwright scripts",
+      "no selectors to maintain",
+      "just your git diff",
     ],
-    command: "npx @browser-tester/cli@latest",
+    command: "npx testie@latest",
     agentPrompt: "Run testie to test my current changes",
-    githubUrl: "https://github.com/AidenYBai/testie",
+    githubUrl: "https://github.com/millionco/testie",
     docsUrl: "#",
   },
 ];
