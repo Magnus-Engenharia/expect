@@ -29,7 +29,9 @@ export const Collapsible = ({
     <Box flexDirection="column">
       <Clickable onClick={onToggle}>
         <Text>
-          <Text color={selected ? COLORS.PRIMARY : COLORS.DIM}>{selected ? "  ▸ " : "    "}</Text>
+          <Text color={selected ? COLORS.PRIMARY : COLORS.DIM}>
+            {selected ? "▸ " : "  "}
+          </Text>
           <Text color={contentColor}>{indicator} </Text>
           <Text bold={selected} color={contentColor}>
             {label.toUpperCase()}
@@ -37,7 +39,11 @@ export const Collapsible = ({
           </Text>
         </Text>
       </Clickable>
-      {open ? children : null}
+      {open ? (
+        <Box flexDirection="column" marginLeft={2}>
+          {children}
+        </Box>
+      ) : null}
     </Box>
   );
 };
