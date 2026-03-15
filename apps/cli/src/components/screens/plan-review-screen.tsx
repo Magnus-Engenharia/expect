@@ -296,7 +296,7 @@ export const PlanReviewScreen = () => {
           setSaving(false);
         });
     }
-    if (input === "a") {
+    if (input === "a" || key.return) {
       requestPlanApproval();
     }
   });
