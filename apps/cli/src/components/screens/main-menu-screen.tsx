@@ -221,9 +221,7 @@ export const MainMenu = () => {
             </Box>
           </Clickable>
         </>
-      ) : (
-        <Text color={COLORS.DIM}>Not a git repository — enter a URL and describe what to test</Text>
-      )}
+      ) : null}
 
       <Box marginTop={1} flexDirection="column">
         <Text color={COLORS.DIM}>Describe what to test</Text>
