@@ -38,6 +38,8 @@ export const SECTION_INDENT = 4;
 export const LAYOUT_ORIGIN_OFFSET = 1;
 export const ALT_SCREEN_ON = "\u001b[?1049h\u001b[2J\u001b[H";
 export const ALT_SCREEN_OFF = "\u001b[?1049l";
+export const FALLBACK_TERMINAL_COLUMNS = 80;
+export const FALLBACK_TERMINAL_ROWS = 24;
 export const BROWSER_TOOL_PREFIX = "mcp__browser__";
 export { detectMouseSupport } from "./utils/detect-mouse-support.js";
 export const CLICK_SUPPORT_ENABLED =

@@ -15,6 +15,7 @@ import {
   type TestAction,
 } from "./utils/browser-agent.js";
 import { loadSavedFlowBySlug } from "./utils/load-saved-flow.js";
+import { setInkInstance } from "./utils/clear-ink-display.js";
 
 const program = new Command()
   .name("testie")
@@ -53,6 +54,7 @@ const renderApp = () => {
       <App />
     </ThemeProvider>,
   );
+  setInkInstance(instance);
   process.stdout.on("resize", () => {
     instance.clear();
   });

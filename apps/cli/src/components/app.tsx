@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { MouseProvider } from "../hooks/mouse-context.js";
 import { useColors } from "./theme-context.js";
@@ -18,6 +18,7 @@ import { resolveBrowserTarget, getBrowserEnvironment } from "../utils/browser-ag
 import { planBrowserFlow } from "@browser-tester/supervisor";
 import { useAppStore } from "../store.js";
 import { saveFlow } from "../utils/save-flow.js";
+import { clearInkDisplay } from "../utils/clear-ink-display.js";
 
 const usePlanningEffect = () => {
   const screen = useAppStore((state) => state.screen);
@@ -154,7 +155,14 @@ export const App = () => {
 
   const navigateTo = useAppStore((state) => state.navigateTo);
 
+  const [, setRefreshTick] = useState(0);
+
   useInput((input, key) => {
+    if (key.ctrl && input === "l") {
+      clearInkDisplay();
+      setRefreshTick((previous) => previous + 1);
+      return;
+    }
     if (key.escape && screen !== "main" && screen !== "review-plan") {
       goBack();
     }
