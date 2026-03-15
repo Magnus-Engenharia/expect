@@ -133,4 +133,4 @@ pnpm dev
 
 ### License
 
-Testie is MIT-licensed open-source software.
+FSL-1.1-MIT © Million Software, Inc.
