@@ -143,35 +143,33 @@ export const PrPickerScreen = () => {
       />
 
       <Box marginTop={1}>
-        <Text color={COLORS.DIM}>
-          {PR_FILTERS.map((filter, index) => {
-            const isActive = filter === activeFilter;
-            const separator = index < PR_FILTERS.length - 1 ? " · " : "";
-            const filterColors: Record<PrFilter, string> = {
-              all: COLORS.TEXT,
-              open: COLORS.GREEN,
-              draft: COLORS.DIM,
-              merged: COLORS.PURPLE,
-              "no-pr": COLORS.YELLOW,
-            };
-            return (
-              <Box key={filter}>
-                <Clickable
-                  fullWidth={false}
-                  onClick={() => {
-                    setActiveFilter(filter);
-                    setHighlightedIndex(0);
-                  }}
-                >
-                  <Text color={isActive ? filterColors[filter] : COLORS.DIM}>
-                    {isActive ? `[${filter}]` : filter}
-                  </Text>
-                </Clickable>
-                <Text color={COLORS.DIM}>{separator}</Text>
-              </Box>
-            );
-          })}
-        </Text>
+        {PR_FILTERS.map((filter, index) => {
+          const isActive = filter === activeFilter;
+          const separator = index < PR_FILTERS.length - 1 ? " · " : "";
+          const filterColors: Record<PrFilter, string> = {
+            all: COLORS.TEXT,
+            open: COLORS.GREEN,
+            draft: COLORS.DIM,
+            merged: COLORS.PURPLE,
+            "no-pr": COLORS.YELLOW,
+          };
+          return (
+            <Box key={filter}>
+              <Clickable
+                fullWidth={false}
+                onClick={() => {
+                  setActiveFilter(filter);
+                  setHighlightedIndex(0);
+                }}
+              >
+                <Text color={isActive ? filterColors[filter] : COLORS.DIM}>
+                  {isActive ? `[${filter}]` : filter}
+                </Text>
+              </Clickable>
+              <Text color={COLORS.DIM}>{separator}</Text>
+            </Box>
+          );
+        })}
       </Box>
 
       {isLoading ? (
