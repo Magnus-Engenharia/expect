@@ -462,22 +462,6 @@ export default function CraftingTable() {
           padding: 0,
         }}
       >
-        {/* Title: "Crafting" */}
-        <div
-          style={{
-            position: "absolute",
-            top: 6 * S,
-            left: 28 * S,
-            color: "#404040",
-            fontSize: 8 * S,
-            fontFamily: "monospace",
-            fontWeight: "bold",
-            letterSpacing: S,
-          }}
-        >
-          Crafting
-        </div>
-
         {/* 3x3 Crafting Grid */}
         {Array.from({ length: 3 }).map((_, row) =>
           Array.from({ length: 3 }).map((_, col) => {
