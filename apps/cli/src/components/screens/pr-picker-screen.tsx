@@ -40,14 +40,18 @@ export const PrPickerScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     fetchRemoteBranches()
       .then((branches) => {
-        setRemoteBranches(branches);
+        if (!cancelled) setRemoteBranches(branches);
       })
       .catch(() => {})
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredBranches = (() => {
@@ -119,8 +123,11 @@ export const PrPickerScreen = () => {
     if (key.rightArrow) cycleFilter(1);
     if (key.leftArrow) cycleFilter(-1);
 
-    if (key.return && filteredBranches.length > 0) {
-      storeSwitchBranch(filteredBranches[highlightedIndex].name);
+    if (key.return) {
+      const selected = filteredBranches[highlightedIndex];
+      if (selected) {
+        storeSwitchBranch(selected.name);
+      }
     }
 
     if (input === "/") {
