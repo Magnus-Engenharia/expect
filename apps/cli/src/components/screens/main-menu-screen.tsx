@@ -62,7 +62,7 @@ export const MainMenu = () => {
   const activateOption = useCallback(
     (option: ScopeMenuOption) => {
       if (option.action === "select-pr") {
-        navigateTo("switch-branch");
+        navigateTo("select-pr");
       } else {
         selectAction(option.action);
       }
@@ -87,10 +87,6 @@ export const MainMenu = () => {
 
     if (key.tab) {
       toggleAutoRun();
-    }
-
-    if (input === "b") {
-      navigateTo("switch-branch");
     }
 
     if (input === "r" && canReuseSavedFlow && selectedOption) {

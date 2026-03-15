@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { MouseProvider } from "../hooks/mouse-context.js";
 import { useColors } from "./theme-context.js";
-import { BranchSwitcherScreen } from "./screens/branch-switcher-screen.js";
+import { PrPickerScreen } from "./screens/pr-picker-screen.js";
 import { CommitPickerScreen } from "./screens/commit-picker-screen.js";
 import { FlowInputScreen } from "./screens/flow-input-screen.js";
 import { PlanningScreen } from "./screens/planning-screen.js";
@@ -23,12 +23,20 @@ const usePlanningEffect = () => {
   const testAction = useAppStore((state) => state.testAction);
   const flowInstruction = useAppStore((state) => state.flowInstruction);
   const selectedCommit = useAppStore((state) => state.selectedCommit);
-  const environmentOverrides = useAppStore((state) => state.environmentOverrides);
+  const environmentOverrides = useAppStore(
+    (state) => state.environmentOverrides
+  );
   const completePlanning = useAppStore((state) => state.completePlanning);
   const failPlanning = useAppStore((state) => state.failPlanning);
 
   useEffect(() => {
-    if (screen !== "planning" || !gitState || !testAction || !flowInstruction.trim()) return;
+    if (
+      screen !== "planning" ||
+      !gitState ||
+      !testAction ||
+      !flowInstruction.trim()
+    )
+      return;
 
     let isCancelled = false;
 
@@ -43,7 +51,9 @@ const usePlanningEffect = () => {
       })
       .catch((caughtError) => {
         if (!isCancelled) {
-          failPlanning(caughtError instanceof Error ? caughtError.message : "Unknown error");
+          failPlanning(
+            caughtError instanceof Error ? caughtError.message : "Unknown error"
+          );
         }
       });
 
@@ -108,8 +118,8 @@ export const App = () => {
         return <CommitPickerScreen />;
       case "theme":
         return <ThemePickerScreen />;
-      case "switch-branch":
-        return <BranchSwitcherScreen />;
+      case "select-pr":
+        return <PrPickerScreen />;
       case "flow-input":
         return <FlowInputScreen />;
       case "saved-flow-picker":

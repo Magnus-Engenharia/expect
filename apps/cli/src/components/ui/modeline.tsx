@@ -19,11 +19,6 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
     case "main": {
       const hints: HintSegment[] = [
         { key: "t", label: "theme", onClick: () => navigateTo("theme") },
-        {
-          key: "b",
-          label: "branch",
-          onClick: () => navigateTo("switch-branch"),
-        },
       ];
       if (savedFlowSummaries.length > 0) {
         hints.push({
@@ -43,10 +38,10 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
       }
       return hints;
     }
-    case "switch-branch":
+    case "select-pr":
       return [
         { key: "↑↓", label: "nav" },
-        { key: "tab", label: "local/remote" },
+        { key: "←→", label: "filter" },
         { key: "/", label: "search" },
         { key: "esc", label: "back", cta: true, onClick: goBack },
         { key: "enter", label: "select", color: COLORS.PRIMARY, cta: true },

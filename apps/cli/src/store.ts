@@ -21,7 +21,7 @@ import type { EnvironmentOverrides } from "./utils/test-run-config.js";
 
 export type Screen =
   | "main"
-  | "switch-branch"
+  | "select-pr"
   | "select-commit"
   | "saved-flow-picker"
   | "flow-input"
