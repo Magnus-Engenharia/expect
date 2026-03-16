@@ -183,3 +183,42 @@ export const getBranchDiffPreview = (cwd: string, mainBranchName: string): strin
 
 export const getCommitDiffPreview = (cwd: string, commitHash: string): string =>
   trimDiffPreview(execGit(cwd, `git show --stat --unified=0 ${commitHash}`));
+
+export const getChangesFromMainDiffStats = (
+  cwd: string,
+  mainBranchName: string,
+): DiffStats | null => {
+  const trackedStats = parseDiffStats(execGit(cwd, `git diff ${mainBranchName} --shortstat`));
+  const untrackedFiles = getUntrackedFiles(cwd);
+  if (!trackedStats && untrackedFiles.length === 0) return null;
+
+  return {
+    filesChanged: (trackedStats?.filesChanged ?? 0) + untrackedFiles.length,
+    additions: (trackedStats?.additions ?? 0) + getUntrackedLineCount(cwd),
+    deletions: trackedStats?.deletions ?? 0,
+  };
+};
+
+export const getChangesFromMainChangedFiles = (
+  cwd: string,
+  mainBranchName: string,
+): ChangedFile[] => {
+  const trackedFiles = parseNameStatus(execGit(cwd, `git diff --name-status ${mainBranchName}`));
+  const untrackedFiles = getUntrackedFiles(cwd).map((path) => ({ path, status: "A" }));
+  const mergedFiles = [...trackedFiles];
+
+  for (const untrackedFile of untrackedFiles) {
+    if (!mergedFiles.some((file) => file.path === untrackedFile.path))
+      mergedFiles.push(untrackedFile);
+  }
+
+  return mergedFiles.slice(0, CHANGED_FILE_LIMIT);
+};
+
+export const getChangesFromMainDiffPreview = (cwd: string, mainBranchName: string): string => {
+  const trackedPreview = execGit(cwd, `git diff ${mainBranchName} --stat --unified=0`);
+  const untrackedFiles = getUntrackedFiles(cwd);
+  const untrackedPreview =
+    untrackedFiles.length > 0 ? `\n\nUntracked files:\n${untrackedFiles.join("\n")}` : "";
+  return trimDiffPreview(`${trackedPreview}${untrackedPreview}`.trim());
+};

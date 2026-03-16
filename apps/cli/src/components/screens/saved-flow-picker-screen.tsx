@@ -14,6 +14,7 @@ import { Clickable } from "../ui/clickable.js";
 const ACTION_LABELS: Record<string, string> = {
   "test-unstaged": "Test current changes",
   "test-branch": "Test entire branch",
+  "test-changes": "Test changes from main",
   "select-commit": "Test commit",
 };
 
@@ -146,9 +147,7 @@ export const SavedFlowPickerScreen = () => {
                       {savedFlow.title}
                     </Text>
                   ) : (
-                    <Text color={COLORS.TEXT}>
-                      {savedFlow.title}
-                    </Text>
+                    <Text color={COLORS.TEXT}>{savedFlow.title}</Text>
                   )}
                   <Text color={COLORS.DIM}>{" · updated "}</Text>
                   <Text color={COLORS.DIM}>{formatTimeAgo(savedFlow.modifiedAtMs)}</Text>

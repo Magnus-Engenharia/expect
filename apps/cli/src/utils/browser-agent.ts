@@ -9,7 +9,7 @@ import {
 } from "@browser-tester/supervisor";
 import type { EnvironmentOverrides } from "./test-run-config.js";
 
-export type TestAction = "test-unstaged" | "test-branch" | "select-commit";
+export type TestAction = "test-unstaged" | "test-branch" | "test-changes" | "select-commit";
 
 interface GenerateBrowserPlanOptions {
   action: TestAction;

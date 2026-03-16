@@ -26,14 +26,14 @@ export interface TestTargetBranch {
 }
 
 export interface TestTargetSelection {
-  action: "test-unstaged" | "test-branch" | "select-commit";
+  action: "test-unstaged" | "test-branch" | "test-changes" | "select-commit";
   commitHash?: string;
   commitShortHash?: string;
   commitSubject?: string;
 }
 
 export interface TestTarget {
-  scope: "unstaged" | "branch" | "commit";
+  scope: "unstaged" | "branch" | "changes" | "commit";
   cwd: string;
   branch: TestTargetBranch;
   displayName: string;

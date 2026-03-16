@@ -1,55 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useAppStore } from "../../store.js";
-import { type GitState } from "../../utils/get-git-state.js";
-import type { TestAction } from "../../utils/browser-agent.js";
 import { useColors } from "../theme-context.js";
 import { Clickable } from "../ui/clickable.js";
 import { Input } from "../ui/input.js";
 import { ErrorMessage } from "../ui/error-message.js";
+import { ContextPicker } from "../ui/context-picker.js";
 import { stripMouseSequences } from "../../hooks/mouse-context.js";
 import { FLOW_PRESETS } from "../../constants.js";
-import { UntestedChangesBanner } from "../ui/untested-changes-banner.js";
-
-interface ScopeOption {
-  label: string;
-  action: TestAction | "select-pr";
-}
-
-const buildScopeOptions = (
-  gitState: GitState,
-  checkedOutBranch: string | null,
-  checkedOutPrNumber: number | null,
-): ScopeOption[] => {
-  if (!gitState.isGitRepo) return [];
-  const options: ScopeOption[] = [];
-
-  if (checkedOutBranch) {
-    const prLabel = checkedOutPrNumber ? ` · PR #${checkedOutPrNumber}` : "";
-    options.push({
-      label: `${checkedOutBranch}${prLabel}`,
-      action: "test-branch",
-    });
-  }
-
-  options.push({
-    label: `Current changes (${gitState.currentBranch})`,
-    action: "test-unstaged",
-  });
-
-  if (!checkedOutBranch && !gitState.isOnMain && gitState.hasBranchCommits) {
-    options.push({
-      label: `Entire branch (${gitState.branchCommitCount} commits)`,
-      action: "test-branch",
-    });
-  }
-
-  options.push({ label: "Select a PR or branch…", action: "select-pr" });
-
-  return options;
-};
-
-type FocusArea = "branch" | "input" | "auto-run";
+import {
+  buildLocalContextOptions,
+  fetchRemoteContextOptions,
+  filterContextOptions,
+  type ContextOption,
+} from "../../utils/context-options.js";
+type FocusArea = "input" | "auto-run";
 
 export const MainMenu = () => {
   const COLORS = useColors();
@@ -58,50 +23,163 @@ export const MainMenu = () => {
   const toggleAutoRun = useAppStore((state) => state.toggleAutoRun);
   const submitFlowInstruction = useAppStore((state) => state.submitFlowInstruction);
   const selectAction = useAppStore((state) => state.selectAction);
-  const navigateTo = useAppStore((state) => state.navigateTo);
-  const checkedOutBranch = useAppStore((state) => state.checkedOutBranch);
-  const checkedOutPrNumber = useAppStore((state) => state.checkedOutPrNumber);
+  const storeSelectContext = useAppStore((state) => state.selectContext);
+  const selectedContext = useAppStore((state) => state.selectedContext);
+  const switchBranch = useAppStore((state) => state.switchBranch);
   const flowInstruction = useAppStore((state) => state.flowInstruction);
+
   const [value, setValue] = useState(flowInstruction);
   const [inputKey, setInputKey] = useState(0);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [scopeIndex, setScopeIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const hasScope = gitState?.isGitRepo ?? false;
-  const defaultFocus = hasScope && gitState?.isOnMain && !checkedOutBranch ? "branch" : "input";
-  const [focus, setFocus] = useState<FocusArea>(defaultFocus);
+  const [focus, setFocus] = useState<FocusArea>("input");
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerIndex, setPickerIndex] = useState(0);
+  const [remoteOptions, setRemoteOptions] = useState<ContextOption[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+
+  const localOptions = useMemo(
+    () => (gitState ? buildLocalContextOptions(gitState) : []),
+    [gitState],
+  );
 
   useEffect(() => {
-    if (checkedOutBranch) {
-      setFocus("input");
-      setScopeIndex(0);
-    }
-  }, [checkedOutBranch]);
+    if (!pickerOpen || !gitState) return;
+    let cancelled = false;
+    setRemoteLoading(true);
+    fetchRemoteContextOptions(gitState)
+      .then((options) => {
+        if (!cancelled) setRemoteOptions(options);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setRemoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOpen, gitState]);
 
-  if (!gitState) return null;
+  const allOptions = useMemo(
+    () => [...localOptions, ...remoteOptions],
+    [localOptions, remoteOptions],
+  );
 
-  const scopeOptions = buildScopeOptions(gitState, checkedOutBranch, checkedOutPrNumber);
-  const currentScope = scopeOptions[scopeIndex % scopeOptions.length];
-  const testAction =
-    currentScope?.action === "select-pr"
-      ? "test-unstaged"
-      : (currentScope?.action ?? "test-unstaged");
-  const submit = (submittedValue?: string) => {
-    const trimmed = (submittedValue ?? value).trim();
-    if (!trimmed) {
-      setErrorMessage("Describe what you want the browser agent to test.");
-      return;
-    }
-    selectAction(testAction);
-    submitFlowInstruction(trimmed);
-  };
+  const filteredOptions = useMemo(
+    () => filterContextOptions(allOptions, pickerQuery),
+    [allOptions, pickerQuery],
+  );
 
-  const showSuggestion = focus === "input" && value === "" && FLOW_PRESETS.length > 0;
+  useEffect(() => {
+    setPickerIndex(0);
+  }, [pickerQuery]);
+
+  const defaultContext = useMemo(() => {
+    if (!gitState) return null;
+    return localOptions.find((option) => option.type === "changes") ?? null;
+  }, [gitState, localOptions]);
+
+  const activeContext = selectedContext ?? defaultContext;
+
+  const openPicker = useCallback(() => {
+    setPickerOpen(true);
+    setPickerQuery("");
+    setPickerIndex(0);
+  }, []);
+
+  const closePicker = useCallback(() => {
+    setPickerOpen(false);
+    setPickerQuery("");
+  }, []);
+
+  const handleContextSelect = useCallback(
+    (option: ContextOption) => {
+      storeSelectContext(option);
+      closePicker();
+    },
+    [storeSelectContext, closePicker],
+  );
+
+  const submit = useCallback(
+    (submittedValue?: string) => {
+      const trimmed = (submittedValue ?? value).trim();
+      if (!trimmed) {
+        setErrorMessage("Describe what you want the browser agent to test.");
+        return;
+      }
+
+      const context = activeContext;
+
+      if (context?.branchName && context.type !== "changes") {
+        switchBranch(context.branchName, context.prNumber ?? null);
+      }
+
+      if (context?.action === "select-commit") {
+        selectAction("select-commit");
+        useAppStore.setState({
+          selectedCommit: context.commitHash
+            ? {
+                hash: context.commitHash,
+                shortHash: context.commitShortHash ?? "",
+                subject: context.commitSubject ?? "",
+              }
+            : null,
+        });
+      } else {
+        selectAction(context?.action ?? "test-changes");
+      }
+
+      submitFlowInstruction(trimmed);
+    },
+    [value, activeContext, switchBranch, selectAction, submitFlowInstruction],
+  );
+
+  const handleInputChange = useCallback(
+    (nextValue: string) => {
+      const stripped = stripMouseSequences(nextValue);
+
+      if (
+        stripped.length > value.length &&
+        stripped[stripped.length - 1] === "@" &&
+        (value.length === 0 || stripped[stripped.length - 2] === " ")
+      ) {
+        setValue(stripped.slice(0, -1));
+        openPicker();
+        return;
+      }
+
+      if (pickerOpen) {
+        const afterAt = stripped.length - value.length;
+        if (afterAt < 0) {
+          closePicker();
+          setValue(stripped);
+        } else {
+          setPickerQuery((previous) => {
+            const added = stripped.slice(value.length);
+            if (added.includes(" ")) {
+              closePicker();
+              setValue(stripped);
+              return "";
+            }
+            return previous + added;
+          });
+        }
+        return;
+      }
+
+      setValue(stripped);
+      if (errorMessage) setErrorMessage(null);
+    },
+    [value, pickerOpen, openPicker, closePicker, errorMessage],
+  );
+
+  const showSuggestion =
+    focus === "input" && value === "" && !pickerOpen && FLOW_PRESETS.length > 0;
   const currentSuggestion = FLOW_PRESETS[suggestionIndex % FLOW_PRESETS.length];
 
-  const focusAreas: FocusArea[] = hasScope
-    ? ["branch", "input", "auto-run"]
-    : ["input", "auto-run"];
+  const focusAreas: FocusArea[] = ["input", "auto-run"];
   const focusNext = () => {
     const currentIndex = focusAreas.indexOf(focus);
     const next = focusAreas[currentIndex + 1];
@@ -115,6 +193,8 @@ export const MainMenu = () => {
 
   useInput(
     (input, key) => {
+      if (pickerOpen) return;
+
       if ((key.tab && !key.shift) || (key.ctrl && input === "n") || key.downArrow) {
         focusNext();
         return;
@@ -124,24 +204,6 @@ export const MainMenu = () => {
         return;
       }
 
-      if (focus === "branch") {
-        if (key.rightArrow) {
-          setScopeIndex((previous) => (previous + 1) % scopeOptions.length);
-          return;
-        }
-        if (key.leftArrow) {
-          setScopeIndex((previous) => (previous - 1 + scopeOptions.length) % scopeOptions.length);
-          return;
-        }
-        if (key.return) {
-          if (currentScope?.action === "select-pr") {
-            navigateTo("select-pr");
-          } else {
-            setFocus("input");
-          }
-          return;
-        }
-      }
       if (focus === "auto-run") {
         if (key.return) {
           toggleAutoRun();
@@ -154,6 +216,8 @@ export const MainMenu = () => {
 
   useInput(
     (input, key) => {
+      if (pickerOpen) return;
+
       if (key.tab && !key.shift && showSuggestion && currentSuggestion) {
         setValue(currentSuggestion);
         setInputKey((previous) => previous + 1);
@@ -182,53 +246,43 @@ export const MainMenu = () => {
     { isActive: focus === "input" },
   );
 
+  if (!gitState) return null;
+
   return (
     <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
       <Box flexDirection="column" marginBottom={1}>
         <Text bold color={COLORS.TEXT}>
           browser-tester
         </Text>
-        <Text color={COLORS.DIM}>arrow keys or tab to navigate sections</Text>
       </Box>
 
-      <UntestedChangesBanner />
-
-      {hasScope ? (
-        <>
-          <Text color={COLORS.DIM}>Test scope</Text>
+      <Box flexDirection="column">
+        <Box justifyContent="space-between">
           <Clickable
+            fullWidth={false}
             onClick={() => {
-              if (focus === "branch") {
-                setScopeIndex((previous) => (previous + 1) % scopeOptions.length);
-              } else {
-                setFocus("branch");
-              }
+              if (pickerOpen) closePicker();
+              else openPicker();
             }}
           >
-            <Box
-              width="100%"
-              borderStyle="round"
-              borderColor={focus === "branch" ? COLORS.PRIMARY : COLORS.BORDER}
-              paddingX={2}
-            >
-              <Text
-                color={focus === "branch" ? COLORS.PRIMARY : COLORS.TEXT}
-                bold={focus === "branch"}
-              >
-                {currentScope?.label ?? "Select..."}
+            {activeContext ? (
+              <Text color={COLORS.PRIMARY}>
+                @{activeContext.type === "pr" ? `#${activeContext.prNumber}` : activeContext.label}{" "}
+                <Text color={COLORS.DIM}>{activeContext.description}</Text>
               </Text>
-              {focus === "branch" ? (
-                <Text color={COLORS.DIM}>
-                  {" ←→ "}[{(scopeIndex % scopeOptions.length) + 1}/{scopeOptions.length}]
-                </Text>
-              ) : null}
-            </Box>
+            ) : (
+              <Text color={COLORS.DIM}>
+                <Text color={COLORS.PRIMARY}>@</Text> no context
+              </Text>
+            )}
           </Clickable>
-        </>
-      ) : null}
-
-      <Box marginTop={1} flexDirection="column">
-        <Text color={COLORS.DIM}>Describe what to test</Text>
+          {showSuggestion && !pickerOpen ? (
+            <Text color={COLORS.DIM}>
+              {"←→ cycle suggestions "}[{(suggestionIndex % FLOW_PRESETS.length) + 1}/
+              {FLOW_PRESETS.length}]
+            </Text>
+          ) : null}
+        </Box>
         <Clickable onClick={() => setFocus("input")}>
           <Box
             width="100%"
@@ -239,28 +293,42 @@ export const MainMenu = () => {
             <Text color={COLORS.PRIMARY}>{"❯ "}</Text>
             <Input
               key={inputKey}
-              focus={focus === "input"}
+              focus={focus === "input" && !pickerOpen}
               multiline
               placeholder={`${currentSuggestion ?? "Describe what to test..."}  [tab]`}
               value={value}
               onSubmit={submit}
-              onUpArrowAtTop={() => setFocus("branch")}
               onDownArrowAtBottom={() => setFocus("auto-run")}
-              onChange={(nextValue) => {
-                setValue(stripMouseSequences(nextValue));
-                if (errorMessage) setErrorMessage(null);
-              }}
+              onChange={handleInputChange}
             />
           </Box>
         </Clickable>
+        {pickerOpen ? (
+          <Box flexDirection="column">
+            <Box marginBottom={0}>
+              <Text color={COLORS.DIM}>@ </Text>
+              <Text color={COLORS.PRIMARY}>{pickerQuery}</Text>
+              <Text color={COLORS.DIM}>{pickerQuery ? "" : "type to filter"}</Text>
+            </Box>
+            <ContextPicker
+              options={filteredOptions}
+              selectedIndex={pickerIndex}
+              isLoading={remoteLoading}
+              query={pickerQuery}
+              onQueryChange={setPickerQuery}
+              onSelect={handleContextSelect}
+              onNavigate={setPickerIndex}
+              onDismiss={closePicker}
+            />
+          </Box>
+        ) : (
+          <Box>
+            <Text color={COLORS.DIM}>
+              type <Text color={COLORS.PRIMARY}>@</Text> to set context
+            </Text>
+          </Box>
+        )}
       </Box>
-
-      {showSuggestion ? (
-        <Text color={COLORS.DIM}>
-          {"  ←→ cycle suggestions "}[{(suggestionIndex % FLOW_PRESETS.length) + 1}/
-          {FLOW_PRESETS.length}]
-        </Text>
-      ) : null}
 
       <ErrorMessage message={errorMessage} />
 

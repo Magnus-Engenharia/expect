@@ -22,12 +22,14 @@ import { saveTestedFingerprint } from "./tested-state.js";
 const ACTION_LABELS: Record<TestAction, string> = {
   "test-unstaged": "unstaged changes",
   "test-branch": "branch",
+  "test-changes": "changes",
   "select-commit": "commit",
 };
 
 const DEFAULT_INSTRUCTIONS: Record<TestAction, string> = {
   "test-unstaged": "Test all unstaged changes in the browser and verify they work correctly.",
   "test-branch": "Test all branch changes in the browser and verify they work correctly.",
+  "test-changes": "Test all changes from main in the browser and verify they work correctly.",
   "select-commit":
     "Test the selected commit's changes in the browser and verify they work correctly.",
 };
@@ -153,6 +155,12 @@ export const autoDetectAndTest = async (config?: Partial<TestRunConfig>): Promis
     return;
   }
   const scope = getRecommendedScope(gitState);
-  const action: TestAction = scope === "unstaged-changes" ? "test-unstaged" : "test-branch";
+  const actionByScope: Record<string, TestAction> = {
+    changes: "test-changes",
+    "unstaged-changes": "test-unstaged",
+    "entire-branch": "test-branch",
+    default: "test-changes",
+  };
+  const action = actionByScope[scope] ?? "test-changes";
   await runTest({ action, ...config });
 };

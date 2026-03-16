@@ -3,6 +3,9 @@ import {
   getBranchCommits,
   getBranchDiffPreview,
   getBranchDiffStats,
+  getChangesFromMainChangedFiles,
+  getChangesFromMainDiffPreview,
+  getChangesFromMainDiffStats,
   getCommitChangedFiles,
   getCommitDiffPreview,
   getCommitDiffStats,
@@ -40,6 +43,29 @@ export const resolveTestTarget = (options: ResolveTestTargetOptions): TestTarget
       changedFiles: getUnstagedChangedFiles(cwd),
       recentCommits: mainBranchName ? getBranchCommits(cwd, mainBranchName) : [],
       diffPreview: getUnstagedDiffPreview(cwd),
+    };
+  }
+
+  if (options.selection.action === "test-changes") {
+    return {
+      scope: "changes",
+      cwd,
+      branch: {
+        current: currentBranchName,
+        main: mainBranchName,
+      },
+      displayName: `changes on ${currentBranchName}`,
+      diffStats: mainBranchName
+        ? getChangesFromMainDiffStats(cwd, mainBranchName)
+        : getUnstagedDiffStats(cwd),
+      branchDiffStats: mainBranchName ? getBranchDiffStats(cwd, mainBranchName) : null,
+      changedFiles: mainBranchName
+        ? getChangesFromMainChangedFiles(cwd, mainBranchName)
+        : getUnstagedChangedFiles(cwd),
+      recentCommits: mainBranchName ? getBranchCommits(cwd, mainBranchName) : [],
+      diffPreview: mainBranchName
+        ? getChangesFromMainDiffPreview(cwd, mainBranchName)
+        : getUnstagedDiffPreview(cwd),
     };
   }
 

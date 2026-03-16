@@ -113,6 +113,16 @@ const formatScopePlanningStrategy = (target: TestTarget): string => {
     ].join("\n");
   }
 
+  if (target.scope === "changes") {
+    return [
+      "- Target mode: changes (all changes from main, committed + uncommitted)",
+      "- Treat committed branch changes and uncommitted working-tree changes as one body of work.",
+      "- Bias toward coverage of the full changeset — both committed and in-progress changes matter equally.",
+      "- Cover the direct journey plus the most obvious adjacent flows that could regress.",
+      "- Prioritize the highest-risk browser journeys over exhaustive coverage.",
+    ].join("\n");
+  }
+
   return [
     "- Target mode: branch",
     "- Bias toward broader regression around neighboring flows touched by the branch diff.",
@@ -169,7 +179,7 @@ const buildPlanningPrompt = (options: PlanBrowserFlowOptions, memoryContext?: st
     formatScopePlanningStrategy(target),
     "",
     "Requirements:",
-    "- Make the plan meaningfully different depending on whether the target is unstaged, branch, or commit.",
+    "- Make the plan meaningfully different depending on whether the target is unstaged, changes, branch, or commit.",
     "- Blend the requested journey with code-change-derived risk areas.",
     "- Focus on realistic browser steps that a browser agent can execute.",
     "- Use each step's expectedOutcome as a concrete browser assertion target, not just a vague goal.",

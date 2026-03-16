@@ -48,6 +48,8 @@ export const LIVE_VIEW_READY_POLL_INTERVAL_MS = 1000;
 export const CLICK_SUPPORT_ENABLED =
   process.env.SUPPORT_CLICK === "true" || process.env.SUPPORT_CLICK === "1";
 
+export const CONTEXT_PICKER_VISIBLE_COUNT = 8;
+
 export const FLOW_PRESETS: readonly string[] = [
   "Verify my recent changes work as expected",
   "Check for regressions in related features",

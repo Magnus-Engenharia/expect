@@ -119,7 +119,13 @@ program
     }
     const { shouldTest, scope } = await runHealthcheckInteractive();
     if (!shouldTest) return;
-    const action = scope === "entire-branch" ? "test-branch" : "test-unstaged";
+    const actionByScope: Record<string, import("./utils/browser-agent.js").TestAction> = {
+      changes: "test-changes",
+      "unstaged-changes": "test-unstaged",
+      "entire-branch": "test-branch",
+      default: "test-changes",
+    };
+    const action = actionByScope[scope] ?? "test-changes";
     const config = resolveTestRunConfig(action, program.opts());
     await seedStoreFromConfig(config);
     renderApp();
@@ -136,7 +142,7 @@ program
   .action(createCommandAction("test-branch"));
 
 program.action(async () => {
-  const config = resolveTestRunConfig("test-unstaged", program.opts());
+  const config = resolveTestRunConfig("test-changes", program.opts());
   if (isHeadless()) return autoDetectAndTest(config);
   if (config.message || config.flowSlug || config.autoRun || config.environmentOverrides) {
     await seedStoreFromConfig(config);

@@ -13,6 +13,8 @@ export {
   getBranchChangedFiles,
   getBranchCommits,
   getBranchDiffStats,
+  getChangesFromMainChangedFiles,
+  getChangesFromMainDiffStats,
   getCommitSummary,
   getCurrentBranchName,
   getLocalBranches,

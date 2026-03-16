@@ -14,6 +14,7 @@ import {
   type TestAction,
 } from "./utils/browser-agent.js";
 import { getGitState, type GitState } from "./utils/get-git-state.js";
+import type { ContextOption } from "./utils/context-options.js";
 import { listSavedFlows, type SavedFlowSummary } from "./utils/list-saved-flows.js";
 import type { LoadedSavedFlow } from "./utils/load-saved-flow.js";
 import type { EnvironmentOverrides } from "./utils/test-run-config.js";
@@ -50,12 +51,14 @@ interface AppStore {
   checkedOutBranch: string | null;
   checkedOutPrNumber: number | null;
   checkoutError: string | null;
+  selectedContext: ContextOption | null;
   latestRunReport: BrowserRunReport | null;
   autoSaveFlows: boolean;
   autoSaveStatus: "idle" | "saving" | "saved" | "error";
   liveViewUrl: string | null;
 
   setMainMenuOnAction: (value: boolean) => void;
+  selectContext: (context: ContextOption | null) => void;
   setLiveViewUrl: (url: string | null) => void;
   loadGitState: () => void;
   loadSavedFlows: () => Promise<void>;
@@ -98,6 +101,7 @@ const RESET_FLOW_STATE = {
   ...RESET_PLAN_STATE,
   testAction: null,
   selectedCommit: null,
+  selectedContext: null,
   flowInstruction: "",
   environmentOverrides: undefined,
   planningError: null,
@@ -131,6 +135,7 @@ export const useAppStore = create<AppStore>((set) => ({
   savedFlowSummaries: [],
   pendingSavedFlow: null,
   mainMenuOnAction: true,
+  selectedContext: null,
   checkedOutBranch: null,
   checkedOutPrNumber: null,
   checkoutError: null,
@@ -142,6 +147,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setMainMenuOnAction: (value) => set({ mainMenuOnAction: value }),
   setLiveViewUrl: (url) => set({ liveViewUrl: url }),
   loadGitState: () => set({ gitState: getGitState() }),
+  selectContext: (context) => set({ selectedContext: context }),
 
   loadSavedFlows: async () => {
     const savedFlowSummaries = await listSavedFlows();
