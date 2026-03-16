@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
-import { planBrowserFlow } from "../src/plan-browser-flow.js";
+import { BROWSER_TEST_MODEL } from "../src/constants.js";
+import { buildPlannerModelSettings, planBrowserFlow } from "../src/plan-browser-flow.js";
 import type { TestTarget } from "../src/types.js";
 
 const createPlannerModel = (
@@ -90,6 +91,17 @@ const baseTarget: TestTarget = {
 };
 
 describe("planBrowserFlow", () => {
+  it("keeps claude planners in read-only plan mode without clearing default tools", () => {
+    const settings = buildPlannerModelSettings({
+      target: baseTarget,
+      provider: "claude",
+    });
+
+    expect(settings.model).toBe(BROWSER_TEST_MODEL);
+    expect(settings.permissionMode).toBe("plan");
+    expect(settings.tools).toBeUndefined();
+  });
+
   it("builds a scope-aware planning prompt and normalizes step ids", async () => {
     let promptText = "";
 

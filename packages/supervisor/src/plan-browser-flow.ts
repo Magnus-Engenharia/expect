@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { AgentProviderSettings } from "@browser-tester/agent";
 import { z } from "zod";
 import {
   BROWSER_TEST_MODEL,
@@ -50,24 +51,30 @@ const browserFlowPlanSchema = z.object({
   steps: z.array(planStepSchema).min(1).max(PLANNER_MAX_STEP_COUNT),
 });
 
+export const buildPlannerModelSettings = (
+  options: Pick<PlanBrowserFlowOptions, "provider" | "providerSettings" | "target">,
+): AgentProviderSettings => {
+  const provider = options.provider ?? DEFAULT_AGENT_PROVIDER;
+  const claudeOnlySettings =
+    provider === "claude" ? { model: BROWSER_TEST_MODEL, permissionMode: "plan" as const } : {};
+
+  return {
+    cwd: options.target.cwd,
+    effort: PLANNER_MODEL_EFFORT,
+    maxTurns: PLANNER_MAX_TURNS,
+    ...claudeOnlySettings,
+    ...(options.providerSettings ?? {}),
+  };
+};
+
 const createPlannerModel = (
   options: Pick<PlanBrowserFlowOptions, "model" | "provider" | "providerSettings" | "target">,
 ): LanguageModelV3 => {
   if (options.model) return options.model;
 
   const provider = options.provider ?? DEFAULT_AGENT_PROVIDER;
-  const claudeOnlySettings =
-    provider === "claude"
-      ? { model: BROWSER_TEST_MODEL, permissionMode: "plan" as const, tools: [] }
-      : {};
 
-  return createAgentModel(provider, {
-    cwd: options.target.cwd,
-    effort: PLANNER_MODEL_EFFORT,
-    maxTurns: PLANNER_MAX_TURNS,
-    ...claudeOnlySettings,
-    ...(options.providerSettings ?? {}),
-  });
+  return createAgentModel(provider, buildPlannerModelSettings(options));
 };
 
 const formatChangedFiles = (changedFiles: TestTarget["changedFiles"]): string =>
