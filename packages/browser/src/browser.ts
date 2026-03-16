@@ -25,6 +25,7 @@ import { BrowserLaunchError, NavigationError, SnapshotTimeoutError } from "./err
 import { toActionError } from "./utils/action-error";
 import { compactTree } from "./utils/compact-tree";
 import { createLocator } from "./utils/create-locator";
+import { evaluateRuntime } from "./utils/evaluate-runtime";
 import { findCursorInteractive } from "./utils/find-cursor-interactive";
 import { getIndentLevel } from "./utils/get-indent-level";
 import { parseAriaLine } from "./utils/parse-aria-line";
@@ -70,7 +71,7 @@ const resolveDefaultBrowserContext = Effect.fn("Browser.resolveDefaultBrowserCon
 
     return {
       defaultBrowser,
-      preferredProfile: profiles[0] as BrowserProfile | undefined,
+      preferredProfile: profiles.at(0),
     };
   },
 );
@@ -154,12 +155,7 @@ const appendCursorInteractiveElements = Effect.fn("Browser.appendCursorInteracti
 });
 
 const injectOverlayLabels = (page: Page, labels: Array<{ label: number; x: number; y: number }>) =>
-  Effect.promise(() =>
-    page.evaluate(
-      ({ containerId, items }) => __browserTesterRuntime.injectOverlayLabels(containerId, items),
-      { containerId: OVERLAY_CONTAINER_ID, items: labels },
-    ),
-  );
+  evaluateRuntime(page, "injectOverlayLabels", OVERLAY_CONTAINER_ID, labels);
 
 export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
   make: Effect.gen(function* () {
@@ -335,12 +331,7 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
         Effect.promise(() => page.screenshot({ fullPage: options.fullPage })).pipe(
           Effect.map((screenshotBuffer) => ({ screenshot: screenshotBuffer, annotations })),
         ),
-        Effect.tryPromise(() =>
-          page.evaluate(
-            (containerId) => __browserTesterRuntime.removeOverlay(containerId),
-            OVERLAY_CONTAINER_ID,
-          ),
-        ).pipe(Effect.ignore),
+        evaluateRuntime(page, "removeOverlay", OVERLAY_CONTAINER_ID).pipe(Effect.ignore),
       );
     });
 

@@ -1,3 +1,5 @@
+import { finder } from "@medv/finder";
+
 interface OverlayItem {
   label: number;
   x: number;
@@ -56,47 +58,6 @@ export const findCursorInteractiveElements = (
   const elements = root.querySelectorAll("*");
   const results: CursorInteractiveResult[] = [];
 
-  const buildUniqueSelector = (element: Element): string => {
-    const testId = element.getAttribute("data-testid");
-    if (testId) return `[data-testid="${testId}"]`;
-    if (element.id) return `#${CSS.escape(element.id)}`;
-
-    const parts: string[] = [];
-    let current: Element | null = element;
-
-    while (current && current !== document.body) {
-      let selectorSegment = current.tagName.toLowerCase();
-      const firstClass = current.classList[0];
-      if (firstClass) selectorSegment += `.${CSS.escape(firstClass)}`;
-
-      const parent = current.parentElement;
-      if (parent) {
-        const siblings = Array.from(parent.children).filter((sibling) => {
-          if (sibling.tagName !== current!.tagName) return false;
-          return !firstClass || sibling.classList.contains(firstClass);
-        });
-        if (siblings.length > 1) {
-          selectorSegment += `:nth-of-type(${siblings.indexOf(current) + 1})`;
-        }
-      }
-
-      parts.unshift(selectorSegment);
-      current = current.parentElement;
-
-      if (parts.length >= 1) {
-        try {
-          const candidate = parts.join(" > ");
-          if (document.querySelectorAll(candidate).length === 1) break;
-        } catch {
-          // HACK: selector may be invalid mid-construction, keep building
-        }
-      }
-      if (parts.length >= 10) break;
-    }
-
-    return parts.join(" > ");
-  };
-
   for (const element of elements) {
     const tagName = element.tagName.toLowerCase();
     if (interactiveTagSet.has(tagName)) continue;
@@ -106,7 +67,9 @@ export const findCursorInteractiveElements = (
 
     const computedStyle = getComputedStyle(element);
     const hasCursorPointer = computedStyle.cursor === "pointer";
-    const hasOnClick = element.hasAttribute("onclick") || (element as HTMLElement).onclick !== null;
+    const hasOnClick =
+      element.hasAttribute("onclick") ||
+      (element instanceof HTMLElement && element.onclick !== null);
     const tabIndexAttr = element.getAttribute("tabindex");
     const hasTabIndex = tabIndexAttr !== null && tabIndexAttr !== "-1";
 
@@ -129,7 +92,7 @@ export const findCursorInteractiveElements = (
     if (hasTabIndex) reasons.push("tabindex");
 
     results.push({
-      selector: buildUniqueSelector(element),
+      selector: finder(element, { root }),
       text,
       reason: reasons.join(", "),
     });
