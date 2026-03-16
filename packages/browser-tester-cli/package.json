@@ -14,6 +14,7 @@
   "dependencies": {
     "@browser-tester/browser": "workspace:*",
     "commander": "^13.0.0",
+    "effect": "4.0.0-beta.28",
     "picocolors": "^1.1.0",
     "playwright": "^1.52.0"
   },
