@@ -178,28 +178,36 @@ export const MainMenu = () => {
     [value, activeContext, switchBranch, selectAction, submitFlowInstruction],
   );
 
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const pickerOpenRef = useRef(pickerOpen);
+  pickerOpenRef.current = pickerOpen;
+  const errorMessageRef = useRef(errorMessage);
+  errorMessageRef.current = errorMessage;
+
   const handleInputChange = useCallback(
     (nextValue: string) => {
       const stripped = stripMouseSequences(nextValue);
+      const previousValue = valueRef.current;
 
       if (
-        stripped.length > value.length &&
+        stripped.length > previousValue.length &&
         stripped[stripped.length - 1] === "@" &&
-        (value.length === 0 || stripped[stripped.length - 2] === " ")
+        (previousValue.length === 0 || stripped[stripped.length - 2] === " ")
       ) {
         setValue(stripped.slice(0, -1));
         openPicker();
         return;
       }
 
-      if (pickerOpen) {
-        const afterAt = stripped.length - value.length;
+      if (pickerOpenRef.current) {
+        const afterAt = stripped.length - previousValue.length;
         if (afterAt < 0) {
           closePicker();
           setValue(stripped);
         } else {
           setPickerQuery((previous) => {
-            const added = stripped.slice(value.length);
+            const added = stripped.slice(previousValue.length);
             if (added.includes(" ")) {
               closePicker();
               setValue(stripped);
@@ -212,9 +220,9 @@ export const MainMenu = () => {
       }
 
       setValue(stripped);
-      if (errorMessage) setErrorMessage(null);
+      if (errorMessageRef.current) setErrorMessage(null);
     },
-    [value, pickerOpen, openPicker, closePicker, errorMessage],
+    [openPicker, closePicker],
   );
 
   const showSuggestion =
