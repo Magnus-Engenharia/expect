@@ -9,6 +9,7 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "eval": "pnpm --filter @browser-tester/evals eval",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish"
