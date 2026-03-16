@@ -4,7 +4,6 @@ export { FirefoxExtractor } from "./firefox-extractor.js";
 export { SafariExtractor } from "./safari-extractor.js";
 export { BrowserDetector, type DetectBrowserProfilesOptions } from "./browser-detector.js";
 export { CdpClient } from "./cdp-client.js";
-export { SqliteClient } from "./sqlite-client.js";
 
 export {
   matchCookies,

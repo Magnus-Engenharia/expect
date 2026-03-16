@@ -35,7 +35,7 @@ const SUPPORTED_BROWSER_KEYS: Browser[] = [
   ...CHROMIUM_CONFIGS.map((config) => config.key),
   "firefox",
   "safari",
-] as Browser[];
+];
 
 const isChromiumBrowser = (browser: Browser): browser is ChromiumBrowser =>
   CHROMIUM_CONFIGS.some((config) => config.key === browser);

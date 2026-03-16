@@ -8,11 +8,6 @@ export { saveVideo } from "./save-video";
 export { waitForNavigationSettle } from "./utils/wait-for-settle";
 export {
   Cookies,
-  BrowserDetector,
-  CdpClient,
-  ChromiumExtractor,
-  FirefoxExtractor,
-  SafariExtractor,
   matchCookieHeader,
   matchCookies,
   toCookieHeader,

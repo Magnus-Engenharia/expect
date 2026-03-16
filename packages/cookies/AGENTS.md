@@ -22,13 +22,12 @@ export class Cookies extends ServiceMap.Service<Cookies>()("@cookies/Cookies", {
     return { extract } as const;
   }),
 }) {
-  static layer = Layer.effect(this)(this.make).pipe(
-    Layer.provide(CdpClient.layer),
-  );
+  static layer = Layer.effect(this)(this.make).pipe(Layer.provide(CdpClient.layer));
 }
 ```
 
 Key differences from `Effect.Service`:
+
 - `make:` not `effect:`
 - No `dependencies:` array — use `Layer.provide()` chaining on `static layer`
 - No `accessors: true`
@@ -54,7 +53,7 @@ export class CookieDatabaseNotFoundError extends Schema.ErrorClass<CookieDatabas
 Use `.asEffect()` to fail:
 
 ```ts
-return yield* new CookieDatabaseNotFoundError({ browser }).asEffect();
+return yield * new CookieDatabaseNotFoundError({ browser }).asEffect();
 ```
 
 ## Error Handling
@@ -64,7 +63,7 @@ Use `catchTag` / `catchTags` for specific errors. Never `catchAll` or `mapError`
 Infrastructure errors become defects:
 
 ```ts
-Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die })
+Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die });
 ```
 
 Domain errors get specific handling:
@@ -72,7 +71,7 @@ Domain errors get specific handling:
 ```ts
 Effect.catchTag("NoSuchElementError", () =>
   new CookieDatabaseNotFoundError({ browser }).asEffect(),
-)
+);
 ```
 
 ## Never Swallow Errors
@@ -97,12 +96,13 @@ Effect.catchTag("CookieDatabaseNotFoundError", () => Effect.succeed([]));
 Every effectful function uses `Effect.fn` with a descriptive span name:
 
 ```ts
-const extractChromiumCookies = Effect.fn("extractChromiumCookies")(
-  function* (browser: ChromiumBrowser, hosts: string[]) {
-    yield* Effect.annotateCurrentSpan({ browser });
-    // ...
-  },
-);
+const extractChromiumCookies = Effect.fn("extractChromiumCookies")(function* (
+  browser: ChromiumBrowser,
+  hosts: string[],
+) {
+  yield* Effect.annotateCurrentSpan({ browser });
+  // ...
+});
 ```
 
 ## Never Explicitly Type Return Types
@@ -133,12 +133,13 @@ return Option.none();
 
 ```ts
 // BAD
-yield* Effect.all(browsers.map((browser) => extractBrowser(browser)));
+yield * Effect.all(browsers.map((browser) => extractBrowser(browser)));
 
 // GOOD
-yield* Effect.forEach(browsers, (browser) => extractBrowser(browser), {
-  concurrency: "unbounded",
-});
+yield *
+  Effect.forEach(browsers, (browser) => extractBrowser(browser), {
+    concurrency: "unbounded",
+  });
 ```
 
 ## Conditional Failures — Use `return yield*`
@@ -147,7 +148,7 @@ Always use `return yield*` for conditional failures so TypeScript narrows correc
 
 ```ts
 if (!databasePath) {
-  return yield* new CookieDatabaseNotFoundError({ browser }).asEffect();
+  return yield * new CookieDatabaseNotFoundError({ browser }).asEffect();
 }
 ```
 
@@ -156,10 +157,11 @@ if (!databasePath) {
 Use `Effect.logInfo`, `Effect.logWarning`, `Effect.logDebug` with structured data:
 
 ```ts
-yield* Effect.logInfo("Chromium cookies extracted", {
-  browser,
-  count: cookies.length,
-});
+yield *
+  Effect.logInfo("Chromium cookies extracted", {
+    browser,
+    count: cookies.length,
+  });
 ```
 
 ## Avoid `try` / `catch`
@@ -167,10 +169,12 @@ yield* Effect.logInfo("Chromium cookies extracted", {
 Use `Effect.try` for sync and `Effect.tryPromise` for async:
 
 ```ts
-const rows = yield* Effect.tryPromise({
-  try: () => querySqlite(dbPath, sql),
-  catch: (cause) => new CookieReadError({ browser, cause: String(cause) }),
-});
+const rows =
+  yield *
+  Effect.tryPromise({
+    try: () => querySqlite(dbPath, sql),
+    catch: (cause) => new CookieReadError({ browser, cause: String(cause) }),
+  });
 ```
 
 ## Pure Functions Stay Pure

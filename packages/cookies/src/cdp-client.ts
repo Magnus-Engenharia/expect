@@ -7,6 +7,9 @@ import WebSocket from "ws";
 import { formatError } from "@browser-tester/utils";
 import { configByDisplayName } from "./browser-config.js";
 import { BrowserSpawnError, CdpConnectionError } from "./errors.js";
+import { stripLeadingDot } from "./utils/host-matching.js";
+import { normalizeSameSite } from "./utils/normalize.js";
+import type { BrowserProfile, Cookie, ExtractProfileOptions } from "./types.js";
 
 const CDP_RETRY_COUNT = 10;
 const CDP_COMMAND_TIMEOUT_MS = 10_000;
@@ -18,10 +21,8 @@ const HEADLESS_CHROME_ARGS = [
   "--no-default-browser-check",
   "--remote-debugging-address=127.0.0.1",
 ] as const;
-import { stripLeadingDot } from "./utils/host-matching.js";
-import { normalizeSameSite } from "./utils/normalize.js";
-import type { BrowserProfile, Cookie, ExtractProfileOptions } from "./types.js";
 
+// HACK: explicit return type needed because TypeScript cannot infer recursive function types
 const copyDirectoryRecursive = (
   fileSystem: FileSystem.FileSystem,
   source: string,

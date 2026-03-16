@@ -80,9 +80,7 @@ export class SqliteClient extends ServiceMap.Service<SqliteClient>()("@cookies/S
       if (IS_BUN) return yield* queryWithBun(databasePath, sqlQuery, browser);
 
       return yield* queryWithNodeSqlite(databasePath, sqlQuery, browser).pipe(
-        Effect.catchTag("CookieReadError", () =>
-          queryWithLibsql(databasePath, sqlQuery, browser),
-        ),
+        Effect.catchTag("CookieReadError", () => queryWithLibsql(databasePath, sqlQuery, browser)),
       );
     });
 

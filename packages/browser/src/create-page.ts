@@ -33,7 +33,7 @@ const resolveDefaultBrowserContext = async (): Promise<DefaultBrowserContext> =>
       if (!defaultBrowser) return EMPTY_DEFAULT_BROWSER_CONTEXT;
 
       const profiles = yield* cookies.detectProfiles({ browser: defaultBrowser });
-      return { defaultBrowser, preferredProfile: profiles[0] } as DefaultBrowserContext;
+      return { defaultBrowser, preferredProfile: profiles[0] };
     }).pipe(
       Effect.provide(CookiesRuntime),
       Effect.catch(() => Effect.succeed(EMPTY_DEFAULT_BROWSER_CONTEXT)),
