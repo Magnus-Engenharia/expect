@@ -91,7 +91,7 @@ const baseTarget: TestTarget = {
 };
 
 describe("planBrowserFlow", () => {
-  it("keeps claude planners in read-only plan mode without clearing default tools", () => {
+  it("keeps claude planners in read-only plan mode with no tools", () => {
     const settings = buildPlannerModelSettings({
       target: baseTarget,
       provider: "claude",
@@ -99,7 +99,7 @@ describe("planBrowserFlow", () => {
 
     expect(settings.model).toBe(BROWSER_TEST_MODEL);
     expect(settings.permissionMode).toBe("plan");
-    expect(settings.tools).toBeUndefined();
+    expect(settings.tools).toEqual([]);
   });
 
   it("builds a scope-aware planning prompt and normalizes step ids", async () => {

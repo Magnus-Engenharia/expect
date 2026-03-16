@@ -56,7 +56,9 @@ export const buildPlannerModelSettings = (
 ): AgentProviderSettings => {
   const provider = options.provider ?? DEFAULT_AGENT_PROVIDER;
   const claudeOnlySettings =
-    provider === "claude" ? { model: BROWSER_TEST_MODEL, permissionMode: "plan" as const } : {};
+    provider === "claude"
+      ? { model: BROWSER_TEST_MODEL, permissionMode: "plan" as const, tools: [] }
+      : {};
 
   return {
     cwd: options.target.cwd,
