@@ -14,7 +14,7 @@ export const findCursorInteractive = Effect.fn("findCursorInteractive")(function
   page: Page,
   rootSelector?: string,
 ) {
-  return (yield* Effect.tryPromise(() =>
+  return (yield* Effect.promise(() =>
     page.evaluate(
       ({
         rootSel,
@@ -122,5 +122,5 @@ export const findCursorInteractive = Effect.fn("findCursorInteractive")(function
         tags: INTERACTIVE_HTML_TAGS,
       },
     ),
-  ).pipe(Effect.orDie)) as CursorInteractiveElement[];
+  )) as CursorInteractiveElement[];
 });

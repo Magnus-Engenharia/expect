@@ -40,28 +40,18 @@ import type {
   VideoOptions,
 } from "./types";
 
-interface DefaultBrowserContext {
-  defaultBrowser: BrowserKey | undefined;
-  preferredProfile: BrowserProfile | undefined;
-}
-
-const EMPTY_DEFAULT_BROWSER_CONTEXT: DefaultBrowserContext = {
-  defaultBrowser: undefined,
-  preferredProfile: undefined,
-};
-
-const NO_INTERACTIVE_ELEMENTS = "(no interactive elements)";
-const CURSOR_INTERACTIVE_HEADER = "# Cursor-interactive elements:";
 const OVERLAY_CONTAINER_ID = "__browser_tester_annotation_overlay__";
-
-const isTooDeep = (line: string, maxDepth?: number): boolean =>
-  maxDepth !== undefined && getIndentLevel(line) > maxDepth;
 
 const shouldAssignRef = (role: string, name: string, interactive?: boolean): boolean => {
   if (INTERACTIVE_ROLES.has(role)) return true;
   if (interactive) return false;
   return CONTENT_ROLES.has(role) && name.length > 0;
 };
+
+const toBrowserLaunchError = (cause: unknown) =>
+  new BrowserLaunchError({
+    cause: cause instanceof Error ? cause.message : String(cause),
+  });
 
 const resolveDefaultBrowserContext = Effect.fn("Browser.resolveDefaultBrowserContext")(
   function* () {
@@ -70,7 +60,7 @@ const resolveDefaultBrowserContext = Effect.fn("Browser.resolveDefaultBrowserCon
       catch: () => new BrowserLaunchError({ cause: "Failed to detect default browser" }),
     });
 
-    if (!defaultBrowser) return EMPTY_DEFAULT_BROWSER_CONTEXT;
+    if (!defaultBrowser) return { defaultBrowser: undefined, preferredProfile: undefined };
 
     const profiles = yield* Effect.try({
       try: () => detectBrowserProfiles({ browser: defaultBrowser }),
@@ -86,7 +76,10 @@ const resolveDefaultBrowserContext = Effect.fn("Browser.resolveDefaultBrowserCon
 
 const extractDefaultBrowserCookies = Effect.fn("Browser.extractDefaultBrowserCookies")(function* (
   url: string,
-  defaultBrowserContext: DefaultBrowserContext,
+  defaultBrowserContext: {
+    defaultBrowser: BrowserKey | undefined;
+    preferredProfile: BrowserProfile | undefined;
+  },
 ) {
   const { defaultBrowser, preferredProfile } = defaultBrowserContext;
 
@@ -106,26 +99,20 @@ const extractDefaultBrowserCookies = Effect.fn("Browser.extractDefaultBrowserCoo
   return result.cookies;
 });
 
-const resolveVideoOptions = (
+const resolveContextOptions = (
   video: boolean | VideoOptions | undefined,
-): VideoOptions | undefined => {
-  if (!video) return undefined;
-  if (video === true) {
-    return {
-      dir: tmpdir(),
-      size: { width: DEFAULT_VIDEO_WIDTH_PX, height: DEFAULT_VIDEO_HEIGHT_PX },
-    };
-  }
-  return {
-    ...video,
-    size: video.size ?? { width: DEFAULT_VIDEO_WIDTH_PX, height: DEFAULT_VIDEO_HEIGHT_PX },
-  };
-};
+  locale: string | undefined,
+) => {
+  const defaultSize = { width: DEFAULT_VIDEO_WIDTH_PX, height: DEFAULT_VIDEO_HEIGHT_PX };
+  const recordVideo = video
+    ? video === true
+      ? { dir: tmpdir(), size: defaultSize }
+      : { ...video, size: video.size ?? defaultSize }
+    : undefined;
 
-const resolveContextOptions = (video: VideoOptions | undefined, locale: string | undefined) => {
-  if (!video && !locale) return undefined;
+  if (!recordVideo && !locale) return undefined;
   return {
-    ...(video ? { recordVideo: video } : {}),
+    ...(recordVideo ? { recordVideo } : {}),
     ...(locale ? { locale } : {}),
   };
 };
@@ -158,7 +145,7 @@ const appendCursorInteractiveElements = Effect.fn("Browser.appendCursorInteracti
   }
 
   if (newLines.length > 0) {
-    filteredLines.push(CURSOR_INTERACTIVE_HEADER);
+    filteredLines.push("# Cursor-interactive elements:");
     filteredLines.push(...newLines);
   }
 
@@ -166,7 +153,7 @@ const appendCursorInteractiveElements = Effect.fn("Browser.appendCursorInteracti
 });
 
 const injectOverlayLabels = (page: Page, labels: Array<{ label: number; x: number; y: number }>) =>
-  Effect.tryPromise(() =>
+  Effect.promise(() =>
     page.evaluate(
       ({
         containerId,
@@ -205,14 +192,7 @@ const injectOverlayLabels = (page: Page, labels: Array<{ label: number; x: numbe
       },
       { containerId: OVERLAY_CONTAINER_ID, items: labels },
     ),
-  ).pipe(Effect.orDie);
-
-const removeOverlay = (page: Page) =>
-  Effect.tryPromise(() =>
-    page.evaluate((containerId: string) => {
-      document.getElementById(containerId)?.remove();
-    }, OVERLAY_CONTAINER_ID),
-  ).pipe(Effect.ignore);
+  );
 
 export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
   make: Effect.gen(function* () {
@@ -229,28 +209,21 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
             executablePath: options.executablePath,
             args: HEADLESS_CHROMIUM_ARGS,
           }),
-        catch: (cause) =>
-          new BrowserLaunchError({
-            cause: cause instanceof Error ? cause.message : String(cause),
-          }),
+        catch: toBrowserLaunchError,
       });
 
       const setupPage = Effect.gen(function* () {
         const defaultBrowserContext =
           options.cookies === true
             ? yield* resolveDefaultBrowserContext()
-            : EMPTY_DEFAULT_BROWSER_CONTEXT;
+            : { defaultBrowser: undefined, preferredProfile: undefined };
 
-        const recordVideo = resolveVideoOptions(options.video);
         const context = yield* Effect.tryPromise({
           try: () =>
             browser.newContext(
-              resolveContextOptions(recordVideo, defaultBrowserContext.preferredProfile?.locale),
+              resolveContextOptions(options.video, defaultBrowserContext.preferredProfile?.locale),
             ),
-          catch: (cause) =>
-            new BrowserLaunchError({
-              cause: cause instanceof Error ? cause.message : String(cause),
-            }),
+          catch: toBrowserLaunchError,
         });
 
         if (options.cookies) {
@@ -259,19 +232,13 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
             : yield* extractDefaultBrowserCookies(url ?? "", defaultBrowserContext);
           yield* Effect.tryPromise({
             try: () => context.addCookies(toPlaywrightCookies(cookies)),
-            catch: (cause) =>
-              new BrowserLaunchError({
-                cause: cause instanceof Error ? cause.message : String(cause),
-              }),
+            catch: toBrowserLaunchError,
           });
         }
 
         const page = yield* Effect.tryPromise({
           try: () => context.newPage(),
-          catch: (cause) =>
-            new BrowserLaunchError({
-              cause: cause instanceof Error ? cause.message : String(cause),
-            }),
+          catch: toBrowserLaunchError,
         });
 
         if (url) {
@@ -301,9 +268,8 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       const selector = options.selector ?? "body";
       yield* Effect.annotateCurrentSpan({ selector });
 
-      const root = page.locator(selector);
       const rawTree = yield* Effect.tryPromise({
-        try: () => root.ariaSnapshot({ timeout }),
+        try: () => page.locator(selector).ariaSnapshot({ timeout }),
         catch: (cause) =>
           new SnapshotTimeoutError({
             selector,
@@ -317,7 +283,7 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       let refCount = 0;
 
       for (const line of rawTree.split("\n")) {
-        if (isTooDeep(line, options.maxDepth)) continue;
+        if (options.maxDepth !== undefined && getIndentLevel(line) > options.maxDepth) continue;
 
         const parsed = parseAriaLine(line);
         if (!parsed) {
@@ -349,7 +315,7 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       resolveNthDuplicates(refs);
 
       let tree = filteredLines.join("\n");
-      if (options.interactive && refCount === 0) tree = NO_INTERACTIVE_ELEMENTS;
+      if (options.interactive && refCount === 0) tree = "(no interactive elements)";
       if (options.compact) tree = compactTree(tree);
 
       const stats = computeSnapshotStats(tree, refs);
@@ -397,19 +363,22 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
 
       yield* injectOverlayLabels(page, labelPositions);
       return yield* Effect.ensuring(
-        Effect.tryPromise(() => page.screenshot({ fullPage: options.fullPage })).pipe(
-          Effect.orDie,
+        Effect.promise(() => page.screenshot({ fullPage: options.fullPage })).pipe(
           Effect.map((screenshotBuffer) => ({ screenshot: screenshotBuffer, annotations })),
         ),
-        removeOverlay(page),
+        Effect.tryPromise(() =>
+          page.evaluate((containerId: string) => {
+            document.getElementById(containerId)?.remove();
+          }, OVERLAY_CONTAINER_ID),
+        ).pipe(Effect.ignore),
       );
     });
 
     const saveVideo = Effect.fn("Browser.saveVideo")(function* (page: Page, outputPath: string) {
       const video = page.video();
       if (!video) return undefined;
-      yield* Effect.tryPromise(() => page.close()).pipe(Effect.orDie);
-      yield* Effect.tryPromise(() => video.saveAs(outputPath)).pipe(Effect.orDie);
+      yield* Effect.promise(() => page.close());
+      yield* Effect.promise(() => video.saveAs(outputPath));
       return outputPath;
     });
 
@@ -417,16 +386,12 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       page: Page,
       urlBefore: string,
     ) {
-      yield* Effect.tryPromise(() => page.waitForTimeout(NAVIGATION_DETECT_DELAY_MS)).pipe(
-        Effect.orDie,
-      );
+      yield* Effect.promise(() => page.waitForTimeout(NAVIGATION_DETECT_DELAY_MS));
       if (page.url() !== urlBefore) {
         yield* Effect.tryPromise(() => page.waitForLoadState("domcontentloaded")).pipe(
           Effect.ignore,
         );
-        yield* Effect.tryPromise(() => page.waitForTimeout(POST_NAVIGATION_SETTLE_MS)).pipe(
-          Effect.orDie,
-        );
+        yield* Effect.promise(() => page.waitForTimeout(POST_NAVIGATION_SETTLE_MS));
       }
     });
 
@@ -443,10 +408,8 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
   static layer = Layer.effect(this)(this.make);
 }
 
-export type BrowserMethods = typeof Browser.Service;
-
 export const runBrowser = <A>(
-  effect: (browser: BrowserMethods) => Effect.Effect<A, unknown>,
+  effect: (browser: typeof Browser.Service) => Effect.Effect<A, unknown>,
 ): Promise<A> =>
   Effect.runPromise(
     Effect.gen(function* () {
