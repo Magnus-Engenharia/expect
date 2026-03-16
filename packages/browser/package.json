@@ -12,6 +12,13 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.mts",
+      "import": "./dist/mcp/index.mjs"
+    },
+    "./cli": {
+      "import": "./dist/mcp/start.mjs"
     }
   },
   "scripts": {
@@ -27,6 +34,7 @@
     "@effect/platform-node": "4.0.0-beta.28",
     "@effect/vitest": "4.0.0-beta.28",
     "@medv/finder": "^4.0.2",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "effect": "4.0.0-beta.28",
     "playwright": "^1.52.0",
     "zod": "^4.3.6"

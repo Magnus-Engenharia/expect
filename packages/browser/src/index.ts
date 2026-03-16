@@ -1,16 +1,19 @@
 export { Browser, runBrowser } from "./browser";
 export { diffSnapshots } from "./diff";
 export {
-  Browsers,
-  Cookies,
-  layerLive,
+  detectBrowserProfiles,
+  detectDefaultBrowser,
+  extractCookies,
+  extractProfileCookies,
+  toPlaywrightCookies,
 } from "@browser-tester/cookies";
 export type {
   Browser as BrowserKey,
-  BrowserInfo,
   BrowserProfile,
   Cookie,
-  SameSitePolicy,
+  ExtractOptions,
+  ExtractResult,
+  PlaywrightCookie,
 } from "@browser-tester/cookies";
 export {
   ActionTimeoutError,
@@ -29,7 +32,6 @@ export type {
   AnnotatedScreenshotResult,
   AriaRole,
   CreatePageOptions,
-  CreatePageResult,
   RefEntry,
   RefMap,
   SnapshotDiff,

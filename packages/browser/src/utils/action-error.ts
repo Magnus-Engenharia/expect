@@ -83,9 +83,6 @@ const NOT_VISIBLE_PATTERNS = [
   "to be visible",
   "Element is not stable",
   "element is not stable",
-] as const;
-
-const NOT_FOUND_PATTERNS = [
   "Element(s) not found",
   "Element is not attached to the DOM",
   "Element is not connected",
@@ -110,10 +107,6 @@ export const toActionError = (error: unknown, ref: string): ActionError => {
   }
 
   if (matchesAny(errorMessage, NOT_VISIBLE_PATTERNS)) {
-    return new RefNotVisibleError({ ref });
-  }
-
-  if (matchesAny(errorMessage, NOT_FOUND_PATTERNS)) {
     return new RefNotVisibleError({ ref });
   }
 

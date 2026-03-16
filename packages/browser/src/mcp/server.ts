@@ -5,9 +5,12 @@ import { dirname } from "node:path";
 import { z } from "zod/v4";
 import type { Browser as PlaywrightBrowser, BrowserContext, Page } from "playwright";
 import { Effect } from "effect";
-import { runBrowser } from "@browser-tester/browser";
-import type { SnapshotResult } from "@browser-tester/browser";
-import { BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME } from "./constants.js";
+import { runBrowser } from "../browser.js";
+import type { SnapshotResult } from "../types.js";
+import {
+  BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME,
+  BROWSER_TESTER_VIDEO_OUTPUT_ENV_NAME,
+} from "./constants.js";
 import { startLiveViewServer, type LiveViewServer } from "./live-view-server.js";
 
 interface ConsoleEntry {
@@ -42,7 +45,6 @@ interface ClosedSessionResult {
 
 let session: BrowserSession | null = null;
 let liveViewServer: LiveViewServer | null = null;
-const VIDEO_OUTPUT_ENV_NAME = "BROWSER_TESTER_VIDEO_OUTPUT_PATH";
 
 const setupPageTracking = (page: Page, browserSession: BrowserSession) => {
   if (browserSession.trackedPages.has(page)) return;
@@ -186,7 +188,7 @@ export const createBrowserMcpServer = () => {
         return textResult(`Navigated to ${url}`);
       }
 
-      const videoOutputPath = process.env[VIDEO_OUTPUT_ENV_NAME];
+      const videoOutputPath = process.env[BROWSER_TESTER_VIDEO_OUTPUT_ENV_NAME];
       const pageResult = await runBrowser((browser) =>
         browser.createPage(url, {
           headed,

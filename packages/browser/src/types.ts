@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import type { Cookie } from "@browser-tester/cookies";
-import type { Browser as PlaywrightBrowser, BrowserContext, Locator, Page } from "playwright";
+import type { Locator, Page } from "playwright";
 import type { RefNotFoundError } from "./errors";
 
 export type AriaRole = Parameters<Page["getByRole"]>[0];
@@ -40,11 +40,6 @@ export interface SnapshotResult {
   locator: (ref: string) => Effect.Effect<Locator, RefNotFoundError>;
 }
 
-export interface ParsedAriaLine {
-  role: string;
-  name: string;
-}
-
 export interface VideoOptions {
   dir: string;
   size?: { width: number; height: number };
@@ -56,12 +51,6 @@ export interface CreatePageOptions {
   cookies?: boolean | Cookie[];
   waitUntil?: "load" | "domcontentloaded" | "networkidle" | "commit";
   video?: boolean | VideoOptions;
-}
-
-export interface CreatePageResult {
-  browser: PlaywrightBrowser;
-  context: BrowserContext;
-  page: Page;
 }
 
 export interface AnnotatedScreenshotOptions extends SnapshotOptions {

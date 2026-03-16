@@ -1,6 +1,10 @@
 import { Option } from "effect";
 import { EXCLUDED_ARIA_ROLE } from "../constants";
-import type { ParsedAriaLine } from "../types";
+
+export interface ParsedAriaLine {
+  role: string;
+  name: string;
+}
 
 const ARIA_LINE_REGEX = /- (\w+)\s*(?:"((?:[^"\\]|\\.)*)")?/;
 

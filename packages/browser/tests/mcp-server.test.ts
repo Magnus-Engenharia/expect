@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createBrowserMcpServer } from "../src/server.js";
+import { createBrowserMcpServer } from "../src/mcp/server.js";
 
 const TEST_HTML = `<!DOCTYPE html>
 <html>
