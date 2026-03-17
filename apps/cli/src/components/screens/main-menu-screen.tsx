@@ -356,7 +356,7 @@ export const MainMenu = () => {
         ) : (
           <Box marginTop={1} paddingX={1}>
             <Text color={COLORS.DIM}>
-              type <Text color={COLORS.PRIMARY}>@</Text> to set context
+              type <Text color={COLORS.PRIMARY}>@</Text> to set context (PRs, branches, commits)
             </Text>
           </Box>
         )}
