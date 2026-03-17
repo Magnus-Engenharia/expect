@@ -6,6 +6,7 @@ import type {
   LanguageModelV3Content,
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { Effect, Layer, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
 import { CodexRunError } from "./errors.js";
@@ -121,7 +122,7 @@ const prepareRun = (settings: AgentProviderSettings, options: LanguageModelV3Cal
       : undefined,
   );
   const threadOptions = {
-    workingDirectory: settings.cwd,
+    workingDirectory: ensureSafeCurrentWorkingDirectory(settings.cwd),
     ...(settings.model ? { model: settings.model } : {}),
   };
   const thread = settings.sessionId

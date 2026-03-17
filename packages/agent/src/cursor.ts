@@ -7,6 +7,7 @@ import type {
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
 } from "@ai-sdk/provider";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { Effect, Layer, Predicate, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
 import { CursorSpawnError } from "./errors.js";
@@ -206,7 +207,7 @@ const spawnCursorAgent = async function* (
 ): AsyncGenerator<Record<string, unknown>> {
   if (signal?.aborted) throw signal.reason;
 
-  const realWorkspace = settings.cwd ?? process.cwd();
+  const realWorkspace = ensureSafeCurrentWorkingDirectory(settings.cwd);
   const overlayDir = settings.mcpServers
     ? createWorkspaceOverlay(
         realWorkspace,

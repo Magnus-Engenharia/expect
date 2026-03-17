@@ -1,6 +1,7 @@
-import { readFileSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type {
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
@@ -32,6 +33,16 @@ const loadFixture = (name: string): Record<string, unknown>[] =>
 const defaultOptions: LanguageModelV3CallOptions = {
   prompt: [{ role: "user", content: [{ type: "text", text: "test" }] }],
 };
+
+let safeDirectory: string | undefined;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  if (safeDirectory) {
+    rmSync(safeDirectory, { recursive: true, force: true });
+    safeDirectory = undefined;
+  }
+});
 
 const generateWith = (events: Record<string, unknown>[]) => {
   pendingEvents = events;
@@ -225,6 +236,22 @@ describe("createClaudeModel", () => {
         if (originalSafeValue === undefined) delete process.env.BROWSER_TESTER_SAFE_ENV;
         else process.env.BROWSER_TESTER_SAFE_ENV = originalSafeValue;
       }
+    });
+
+    it("uses the provided cwd when process.cwd throws", async () => {
+      safeDirectory = mkdtempSync(join(tmpdir(), "claude-cwd-"));
+      vi.spyOn(process, "cwd").mockImplementation(() => {
+        throw new Error("uv_cwd");
+      });
+      const changeDirectory = vi.spyOn(process, "chdir").mockImplementation(() => undefined);
+
+      pendingEvents = [sdkAssistant([{ type: "text", text: "Hi" }])];
+      lastQueryOptions = undefined;
+
+      await createClaudeModel({ cwd: safeDirectory }).doGenerate(defaultOptions);
+
+      expect(changeDirectory).toHaveBeenCalledWith(safeDirectory);
+      expect(lastQueryOptions).toMatchObject({ cwd: safeDirectory });
     });
 
     it("skips system and result events", async () => {

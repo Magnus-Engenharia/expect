@@ -14,5 +14,9 @@ export {
 export { execCommand } from "./exec-command";
 export { formatError } from "./format-error";
 export { getEpochSeconds } from "./get-epoch-seconds";
+export {
+  ensureSafeCurrentWorkingDirectory,
+  resolveSafeCurrentWorkingDirectory,
+} from "./get-safe-current-working-directory";
 export { isRecord } from "./is-record";
 export { sleep } from "./sleep";

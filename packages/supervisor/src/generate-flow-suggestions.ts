@@ -1,4 +1,5 @@
 import { BROWSER_TEST_MODEL, CODEX_PLANNER_MODEL, DEFAULT_AGENT_PROVIDER } from "./constants.js";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { createAgentModel } from "./create-agent-model.js";
 import { extractJsonObject } from "./json.js";
 import type { AgentProvider, ChangedFile } from "./types.js";
@@ -58,7 +59,7 @@ export const generateFlowSuggestions = async (
 
   try {
     const model = createAgentModel(provider, {
-      cwd: process.cwd(),
+      cwd: ensureSafeCurrentWorkingDirectory(),
       effort: "low",
       maxTurns: 1,
       ...(provider === "claude"

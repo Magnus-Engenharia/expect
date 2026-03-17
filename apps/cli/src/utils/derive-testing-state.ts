@@ -29,7 +29,6 @@ export const deriveTestingState = (
   plan: BrowserFlowPlan,
   events: BrowserRunEvent[],
   toolCallDisplayMode: string,
-  isRunning: boolean,
 ): DerivedTestingState => {
   const stepStateById = new Map<string, StepDisplayState>();
 
@@ -49,6 +48,12 @@ export const deriveTestingState = (
   for (const event of events) {
     switch (event.type) {
       case "step-started": {
+        if (activeStepId && activeStepId !== event.stepId) {
+          const previousActiveStepState = stepStateById.get(activeStepId);
+          if (previousActiveStepState?.status === "active") {
+            previousActiveStepState.status = "pending";
+          }
+        }
         const stepState = stepStateById.get(event.stepId);
         if (stepState) {
           stepState.status = "active";
@@ -65,7 +70,7 @@ export const deriveTestingState = (
           stepState.label = event.summary;
           if (activeStepId === event.stepId) {
             activeStepId = null;
-            activeStepStartedAt = event.timestamp;
+            activeStepStartedAt = null;
             currentToolCallText = null;
           }
         }
@@ -78,7 +83,7 @@ export const deriveTestingState = (
           stepState.label = event.message;
           if (activeStepId === event.stepId) {
             activeStepId = null;
-            activeStepStartedAt = event.timestamp;
+            activeStepStartedAt = null;
             currentToolCallText = null;
           }
         }
@@ -112,13 +117,6 @@ export const deriveTestingState = (
         label: planStep.title,
       },
   );
-
-  if (isRunning && !activeStepId) {
-    const firstPending = steps.find((step) => step.status === "pending");
-    if (firstPending) {
-      firstPending.status = "active";
-    }
-  }
 
   const completedCount = steps.filter(
     (step) => step.status === "passed" || step.status === "failed",

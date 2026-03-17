@@ -1,13 +1,13 @@
-import { existsSync, mkdirSync } from "node:fs";
+import * as fs from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import * as nodeOs from "node:os";
+import path from "node:path";
 import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
 } from "@ai-sdk/provider";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { Effect, Layer, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
 import { ClaudeQueryError } from "./errors.js";
@@ -27,12 +27,12 @@ import type { AgentProviderSettings } from "./types.js";
 import { buildClaudeProcessEnv } from "./utils/build-claude-process-env.js";
 
 const DEFAULT_CLAUDE_MAX_TURNS = 200;
-const AGENT_LOG_DIRECTORY = join(tmpdir(), "browser-tester-agent-logs");
+const AGENT_LOG_DIRECTORY = path.join(nodeOs.tmpdir(), "browser-tester-agent-logs");
 
 const createAgentDebugLogPath = (): string => {
-  mkdirSync(AGENT_LOG_DIRECTORY, { recursive: true });
+  fs.mkdirSync(AGENT_LOG_DIRECTORY, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return join(AGENT_LOG_DIRECTORY, `${timestamp}.log`);
+  return path.join(AGENT_LOG_DIRECTORY, `${timestamp}.log`);
 };
 
 const resolveClaudeExecutablePath = (): string | undefined => {
@@ -40,8 +40,8 @@ const resolveClaudeExecutablePath = (): string | undefined => {
 
   try {
     const sdkEntryPath = require.resolve("@anthropic-ai/claude-agent-sdk");
-    const sdkCliPath = join(dirname(sdkEntryPath), "cli.js");
-    return existsSync(sdkCliPath) ? sdkCliPath : undefined;
+    const sdkCliPath = path.join(path.dirname(sdkEntryPath), "cli.js");
+    return fs.existsSync(sdkCliPath) ? sdkCliPath : undefined;
   } catch {
     return undefined;
   }
@@ -60,6 +60,7 @@ const runGenerate = Effect.fn("ClaudeAgent.generate")(function* (
 
   yield* Effect.tryPromise({
     try: async () => {
+      const query = await loadClaudeQuery(settings.cwd);
       for await (const event of query({
         prompt: userPrompt,
         options: buildQueryOptions(settings, abortController, systemPrompt),
@@ -114,6 +115,7 @@ const runStream = Effect.fn("ClaudeAgent.stream")(function* (
 
   const stream = buildAgentStream(
     async (controller) => {
+      const query = await loadClaudeQuery(settings.cwd);
       let sessionId: string | undefined;
       let blockCounter = 0;
 
@@ -190,7 +192,7 @@ const buildQueryOptions = (
   return {
     model: resolvedModel,
     maxTurns: settings.maxTurns ?? DEFAULT_CLAUDE_MAX_TURNS,
-    cwd: settings.cwd ?? process.cwd(),
+    cwd: ensureSafeCurrentWorkingDirectory(settings.cwd),
     allowDangerouslySkipPermissions:
       settings.permissionMode === "bypassPermissions" ? true : undefined,
     permissionMode: settings.permissionMode ?? "bypassPermissions",
@@ -203,4 +205,10 @@ const buildQueryOptions = (
     ...(settings.mcpServers ? { mcpServers: settings.mcpServers } : {}),
     ...(explicitExecutablePath ? { pathToClaudeCodeExecutable: explicitExecutablePath } : {}),
   };
+};
+
+const loadClaudeQuery = async (preferredDirectory?: string) => {
+  ensureSafeCurrentWorkingDirectory(preferredDirectory);
+  const { query } = await import("@anthropic-ai/claude-agent-sdk");
+  return query;
 };

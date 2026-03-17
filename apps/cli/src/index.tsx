@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { Command, InvalidOptionArgumentError } from "commander";
 import { render } from "ink";
 import { App } from "./components/app.js";
@@ -66,6 +67,8 @@ Environment variables:
   );
 
 const isHeadless = () => isRunningInAgent() || !process.stdin.isTTY;
+
+ensureSafeCurrentWorkingDirectory();
 
 const renderApp = () => {
   const initialTheme = loadThemeName() ?? undefined;

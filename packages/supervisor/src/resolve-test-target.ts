@@ -16,6 +16,7 @@ import {
   getUnstagedDiffPreview,
   getUnstagedDiffStats,
 } from "./git.js";
+import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import type { ResolveTestTargetOptions, TestTarget } from "./types.js";
 
 const resolveCommitDisplayName = (commitShortHash?: string, commitSubject?: string): string => {
@@ -25,7 +26,7 @@ const resolveCommitDisplayName = (commitShortHash?: string, commitSubject?: stri
 };
 
 export const resolveTestTarget = (options: ResolveTestTargetOptions): TestTarget => {
-  const cwd = options.cwd ?? process.cwd();
+  const cwd = ensureSafeCurrentWorkingDirectory(options.cwd);
   const currentBranchName = getCurrentBranchName(cwd);
   const mainBranchName = getMainBranchName(cwd);
 

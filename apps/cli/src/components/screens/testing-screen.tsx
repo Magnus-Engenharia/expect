@@ -67,8 +67,8 @@ export const TestingScreen = () => {
   const runFiberRef = useRef<Fiber.Fiber<unknown, unknown> | null>(null);
 
   const derivedState = useMemo(
-    () => (plan ? deriveTestingState(plan, events, toolCallDisplayMode, running) : null),
-    [plan, events, toolCallDisplayMode, running],
+    () => (plan ? deriveTestingState(plan, events, toolCallDisplayMode) : null),
+    [plan, events, toolCallDisplayMode],
   );
 
   const elapsedTimeLabel = useMemo(() => formatElapsedTime(elapsedTimeMs), [elapsedTimeMs]);
