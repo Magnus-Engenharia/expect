@@ -39,7 +39,7 @@ export type {
   RunMemoryStepOutcome,
 } from "./memory/index.js";
 export { generateFlowSuggestions } from "./generate-flow-suggestions.js";
-export { planBrowserFlow } from "./plan-browser-flow.js";
+export { planBrowserFlow, streamPlanBrowserFlow, type PlanningStreamEvent } from "./plan-browser-flow.js";
 export { formatDiffStats } from "./utils/format-diff-stats.js";
 export { isRunningInAgent } from "./utils/is-running-in-agent.js";
 export { resolveAgentProvider } from "./utils/resolve-agent-provider.js";

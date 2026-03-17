@@ -15,7 +15,7 @@ import { ThemePickerScreen } from "./screens/theme-picker-screen.js";
 import { MainMenu } from "./screens/main-menu-screen.js";
 import { Modeline } from "./ui/modeline.js";
 import { resolveBrowserTarget, getBrowserEnvironment } from "../utils/browser-agent.js";
-import { planBrowserFlow, resolveAgentProvider } from "@browser-tester/supervisor";
+import { streamPlanBrowserFlow, resolveAgentProvider } from "@browser-tester/supervisor";
 import { useAppStore } from "../store.js";
 import { CliRuntime } from "../runtime.js";
 import { saveFlow } from "../utils/flow-storage.js";
@@ -42,7 +42,15 @@ const usePlanningEffect = () => {
       commit: selectedCommit ?? undefined,
     });
     const environment = getBrowserEnvironment(environmentOverrides);
-    useAppStore.setState({ resolvedTarget: target, resolvedPlanningProvider: null });
+    useAppStore.setState({ resolvedTarget: target, resolvedPlanningProvider: null, planningThinkingLines: [] });
+
+    const handlePlanningEvent = (event: { kind: string; text?: string }) => {
+      if (event.kind === "thinking" && event.text) {
+        useAppStore.setState((state) => ({
+          planningThinkingLines: [...state.planningThinkingLines, event.text as string],
+        }));
+      }
+    };
 
     const planningFiber = Effect.runFork(
       resolveAgentProvider(planningProvider).pipe(
@@ -52,13 +60,16 @@ const usePlanningEffect = () => {
           ),
         ),
         Effect.flatMap(() =>
-          planBrowserFlow({
-            target,
-            userInstruction: flowInstruction,
-            environment,
-            provider: planningProvider,
-            ...(planningModel ? { providerSettings: { model: planningModel } } : {}),
-          }),
+          streamPlanBrowserFlow(
+            {
+              target,
+              userInstruction: flowInstruction,
+              environment,
+              provider: planningProvider,
+              ...(planningModel ? { providerSettings: { model: planningModel } } : {}),
+            },
+            handlePlanningEvent,
+          ),
         ),
         Effect.tap((plan) => Effect.sync(() => completePlanning({ target, plan, environment }))),
         Effect.catch((caughtError) =>

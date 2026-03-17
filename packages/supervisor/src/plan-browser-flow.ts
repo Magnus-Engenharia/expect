@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV3, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import type { AgentProviderSettings } from "@browser-tester/agent";
 import { Effect, Option, Result, Schema } from "effect";
 import {
@@ -359,4 +359,181 @@ export const planBrowserFlow = Effect.fn("planBrowserFlow")(function* (
       changedFileEvidence: [...(step.changedFileEvidence ?? [])],
     })) satisfies PlanStep[],
   };
+});
+
+export interface PlanningThinkingEvent {
+  kind: "thinking";
+  text: string;
+}
+
+export interface PlanningCompleteEvent {
+  kind: "complete";
+  plan: ReturnType<typeof parsePlanFromText> extends Effect.Effect<infer A, unknown, unknown>
+    ? A
+    : never;
+}
+
+export type PlanningStreamEvent = PlanningThinkingEvent | PlanningCompleteEvent;
+
+const streamGeneratePlanResponse = Effect.fn("streamGeneratePlanResponse")(function* (
+  options: PlanBrowserFlowOptions,
+  prompt: string,
+  provider: NonNullable<PlanBrowserFlowOptions["provider"]>,
+) {
+  const model: LanguageModelV3 =
+    options.model ??
+    createAgentModel(provider, buildPlannerModelSettings({ ...options, provider }));
+
+  return yield* Effect.tryPromise({
+    try: () =>
+      model.doStream({
+        prompt: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+      }),
+    catch: (cause) =>
+      ({
+        cause,
+        authMessage: detectAuthError(provider, cause),
+      }) satisfies PlannerModelFailure,
+  });
+});
+
+const resolveStreamingResponse = Effect.fn("resolveStreamingResponse")(function* (
+  options: PlanBrowserFlowOptions,
+  prompt: string,
+) {
+  if (options.model) {
+    return yield* streamGeneratePlanResponse(
+      options,
+      prompt,
+      options.provider ?? DEFAULT_AGENT_PROVIDER,
+    ).pipe(
+      Effect.mapError(
+        (failure) =>
+          new PlanningError({
+            stage: "model generation",
+            cause: failure.authMessage ?? failure.cause,
+          }),
+      ),
+    );
+  }
+
+  const resolvedAgentProvider = yield* resolveAgentProvider(options.provider).pipe(
+    Effect.mapError((cause) => new PlanningError({ stage: "agent selection", cause })),
+  );
+  const providersToTry = [
+    resolvedAgentProvider.provider,
+    ...resolvedAgentProvider.fallbackProviders,
+  ] as const;
+
+  for (const [providerIndex, provider] of providersToTry.entries()) {
+    const attempt = yield* Effect.result(streamGeneratePlanResponse(options, prompt, provider));
+
+    if (Result.isSuccess(attempt)) {
+      return attempt.success;
+    }
+
+    const isLastProvider = providerIndex === providersToTry.length - 1;
+
+    if (
+      resolvedAgentProvider.explicit ||
+      attempt.failure.authMessage === undefined ||
+      isLastProvider
+    ) {
+      return yield* new PlanningError({
+        stage: "model generation",
+        cause: attempt.failure.authMessage ?? attempt.failure.cause,
+      }).asEffect();
+    }
+  }
+
+  return yield* new PlanningError({
+    stage: "model generation",
+    cause: "No available planning agent could complete the request.",
+  }).asEffect();
+});
+
+const parsePlanFromText = Effect.fn("parsePlanFromText")(function* (
+  text: string,
+  options: PlanBrowserFlowOptions,
+) {
+  const parsedJson = yield* Effect.try({
+    try: () => JSON.parse(extractJsonObject(text)),
+    catch: (cause) => new PlanParseError({ stage: "json extraction", cause }),
+  });
+
+  const parsedPlan = yield* Schema.decodeUnknownEffect(BrowserFlowPlanSchema)(
+    findPlanCandidate(parsedJson),
+  ).pipe(Effect.mapError((cause) => new PlanParseError({ stage: "schema decode", cause })));
+
+  if (parsedPlan.steps.length === 0 || parsedPlan.steps.length > PLANNER_MAX_STEP_COUNT) {
+    return yield* new PlanParseError({
+      stage: "schema decode",
+      cause: `Expected between 1 and ${PLANNER_MAX_STEP_COUNT} steps.`,
+    }).asEffect();
+  }
+
+  return {
+    ...parsedPlan,
+    assumptions: [...(parsedPlan.assumptions ?? [])],
+    riskAreas: [...(parsedPlan.riskAreas ?? [])],
+    targetUrls: [...(parsedPlan.targetUrls ?? [])],
+    userInstruction: options.userInstruction,
+    steps: parsedPlan.steps.map((step, index) => ({
+      ...step,
+      id: step.id ?? `step-${String(index + 1).padStart(STEP_ID_PAD_LENGTH, "0")}`,
+      routeHint: step.routeHint ?? undefined,
+      changedFileEvidence: [...(step.changedFileEvidence ?? [])],
+    })) satisfies PlanStep[],
+  };
+});
+
+export const streamPlanBrowserFlow = Effect.fn("streamPlanBrowserFlow")(function* (
+  options: PlanBrowserFlowOptions,
+  onEvent: (event: PlanningStreamEvent) => void,
+) {
+  yield* Effect.annotateCurrentSpan({
+    cwd: options.target.cwd,
+    scope: options.target.scope,
+  });
+
+  const memoryContext = yield* Effect.try({
+    try: () =>
+      retrievePlannerMemory(options.target.cwd, {
+        instruction: options.userInstruction,
+      }),
+    catch: (cause) => new MemoryRetrievalError({ stage: "planner", cause }),
+  }).pipe(
+    Effect.map(Option.some),
+    Effect.catchTag("MemoryRetrievalError", () => Effect.succeed(Option.none<string>())),
+  );
+
+  const prompt = buildPlanningPrompt(options, Option.getOrUndefined(memoryContext));
+  const streamResult = yield* resolveStreamingResponse(options, prompt);
+
+  let accumulatedText = "";
+  const reader = streamResult.stream.getReader();
+
+  yield* Effect.tryPromise({
+    try: async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const part = value as LanguageModelV3StreamPart;
+
+        if (part.type === "reasoning-delta" && part.delta) {
+          onEvent({ kind: "thinking", text: part.delta });
+        }
+
+        if (part.type === "text-delta") {
+          accumulatedText += part.delta;
+        }
+      }
+    },
+    catch: (cause) => new PlanningError({ stage: "stream consumption", cause }),
+  });
+
+  const plan = yield* parsePlanFromText(accumulatedText, options);
+  onEvent({ kind: "complete", plan });
+  return plan;
 });

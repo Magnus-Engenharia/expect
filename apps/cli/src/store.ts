@@ -56,6 +56,7 @@ interface AppStore {
   browserEnvironment: BrowserEnvironmentHints | null;
   environmentOverrides: EnvironmentOverrides | undefined;
   planningError: string | null;
+  planningThinkingLines: string[];
   planOrigin: "generated" | "saved" | null;
   savedFlowSummaries: SavedFlowSummary[];
   pendingSavedFlow: LoadedSavedFlow | null;
@@ -119,6 +120,7 @@ const RESET_FLOW_STATE = {
   flowInstruction: "",
   environmentOverrides: undefined,
   planningError: null,
+  planningThinkingLines: [],
   planOrigin: null,
 };
 
@@ -151,6 +153,7 @@ export const useAppStore = create<AppStore>((set) => ({
   browserEnvironment: null,
   environmentOverrides: undefined,
   planningError: null,
+  planningThinkingLines: [],
   planOrigin: null,
   savedFlowSummaries: [],
   pendingSavedFlow: null,
@@ -258,6 +261,7 @@ export const useAppStore = create<AppStore>((set) => ({
       testAction: action,
       selectedCommit: null,
       planningError: null,
+  planningThinkingLines: [],
       planOrigin: "saved",
       screen: "saved-flow-picker",
     }),
@@ -287,6 +291,7 @@ export const useAppStore = create<AppStore>((set) => ({
       flowInstruction: instruction,
       flowInstructionHistory: rememberFlowInstruction(state.flowInstructionHistory, instruction),
       planningError: null,
+  planningThinkingLines: [],
       planOrigin: "generated",
       screen: "planning",
     })),
