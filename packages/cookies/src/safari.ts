@@ -44,7 +44,7 @@ export class SafariSource extends ServiceMap.Service<SafariSource>()(
 
           return [new SafariBrowser({ cookieFilePath })];
         }).pipe(
-          Effect.catchTag(("PlatformError", (cause) =>
+          Effect.catchTag("PlatformError", (cause) =>
             new ListBrowsersError({ cause: String(cause) }).asEffect()
           )
         )
