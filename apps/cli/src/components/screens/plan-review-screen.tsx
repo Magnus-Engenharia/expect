@@ -589,16 +589,17 @@ export const PlanReviewScreen = () => {
                 </Clickable>
                 {isSelected ? (
                   <Box flexDirection="column">
+                    <Text color={railColor}>{`${continuation}  `}<Text color={COLORS.DIM}>ACTION</Text></Text>
                     <Box>
                       <Text color={railColor}>{`${continuation}  `}</Text>
-                      <Text color={COLORS.DIM}>{"ACTION   "}</Text>
                       <Box flexShrink={1}>
                         <Text color={COLORS.TEXT} wrap="wrap">{step.instruction}</Text>
                       </Box>
                     </Box>
+                    <Text color={railColor}>{`${continuation}`}</Text>
+                    <Text color={railColor}>{`${continuation}  `}<Text color={COLORS.DIM}>EXPECTED</Text></Text>
                     <Box>
                       <Text color={railColor}>{`${continuation}  `}</Text>
-                      <Text color={COLORS.DIM}>{"EXPECTED "}</Text>
                       <Box flexShrink={1}>
                         <Text color={COLORS.GREEN} wrap="wrap">{step.expectedOutcome}</Text>
                       </Box>
