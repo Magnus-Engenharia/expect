@@ -375,16 +375,17 @@ export interface PlanningCompleteEvent {
 
 export type PlanningStreamEvent = PlanningThinkingEvent | PlanningCompleteEvent;
 
-const streamGeneratePlanResponse = Effect.fn("streamGeneratePlanResponse")(function* (
+const streamAndConsumeWithProvider = Effect.fn("streamAndConsumeWithProvider")(function* (
   options: PlanBrowserFlowOptions,
   prompt: string,
   provider: NonNullable<PlanBrowserFlowOptions["provider"]>,
+  onEvent: (event: PlanningStreamEvent) => void,
 ) {
   const model: LanguageModelV3 =
     options.model ??
     createAgentModel(provider, buildPlannerModelSettings({ ...options, provider }));
 
-  return yield* Effect.tryPromise({
+  const streamResult = yield* Effect.tryPromise({
     try: () =>
       model.doStream({
         prompt: [{ role: "user", content: [{ type: "text", text: prompt }] }],
@@ -395,17 +396,62 @@ const streamGeneratePlanResponse = Effect.fn("streamGeneratePlanResponse")(funct
         authMessage: detectAuthError(provider, cause),
       }) satisfies PlannerModelFailure,
   });
+
+  let accumulatedText = "";
+  let accumulatedReasoning = "";
+  let streamError: unknown = null;
+  const reader = streamResult.stream.getReader();
+
+  yield* Effect.tryPromise({
+    try: async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const part = value as LanguageModelV3StreamPart;
+
+        if (part.type === "reasoning-delta") {
+          accumulatedReasoning += part.delta;
+          onEvent({ kind: "thinking", text: part.delta });
+        }
+
+        if (part.type === "text-delta") {
+          accumulatedText += part.delta;
+        }
+
+        if (part.type === "error") {
+          streamError = (part as unknown as { error: unknown }).error;
+        }
+      }
+    },
+    catch: (cause) =>
+      ({
+        cause,
+        authMessage: detectAuthError(provider, cause),
+      }) satisfies PlannerModelFailure,
+  });
+
+  if (streamError && accumulatedText.length === 0 && accumulatedReasoning.length === 0) {
+    return yield* Effect.fail({
+      cause: streamError,
+      authMessage: detectAuthError(provider, streamError),
+    } satisfies PlannerModelFailure);
+  }
+
+  return { accumulatedText, accumulatedReasoning };
 });
 
-const resolveStreamingResponse = Effect.fn("resolveStreamingResponse")(function* (
+const resolveStreamingContent = Effect.fn("resolveStreamingContent")(function* (
   options: PlanBrowserFlowOptions,
   prompt: string,
+  onEvent: (event: PlanningStreamEvent) => void,
 ) {
   if (options.model) {
-    return yield* streamGeneratePlanResponse(
+    return yield* streamAndConsumeWithProvider(
       options,
       prompt,
       options.provider ?? DEFAULT_AGENT_PROVIDER,
+      onEvent,
     ).pipe(
       Effect.mapError(
         (failure) =>
@@ -426,7 +472,9 @@ const resolveStreamingResponse = Effect.fn("resolveStreamingResponse")(function*
   ] as const;
 
   for (const [providerIndex, provider] of providersToTry.entries()) {
-    const attempt = yield* Effect.result(streamGeneratePlanResponse(options, prompt, provider));
+    const attempt = yield* Effect.result(
+      streamAndConsumeWithProvider(options, prompt, provider, onEvent),
+    );
 
     if (Result.isSuccess(attempt)) {
       return attempt.success;
@@ -508,51 +556,9 @@ export const streamPlanBrowserFlow = Effect.fn("streamPlanBrowserFlow")(function
   );
 
   const prompt = buildPlanningPrompt(options, Option.getOrUndefined(memoryContext));
-  const streamResult = yield* resolveStreamingResponse(options, prompt);
+  const result = yield* resolveStreamingContent(options, prompt, onEvent);
 
-  let accumulatedText = "";
-  let accumulatedReasoning = "";
-  const seenPartTypes = new Set<string>();
-  const reader = streamResult.stream.getReader();
-
-  yield* Effect.tryPromise({
-    try: async () => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const part = value as LanguageModelV3StreamPart;
-        seenPartTypes.add(part.type);
-
-        if (part.type === "reasoning-delta") {
-          accumulatedReasoning += part.delta;
-          onEvent({ kind: "thinking", text: part.delta });
-        }
-
-        if (part.type === "text-delta") {
-          accumulatedText += part.delta;
-        }
-
-        if (part.type === "error") {
-          process.stderr.write(`[plan-debug] stream error: ${JSON.stringify(part)}\n`);
-        }
-      }
-    },
-    catch: (cause) => new PlanningError({ stage: "stream consumption", cause }),
-  });
-
-  const textToParse = accumulatedText || accumulatedReasoning;
-
-  process.stderr.write(
-    `\n[plan-debug] text=${accumulatedText.length} reasoning=${accumulatedReasoning.length} partTypes=${[...seenPartTypes].join(",")}\n`,
-  );
-  if (accumulatedText.length > 0) {
-    process.stderr.write(`[plan-debug] textPreview: ${accumulatedText.slice(0, 300)}\n`);
-  }
-  if (accumulatedReasoning.length > 0) {
-    process.stderr.write(`[plan-debug] reasoningPreview: ${accumulatedReasoning.slice(0, 300)}\n`);
-  }
-
+  const textToParse = result.accumulatedText || result.accumulatedReasoning;
   const plan = yield* parsePlanFromText(textToParse, options);
   onEvent({ kind: "complete", plan });
   return plan;
