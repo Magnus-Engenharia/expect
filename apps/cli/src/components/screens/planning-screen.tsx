@@ -56,15 +56,17 @@ const getStageIndex = (elapsed: number): number => {
 
 const FINAL_STAGE_DURATION_MS = 15000;
 const PROGRESS_TICK_MS = 100;
+const CYCLE_DURATION_MS = PLANNING_STAGES[PLANNING_STAGES.length - 1].after + FINAL_STAGE_DURATION_MS;
 
 const getSmoothProgress = (elapsed: number): number => {
-  const stageIndex = getStageIndex(elapsed);
+  const looped = elapsed % CYCLE_DURATION_MS;
+  const stageIndex = getStageIndex(looped);
   const currentAfter = PLANNING_STAGES[stageIndex].after;
   const nextAfter =
     stageIndex < PLANNING_STAGES.length - 1
       ? PLANNING_STAGES[stageIndex + 1].after
       : currentAfter + FINAL_STAGE_DURATION_MS;
-  const stageProgress = Math.min(1, (elapsed - currentAfter) / (nextAfter - currentAfter));
+  const stageProgress = Math.min(1, (looped - currentAfter) / (nextAfter - currentAfter));
   return (stageIndex + stageProgress) / PLANNING_STAGES.length;
 };
 

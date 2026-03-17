@@ -189,7 +189,7 @@ export const Modeline = () => {
 
   return (
     <Box flexDirection="column">
-      {screen === "planning" || screen === "testing" ? (
+      {screen === "testing" ? (
         <TextShimmer
           text={"─".repeat(columns)}
           baseColor={theme.border}
