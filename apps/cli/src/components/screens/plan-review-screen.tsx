@@ -5,9 +5,9 @@ import { useColors } from "../theme-context.js";
 import { stripMouseSequences } from "../../hooks/mouse-context.js";
 import { Clickable } from "../ui/clickable.js";
 import { RuledBox } from "../ui/ruled-box.js";
-import { Collapsible } from "../ui/collapsible.js";
 import { FileLink } from "../ui/file-link.js";
 import { ContextPicker } from "../ui/context-picker.js";
+import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions.js";
 import { saveFlow } from "../../utils/save-flow.js";
 import { useAppStore } from "../../store.js";
 import { ErrorMessage } from "../ui/error-message.js";
@@ -17,21 +17,6 @@ import {
   filterContextOptions,
   type ContextOption,
 } from "../../utils/context-options.js";
-import type { BrowserFlowPlan } from "@browser-tester/supervisor";
-
-type Section = "details" | "assumptions" | "cookies" | "steps";
-
-interface SectionItem {
-  kind: "section";
-  section: Section;
-}
-
-interface StepItem {
-  kind: "step";
-  stepIndex: number;
-}
-
-type NavigableItem = SectionItem | StepItem;
 
 interface StepEditingState {
   kind: "step";
@@ -44,58 +29,9 @@ interface AssumptionsEditingState {
 
 type EditingState = StepEditingState | AssumptionsEditingState | null;
 
-interface PlanStepRowProps {
-  step: BrowserFlowPlan["steps"][number];
-  stepNumber: number;
-  selected: boolean;
-  onClick: () => void;
-}
-
-const PlanStepRow = ({ step, stepNumber, selected, onClick }: PlanStepRowProps) => {
-  const COLORS = useColors();
-
-  return (
-    <Clickable onClick={onClick}>
-      <Text>
-        <Text color={selected ? COLORS.PRIMARY : COLORS.DIM}>
-          {String(stepNumber).padStart(2, " ")}.{" "}
-        </Text>
-        <Text color={selected ? COLORS.PRIMARY : COLORS.TEXT} bold={selected}>
-          {step.title}
-        </Text>
-      </Text>
-    </Clickable>
-  );
-};
-
-interface StepPreviewProps {
-  step: BrowserFlowPlan["steps"][number];
-  stepNumber: number;
-  totalSteps: number;
-}
-
-const StepPreview = ({ step, stepNumber, totalSteps }: StepPreviewProps) => {
-  const COLORS = useColors();
-
-  return (
-    <RuledBox color={COLORS.BORDER}>
-      <Text color={COLORS.PRIMARY} bold>
-        STEP {stepNumber}/{totalSteps} │ {step.title}
-      </Text>
-      <Text color={COLORS.DIM}>
-        {"ACTION    "}
-        <Text color={COLORS.TEXT}>{step.instruction}</Text>
-      </Text>
-      <Text color={COLORS.DIM}>
-        {"EXPECTED  "}
-        <Text color={COLORS.GREEN}>{step.expectedOutcome}</Text>
-      </Text>
-    </RuledBox>
-  );
-};
-
 export const PlanReviewScreen = () => {
   const COLORS = useColors();
+  const [columns] = useStdoutDimensions();
   const plan = useAppStore((state) => state.generatedPlan);
   const environment = useAppStore((state) => state.browserEnvironment);
   const resolvedTarget = useAppStore((state) => state.resolvedTarget);
@@ -105,7 +41,6 @@ export const PlanReviewScreen = () => {
   const requestPlanApproval = useAppStore((state) => state.requestPlanApproval);
   const loadSavedFlows = useAppStore((state) => state.loadSavedFlows);
   const flowInstruction = useAppStore((state) => state.flowInstruction);
-  const selectedContext = useAppStore((state) => state.selectedContext);
   const storeSelectContext = useAppStore((state) => state.selectContext);
   const gitState = useAppStore((state) => state.gitState);
   const navigateTo = useAppStore((state) => state.navigateTo);
@@ -113,11 +48,6 @@ export const PlanReviewScreen = () => {
   const submitFlowInstruction = useAppStore((state) => state.submitFlowInstruction);
   const testAction = useAppStore((state) => state.testAction);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
-    details: true,
-    assumptions: true,
-    cookies: true,
-  });
   const [editingState, setEditingState] = useState<EditingState>(null);
   const [editingValue, setEditingValue] = useState("");
   const [savedPaths, setSavedPaths] = useState<{
@@ -241,42 +171,31 @@ export const PlanReviewScreen = () => {
   const cookieSyncIsRequired = plan.cookieSync.required;
   const cookieSyncNeedsAttention = cookieSyncIsRequired && !cookiesEnabled;
 
-  const items: NavigableItem[] = useMemo(() => {
-    const result: NavigableItem[] = [];
-    result.push({ kind: "section", section: "details" });
-    if (cookieSyncIsRequired) {
-      result.push({ kind: "section", section: "cookies" });
-    }
+  type RailSection = "info" | "steps";
+
+  type RailItem =
+    | { kind: "details"; section: RailSection }
+    | { kind: "assumptions"; section: RailSection }
+    | { kind: "cookies"; section: RailSection }
+    | { kind: "step"; stepIndex: number; section: RailSection };
+
+  const railItems: RailItem[] = useMemo(() => {
+    const result: RailItem[] = [];
+    result.push({ kind: "details", section: "info" });
     if (plan.assumptions.length > 0) {
-      result.push({ kind: "section", section: "assumptions" });
+      result.push({ kind: "assumptions", section: "info" });
     }
-    result.push({ kind: "section", section: "steps" });
-    if (!collapsed["steps"]) {
-      plan.steps.forEach((_, index) => {
-        result.push({ kind: "step", stepIndex: index });
-      });
+    if (cookieSyncIsRequired) {
+      result.push({ kind: "cookies", section: "info" });
     }
+    plan.steps.forEach((_, index) => {
+      result.push({ kind: "step", stepIndex: index, section: "steps" });
+    });
     return result;
-  }, [cookieSyncIsRequired, plan, collapsed]);
+  }, [plan, cookieSyncIsRequired]);
 
-  const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
-  useEffect(() => {
-    if (hasInitializedSelection) return;
-    const firstStepIndex = items.findIndex((item) => item.kind === "step" && item.stepIndex === 0);
-    if (firstStepIndex >= 0) {
-      setSelectedIndex(firstStepIndex);
-      setHasInitializedSelection(true);
-    }
-  }, [items, hasInitializedSelection]);
-
-  const currentItem = items[selectedIndex];
-
-  const toggleSection = (section: Section) => {
-    setCollapsed((previous) => ({
-      ...previous,
-      [section]: !previous[section],
-    }));
-  };
+  const totalItems = railItems.length;
+  const currentRailItem = railItems[selectedIndex];
 
   useInput((input, key) => {
     if (editingState) {
@@ -345,7 +264,7 @@ export const PlanReviewScreen = () => {
     }
 
     if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
-      setSelectedIndex((previous) => Math.min(items.length - 1, previous + 1));
+      setSelectedIndex((previous) => Math.min(totalItems - 1, previous + 1));
     }
     if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       if (selectedIndex === 0) {
@@ -355,22 +274,19 @@ export const PlanReviewScreen = () => {
       }
     }
 
-    if (key.tab && !key.shift && currentItem?.kind === "section") {
-      toggleSection(currentItem.section);
-    }
     if (key.shift && key.tab) {
       setTopFocus("input");
     }
 
-    if (input === "e" && currentItem?.kind === "step") {
-      const step = plan.steps[currentItem.stepIndex];
+    if (input === "e" && currentRailItem?.kind === "step") {
+      const step = plan.steps[currentRailItem.stepIndex];
       if (step) {
-        setEditingState({ kind: "step", stepIndex: currentItem.stepIndex });
+        setEditingState({ kind: "step", stepIndex: currentRailItem.stepIndex });
         setEditingValue(step.instruction);
       }
     }
 
-    if (input === "e" && currentItem?.kind === "section" && currentItem.section === "assumptions") {
+    if (input === "e" && currentRailItem?.kind === "assumptions") {
       setEditingState({ kind: "assumptions" });
       setEditingValue(plan.assumptions.join("\n"));
     }
@@ -448,20 +364,14 @@ export const PlanReviewScreen = () => {
     setResubmitConfirmVisible(true);
   };
 
-  const isSectionSelected = (section: Section) =>
-    currentItem?.kind === "section" && currentItem.section === section;
+  const railColor = COLORS.BORDER;
 
   return (
     <Box flexDirection="column" width="100%" paddingY={1}>
-      <Box flexDirection="column">
-        {selectedContext ? (
-          <Box paddingX={1}>
-            <Text color={COLORS.DIM}>{selectedContext.label}</Text>
-          </Box>
-        ) : null}
-        <Clickable onClick={() => setTopFocus("input")}>
-          <RuledBox color={inputFocused ? COLORS.PRIMARY : COLORS.BORDER}>
-            {inputFocused ? (
+      {inputFocused ? (
+        <Box flexDirection="column">
+          <Clickable onClick={() => setTopFocus("input")}>
+            <RuledBox color={COLORS.PRIMARY}>
               <Box>
                 <Text color={COLORS.PRIMARY}>{"❯ "}</Text>
                 <Input
@@ -472,37 +382,35 @@ export const PlanReviewScreen = () => {
                   onChange={handleInputChange}
                 />
               </Box>
-            ) : (
-              <Text color={COLORS.DIM}>{flowInstruction}</Text>
-            )}
-          </RuledBox>
-        </Clickable>
-        {pickerOpen ? (
-          <Box flexDirection="column">
-            <Box marginBottom={0} paddingX={1}>
-              <Text color={COLORS.DIM}>@ </Text>
-              <Text color={COLORS.PRIMARY}>{pickerQuery}</Text>
-              <Text color={COLORS.DIM}>{pickerQuery ? "" : "type to filter"}</Text>
+            </RuledBox>
+          </Clickable>
+          {pickerOpen ? (
+            <Box flexDirection="column">
+              <Box marginBottom={0} paddingX={1}>
+                <Text color={COLORS.DIM}>@ </Text>
+                <Text color={COLORS.PRIMARY}>{pickerQuery}</Text>
+                <Text color={COLORS.DIM}>{pickerQuery ? "" : "type to filter"}</Text>
+              </Box>
+              <ContextPicker
+                options={filteredOptions}
+                selectedIndex={pickerIndex}
+                isLoading={remoteLoading}
+                query={pickerQuery}
+                onQueryChange={setPickerQuery}
+                onSelect={handleContextSelect}
+                onNavigate={setPickerIndex}
+                onDismiss={closePicker}
+              />
             </Box>
-            <ContextPicker
-              options={filteredOptions}
-              selectedIndex={pickerIndex}
-              isLoading={remoteLoading}
-              query={pickerQuery}
-              onQueryChange={setPickerQuery}
-              onSelect={handleContextSelect}
-              onNavigate={setPickerIndex}
-              onDismiss={closePicker}
-            />
-          </Box>
-        ) : inputFocused ? (
-          <Box paddingX={1}>
-            <Text color={COLORS.DIM}>
-              type <Text color={COLORS.PRIMARY}>@</Text> to set context
-            </Text>
-          </Box>
-        ) : null}
-      </Box>
+          ) : (
+            <Box paddingX={1}>
+              <Text color={COLORS.DIM}>
+                type <Text color={COLORS.PRIMARY}>@</Text> to set context
+              </Text>
+            </Box>
+          )}
+        </Box>
+      ) : null}
 
       {resubmitConfirmVisible ? (
         <RuledBox color={COLORS.YELLOW} marginTop={1}>
@@ -517,167 +425,192 @@ export const PlanReviewScreen = () => {
         </RuledBox>
       ) : null}
 
-      {cookieSyncIsRequired ? (
-        <RuledBox color={cookieSyncNeedsAttention ? COLORS.RED : COLORS.YELLOW} marginTop={1}>
-          <Text color={cookieSyncNeedsAttention ? COLORS.RED : COLORS.YELLOW} bold>
-            {cookieSyncNeedsAttention
-              ? "Cookie sync is required and currently off."
-              : "Cookie sync is enabled for this plan."}
+      {!inputFocused ? (
+        <Box flexDirection="column" paddingX={1}>
+          <Text color={COLORS.BORDER}>
+            <Text bold color={COLORS.TEXT}>BROWSER TEST PLAN</Text>
+            {" "}
+            {"─".repeat(Math.max(0, columns - 20))}
           </Text>
-          <Text color={COLORS.DIM}>
-            <Text color={COLORS.TEXT}>{plan.cookieSync.reason}</Text>
-          </Text>
-          <Text color={COLORS.DIM}>
-            {cookieSyncNeedsAttention
-              ? "Running without synced cookies will make this browser test less reliable and more likely to fail."
-              : "This run will inherit your synced cookies, which should make authenticated checks more reliable."}
-          </Text>
-          {cookieSyncNeedsAttention ? (
-            <Text color={COLORS.DIM}>
-              Press <Text color={COLORS.PRIMARY}>c</Text> to turn cookie sync on before approving.
-            </Text>
-          ) : null}
-        </RuledBox>
-      ) : null}
 
-      <Box flexDirection="column" marginTop={1} paddingX={1}>
-        <Collapsible
-          label="Details"
-          selected={isSectionSelected("details")}
-          open={!collapsed["details"]}
-          onToggle={() => toggleSection("details")}
-        >
-          <Text color={COLORS.DIM}>{plan.rationale}</Text>
           <Box marginTop={1}>
-            <Text color={COLORS.DIM}>{plan.targetSummary}</Text>
-          </Box>
-        </Collapsible>
-      </Box>
-
-      {cookieSyncIsRequired ? (
-        <Box flexDirection="column" marginTop={1} paddingX={1}>
-          <Collapsible
-            label="Cookie sync"
-            selected={isSectionSelected("cookies")}
-            open={!collapsed["cookies"]}
-            onToggle={() => toggleSection("cookies")}
-          >
-            <Text color={COLORS.DIM}>
-              {"REQUIRED  "}
-              <Text color={COLORS.YELLOW} bold>
-                yes
-              </Text>
-            </Text>
-            <Text color={COLORS.DIM}>
-              {"REASON    "}
-              <Text color={COLORS.TEXT}>{plan.cookieSync.reason}</Text>
-            </Text>
-            <Clickable
-              onClick={() =>
-                updateEnvironment({
-                  ...(environment ?? {}),
-                  cookies: !cookiesEnabled,
-                })
-              }
-            >
-              <Text color={COLORS.DIM}>
-                {"SYNC      "}
-                <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.RED} bold>
-                  {cookiesEnabled ? "on" : "off"}
-                </Text>
-                <Text color={COLORS.DIM}> (c to toggle)</Text>
-              </Text>
-            </Clickable>
-            <Text color={COLORS.DIM}>
-              {"IMPACT    "}
-              <Text color={cookieSyncNeedsAttention ? COLORS.RED : COLORS.TEXT}>
-                {cookieSyncNeedsAttention
-                  ? "Without synced cookies, this run is more likely to fail."
-                  : "Synced cookies will make the run more reliable."}
-              </Text>
-            </Text>
-          </Collapsible>
-        </Box>
-      ) : null}
-
-      {plan.assumptions.length > 0 ? (
-        <Box flexDirection="column" marginTop={1} paddingX={1}>
-          <Collapsible
-            label="Assumptions"
-            count={plan.assumptions.length}
-            selected={isSectionSelected("assumptions")}
-            open={!collapsed["assumptions"]}
-            onToggle={() => toggleSection("assumptions")}
-          >
-            {plan.assumptions.map((assumption, index) => (
-              <Text key={`${assumption}-${index}`} color={COLORS.DIM}>
-                {"· "}
-                {assumption}
-              </Text>
-            ))}
-            {isSectionSelected("assumptions") && !editingAssumptions ? (
-              <Text color={COLORS.DIM}>
-                <Text color={COLORS.PRIMARY}>e</Text>
-                {" to edit assumptions or add notes"}
-              </Text>
-            ) : null}
-          </Collapsible>
-        </Box>
-      ) : null}
-
-      {savedPaths ? (
-        <Box marginTop={1} flexDirection="column" paddingX={1}>
-          <Text color={COLORS.GREEN}>
-            Saved <FileLink path={savedPaths.flowPath} />
-          </Text>
-          <Text color={COLORS.GREEN}>
-            Updated <FileLink path={savedPaths.directoryPath} />
-          </Text>
-        </Box>
-      ) : null}
-
-      <Box paddingX={1}>
-        <ErrorMessage message={saveError} />
-      </Box>
-
-      <Box flexDirection="column" marginTop={1} paddingX={1}>
-        <Collapsible
-          label="Steps"
-          count={plan.steps.length}
-          selected={isSectionSelected("steps")}
-          open={!collapsed["steps"]}
-          onToggle={() => toggleSection("steps")}
-        >
-          <Box flexDirection="column">
-            {plan.steps.map((step, index) => {
-              const selected = currentItem?.kind === "step" && currentItem.stepIndex === index;
-              return (
-                <PlanStepRow
-                  key={step.id}
-                  step={step}
-                  stepNumber={index + 1}
-                  selected={selected}
-                  onClick={() => {
-                    const itemIndex = items.findIndex(
-                      (item) => item.kind === "step" && item.stepIndex === index,
-                    );
-                    if (itemIndex >= 0) setSelectedIndex(itemIndex);
-                  }}
-                />
-              );
-            })}
-          </Box>
-          {currentItem?.kind === "step" && plan.steps[currentItem.stepIndex] ? (
-            <Box marginTop={1}>
-              <StepPreview
-                step={plan.steps[currentItem.stepIndex]}
-                stepNumber={currentItem.stepIndex + 1}
-                totalSteps={plan.steps.length}
-              />
+            <Text color={railColor}>{"┌  "}</Text>
+            <Box flexShrink={1}>
+              <Text color={COLORS.TEXT} wrap="wrap">{flowInstruction}</Text>
             </Box>
-          ) : null}
-        </Collapsible>
-      </Box>
+          </Box>
+
+          <Box>
+            <Text color={railColor}>{"│  "}</Text>
+            <Text color={COLORS.DIM}>{resolvedTarget.displayName}</Text>
+          </Box>
+
+          <Text color={railColor}>{"│"}</Text>
+
+          {railItems.map((item, index) => {
+            const isSelected = index === selectedIndex;
+            const isLast = index === railItems.length - 1;
+            const continuation = isLast ? " " : "│";
+            const previousItem = index > 0 ? railItems[index - 1] : null;
+            const sectionBreak = previousItem !== null && previousItem.section !== item.section;
+
+            if (item.kind === "details") {
+              return (
+                <Box key="details" flexDirection="column">
+                  <Clickable onClick={() => setSelectedIndex(index)}>
+                    <Box>
+                      <Text color={isSelected ? COLORS.PRIMARY : railColor}>
+                        {isSelected ? "◆" : "◇"}{" "}
+                      </Text>
+                      <Text color={isSelected ? COLORS.PRIMARY : COLORS.TEXT} bold={isSelected}>
+                        Details
+                      </Text>
+                    </Box>
+                  </Clickable>
+                  {isSelected ? (
+                    <Box flexDirection="column">
+                      {plan.rationale ? (
+                        <Box>
+                          <Text color={railColor}>{`${continuation}  `}</Text>
+                          <Box flexShrink={1}>
+                            <Text color={COLORS.DIM} wrap="wrap">{plan.rationale}</Text>
+                          </Box>
+                        </Box>
+                      ) : null}
+                      {plan.targetSummary ? (
+                        <Box>
+                          <Text color={railColor}>{`${continuation}  `}</Text>
+                          <Box flexShrink={1}>
+                            <Text color={COLORS.DIM} wrap="wrap">{plan.targetSummary}</Text>
+                          </Box>
+                        </Box>
+                      ) : null}
+                    </Box>
+                  ) : null}
+                </Box>
+              );
+            }
+
+            if (item.kind === "assumptions") {
+              return (
+                <Box key="assumptions" flexDirection="column">
+                  <Clickable onClick={() => setSelectedIndex(index)}>
+                    <Box>
+                      <Text color={isSelected ? COLORS.PRIMARY : railColor}>
+                        {isSelected ? "◆" : "◇"}{" "}
+                      </Text>
+                      <Text color={isSelected ? COLORS.PRIMARY : COLORS.TEXT} bold={isSelected}>
+                        Assumptions
+                      </Text>
+                      <Text color={COLORS.DIM}>{` [${plan.assumptions.length}]`}</Text>
+                    </Box>
+                  </Clickable>
+                  {isSelected ? (
+                    <Box flexDirection="column">
+                      {plan.assumptions.map((assumption, assumptionIndex) => (
+                        <Box key={`a-${assumptionIndex}`}>
+                          <Text color={railColor}>{`${continuation}  `}</Text>
+                          <Text color={COLORS.DIM}>{"· "}</Text>
+                          <Box flexShrink={1}>
+                            <Text color={COLORS.DIM} wrap="wrap">{assumption}</Text>
+                          </Box>
+                        </Box>
+                      ))}
+                      <Box>
+                        <Text color={railColor}>{`${continuation}  `}</Text>
+                        <Text color={COLORS.DIM}>
+                          <Text color={COLORS.PRIMARY}>e</Text>{" to edit"}
+                        </Text>
+                      </Box>
+                    </Box>
+                  ) : null}
+                </Box>
+              );
+            }
+
+            if (item.kind === "cookies") {
+              return (
+                <Box key="cookies" flexDirection="column">
+                  <Clickable onClick={() => setSelectedIndex(index)}>
+                    <Box>
+                      <Text color={isSelected ? COLORS.PRIMARY : (cookieSyncNeedsAttention ? COLORS.RED : railColor)}>
+                        {isSelected ? "◆" : "◇"}{" "}
+                      </Text>
+                      <Text
+                        color={isSelected ? COLORS.PRIMARY : (cookieSyncNeedsAttention ? COLORS.RED : COLORS.TEXT)}
+                        bold={isSelected}
+                      >
+                        Cookie sync
+                      </Text>
+                      <Text color={cookiesEnabled ? COLORS.GREEN : COLORS.RED}>
+                        {cookiesEnabled ? " on" : " off"}
+                      </Text>
+                    </Box>
+                  </Clickable>
+                  {isSelected ? (
+                    <Box flexDirection="column">
+                      <Box>
+                        <Text color={railColor}>{`${continuation}  `}</Text>
+                        <Box flexShrink={1}>
+                          <Text color={COLORS.DIM} wrap="wrap">{plan.cookieSync.reason}</Text>
+                        </Box>
+                      </Box>
+                      <Box>
+                        <Text color={railColor}>{`${continuation}  `}</Text>
+                        <Text color={COLORS.DIM}>
+                          <Text color={COLORS.PRIMARY}>c</Text>{" to toggle"}
+                        </Text>
+                      </Box>
+                    </Box>
+                  ) : null}
+                </Box>
+              );
+            }
+
+            const step = plan.steps[item.stepIndex];
+            return (
+              <Box key={step.id} flexDirection="column">
+                {sectionBreak ? (
+                  <Box marginTop={1} marginBottom={1}>
+                    <Text color={COLORS.BORDER}>
+                      {"STEPS "}{"─".repeat(Math.max(0, columns - 8))}
+                    </Text>
+                  </Box>
+                ) : null}
+                <Clickable onClick={() => setSelectedIndex(index)}>
+                  <Box>
+                    <Text color={isSelected ? COLORS.PRIMARY : railColor}>
+                      {isSelected ? "◆" : "◇"}{" "}
+                    </Text>
+                    <Text color={isSelected ? COLORS.PRIMARY : COLORS.TEXT} bold={isSelected}>
+                      {step.title}
+                    </Text>
+                  </Box>
+                </Clickable>
+                {isSelected ? (
+                  <Box flexDirection="column">
+                    <Box>
+                      <Text color={railColor}>{`${continuation}  `}</Text>
+                      <Text color={COLORS.DIM}>{"ACTION   "}</Text>
+                      <Box flexShrink={1}>
+                        <Text color={COLORS.TEXT} wrap="wrap">{step.instruction}</Text>
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Text color={railColor}>{`${continuation}  `}</Text>
+                      <Text color={COLORS.DIM}>{"EXPECTED "}</Text>
+                      <Box flexShrink={1}>
+                        <Text color={COLORS.GREEN} wrap="wrap">{step.expectedOutcome}</Text>
+                      </Box>
+                    </Box>
+                  </Box>
+                ) : null}
+              </Box>
+            );
+          })}
+
+        </Box>
+      ) : null}
 
       {editingState ? (
         <Box flexDirection="column" marginTop={1} paddingX={1}>
@@ -700,6 +633,21 @@ export const PlanReviewScreen = () => {
           </Box>
         </Box>
       ) : null}
+
+      {savedPaths ? (
+        <Box marginTop={1} flexDirection="column" paddingX={1}>
+          <Text color={COLORS.GREEN}>
+            Saved <FileLink path={savedPaths.flowPath} />
+          </Text>
+          <Text color={COLORS.GREEN}>
+            Updated <FileLink path={savedPaths.directoryPath} />
+          </Text>
+        </Box>
+      ) : null}
+
+      <Box paddingX={1}>
+        <ErrorMessage message={saveError} />
+      </Box>
 
       {saving ? (
         <Box marginTop={1} paddingX={1}>
