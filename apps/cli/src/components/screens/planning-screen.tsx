@@ -25,60 +25,40 @@ const PLANNING_STAGES = [
 
 const STAGE_LABEL_WIDTH = Math.max(...PLANNING_STAGES.map((stage) => stage.label.length));
 
-const THINKING_FRAGMENTS: Record<number, readonly string[]> = {
-  0: [
-    "scanning modified files for testable surfaces...",
-    "checking diff for UI component changes...",
-    "evaluating changeset scope and risk profile...",
-  ],
-  1: [
-    "parsing added and removed lines...",
-    "identifying affected rendering paths...",
-    "correlating file changes with route handlers...",
-  ],
-  2: [
-    "mapping user-facing interactions...",
-    "checking form inputs, buttons, and navigation targets...",
-    "evaluating conditional rendering branches...",
-  ],
-  3: [
-    "tracing component dependency graph...",
-    "resolving shared state between changed modules...",
-    "identifying integration boundaries...",
-  ],
-  4: [
-    "constructing navigation sequence...",
-    "ordering steps by dependency chain...",
-    "defining browser actions for each test surface...",
-  ],
-  5: [
-    "planning viewport interactions...",
-    "sequencing click, type, and wait actions...",
-    "adding assertion checkpoints between steps...",
-  ],
-  6: [
-    "deriving expected DOM state after each action...",
-    "mapping visual assertions to component output...",
-    "checking for error state edge cases...",
-  ],
-  7: [
-    "validating assertion coverage...",
-    "cross-referencing steps with changed lines...",
-    "confirming expected outcomes are observable...",
-  ],
-  8: [
-    "verifying step ordering is deterministic...",
-    "checking for redundant or overlapping assertions...",
-    "ensuring plan covers critical paths...",
-  ],
-  9: [
-    "assembling final plan structure...",
-    "writing step metadata and risk annotations...",
-  ],
-};
+const THINKING_LINES = [
+  "looking at the changed files",
+  "3 files modified — plan-review-screen.tsx, planning-screen.tsx, modeline.tsx",
+  "the main surface area is the plan review component",
+  "checking what the diff actually changes...",
+  "ok so the rendering logic was refactored significantly",
+  "collapsibles replaced with a vertical rail pattern",
+  "need to verify the rail items render correctly",
+  "also the navigation model changed — steps are now direct items",
+  "the modeline got new keybinds for the planning screen",
+  "should test that the agent label shows up",
+  "thinking about the right step sequence",
+  "step 1: open the app and verify initial render",
+  "step 2: submit a test prompt and enter planning",
+  "step 3: verify the planning screen shows progress",
+  "step 4: review the generated plan",
+  "need to check that step selection works with arrow keys",
+  "step 5: expand a step and verify action/expected display",
+  "step 6: test the edit flow on a step instruction",
+  "checking if cookie sync UI needs coverage...",
+  "the cookie sync toggle is on the plan review rail",
+  "step 7: approve the plan and verify transition",
+  "considering edge cases — empty plan, long text wrapping",
+  "mapping expected outcomes for each step",
+  "verifying assertions are observable in the DOM",
+  "cross-referencing coverage with the actual diff",
+  "looks good — finalizing the plan structure",
+  "writing step metadata",
+];
 
-const TOKEN_SPEED_MS = 30;
-const FRAGMENT_PAUSE_MS = 800;
+const BASE_TOKEN_MS = 22;
+const TOKEN_JITTER_MS = 35;
+const BASE_PAUSE_MS = 400;
+const PAUSE_JITTER_MS = 1200;
 
 const TIPS = [
   "Use @ in the input to target a specific PR, branch, or commit",
@@ -154,25 +134,26 @@ export const PlanningScreen = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const stageIndex = getStageIndex(Date.now() - startTime);
-    const fragments = THINKING_FRAGMENTS[stageIndex] ?? THINKING_FRAGMENTS[9];
-    const fragment = fragments[thinkingKey % fragments.length];
+    const line = THINKING_LINES[thinkingKey % THINKING_LINES.length];
     let charIndex = 0;
     setCurrentLine("");
 
     const typeNextChar = () => {
       if (cancelled) return;
-      if (charIndex <= fragment.length) {
-        setCurrentLine(fragment.slice(0, charIndex));
+      if (charIndex <= line.length) {
+        setCurrentLine(line.slice(0, charIndex));
         charIndex++;
-        setTimeout(typeNextChar, TOKEN_SPEED_MS);
+        const jitter = Math.random() * TOKEN_JITTER_MS;
+        const charDelay = line[charIndex - 1] === " " ? BASE_TOKEN_MS + jitter * 2 : BASE_TOKEN_MS + jitter;
+        setTimeout(typeNextChar, charDelay);
       } else {
+        const pause = BASE_PAUSE_MS + Math.random() * PAUSE_JITTER_MS;
         setTimeout(() => {
           if (!cancelled) {
-            setCompletedLines((previous) => [...previous, fragment]);
+            setCompletedLines((previous) => [...previous, line]);
             setThinkingKey((previous) => previous + 1);
           }
-        }, FRAGMENT_PAUSE_MS);
+        }, pause);
       }
     };
     typeNextChar();
@@ -180,7 +161,7 @@ export const PlanningScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [thinkingKey, startTime]);
+  }, [thinkingKey]);
 
   const stageLabel = getStageLabel(elapsed);
   const smoothProgress = getSmoothProgress(progressElapsed);
