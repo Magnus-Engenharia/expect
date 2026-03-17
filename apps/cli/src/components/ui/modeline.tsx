@@ -117,7 +117,19 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
       return hints;
     }
     case "results": {
+      const resultsHints: HintSegment[] = [];
+      const videoPath = latestRunReport?.artifacts.redactedVideoPath ?? latestRunReport?.artifacts.rawVideoPath;
+      if (videoPath) {
+        resultsHints.push({ key: "v", label: "open video" });
+      }
+      if (latestRunReport?.artifacts.highlightVideoPath) {
+        resultsHints.push({ key: "h", label: "highlight reel" });
+      }
+      if (latestRunReport?.artifacts.shareUrl) {
+        resultsHints.push({ key: "o", label: "open report" });
+      }
       return [
+        ...resultsHints,
         { key: "y", label: "copy", color: COLORS.PRIMARY, cta: true },
         ...(latestRunReport?.pullRequest ? [{ key: "p", label: "post to PR", cta: true }] : []),
         { key: "esc", label: "main menu", cta: true, onClick: goBack },

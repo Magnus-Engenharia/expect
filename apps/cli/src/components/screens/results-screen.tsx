@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Box, Text, useInput } from "ink";
 import Link from "ink-link";
 import { postPullRequestComment, type BrowserRunReport } from "@browser-tester/supervisor";
 import { useAppStore } from "../../store.js";
 import { copyToClipboard } from "../../utils/copy-to-clipboard.js";
+import { openUrl } from "../../utils/open-url.js";
 import { useColors } from "../theme-context.js";
 import { RuledBox } from "../ui/ruled-box.js";
 import { ScreenHeading } from "../ui/screen-heading.js";
@@ -119,6 +122,10 @@ export const ResultsScreen = () => {
       });
   };
 
+  const openLocalFile = (filePath: string) => {
+    openUrl(pathToFileURL(resolve(filePath)).href);
+  };
+
   useInput((input) => {
     const normalizedInput = input.toLowerCase();
 
@@ -129,6 +136,27 @@ export const ResultsScreen = () => {
 
     if (normalizedInput === "p") {
       handlePostPullRequestComment();
+      return;
+    }
+
+    if (normalizedInput === "v" && latestRunReport) {
+      const videoPath = latestRunReport.artifacts.redactedVideoPath ?? latestRunReport.artifacts.rawVideoPath;
+      if (videoPath) openLocalFile(videoPath);
+      return;
+    }
+
+    if (normalizedInput === "h" && latestRunReport?.artifacts.highlightVideoPath) {
+      openLocalFile(latestRunReport.artifacts.highlightVideoPath);
+      return;
+    }
+
+    if (normalizedInput === "o" && latestRunReport?.artifacts.shareUrl) {
+      const url = latestRunReport.artifacts.shareUrl;
+      if (isRemoteUrl(url)) {
+        openUrl(url);
+      } else {
+        openLocalFile(url);
+      }
     }
   });
 
