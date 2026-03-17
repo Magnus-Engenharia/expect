@@ -1,4 +1,4 @@
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, it } from "vitest";
 import { Effect } from "effect";
 import { CdpClient } from "../src/cdp-client.js";
 
@@ -8,12 +8,14 @@ const CHROME_EXECUTABLE_PATH = "/Applications/Google Chrome.app/Contents/MacOS/G
 const CdpTestLayer = CdpClient.layer;
 
 describe("CdpClient", () => {
-  it.live(
+  it(
     "extracts cookies from a Chrome profile via CDP",
+    { timeout: 30_000 },
     () =>
       Effect.gen(function* () {
         const cdpClient = yield* CdpClient;
         const cookies = yield* cdpClient.extractCookies({
+          key: "chrome",
           profilePath: CHROME_PROFILE_PATH,
           executablePath: CHROME_EXECUTABLE_PATH,
         });
@@ -28,16 +30,17 @@ describe("CdpClient", () => {
         assert.isString(first.path);
         assert.isBoolean(first.secure);
         assert.isBoolean(first.httpOnly);
-      }).pipe(Effect.scoped, Effect.provide(CdpTestLayer)),
-    { timeout: 30_000 },
+      }).pipe(Effect.scoped, Effect.provide(CdpTestLayer), Effect.runPromise),
   );
 
-  it.effect(
+  it(
     "returns cookies with stripped leading dots on domains",
+    { timeout: 30_000 },
     () =>
       Effect.gen(function* () {
         const cdpClient = yield* CdpClient;
         const cookies = yield* cdpClient.extractCookies({
+          key: "chrome",
           profilePath: CHROME_PROFILE_PATH,
           executablePath: CHROME_EXECUTABLE_PATH,
         });
@@ -48,7 +51,6 @@ describe("CdpClient", () => {
             `domain should not start with dot: ${cookie.domain}`,
           );
         }
-      }).pipe(Effect.scoped, Effect.provide(CdpTestLayer)),
-    { timeout: 30_000 },
+      }).pipe(Effect.scoped, Effect.provide(CdpTestLayer), Effect.runPromise),
   );
 });
