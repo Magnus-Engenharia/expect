@@ -8,7 +8,7 @@ import { RuledBox } from "../ui/ruled-box.js";
 import { FileLink } from "../ui/file-link.js";
 import { ContextPicker } from "../ui/context-picker.js";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions.js";
-import { saveFlow } from "../../utils/save-flow.js";
+import { saveFlow } from "../../utils/flow-storage.js";
 import { useAppStore } from "../../store.js";
 import { ErrorMessage } from "../ui/error-message.js";
 import {
