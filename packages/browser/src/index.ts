@@ -17,6 +17,7 @@ export type {
 } from "@browser-tester/cookies";
 export {
   ActionTimeoutError,
+  ActionUnknownError,
   BrowserLaunchError,
   NavigationError,
   RefAmbiguousError,

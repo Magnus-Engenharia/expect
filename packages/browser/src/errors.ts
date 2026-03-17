@@ -64,6 +64,16 @@ export class ActionTimeoutError extends Schema.ErrorClass<ActionTimeoutError>("A
   message = `Action on "${this.ref}" timed out. The element may be blocked or still loading. Run snapshot to check.`;
 }
 
+export class ActionUnknownError extends Schema.ErrorClass<ActionUnknownError>("ActionUnknownError")(
+  {
+    _tag: Schema.tag("ActionUnknownError"),
+    ref: Schema.String,
+    cause: Schema.String,
+  },
+) {
+  message = `Action on "${this.ref}" failed: ${this.cause}`;
+}
+
 export class NavigationError extends Schema.ErrorClass<NavigationError>("NavigationError")({
   _tag: Schema.tag("NavigationError"),
   url: Schema.String,
@@ -76,4 +86,5 @@ export type ActionError =
   | RefAmbiguousError
   | RefBlockedError
   | RefNotVisibleError
-  | ActionTimeoutError;
+  | ActionTimeoutError
+  | ActionUnknownError;

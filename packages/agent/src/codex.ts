@@ -9,18 +9,19 @@ import type {
 import { Effect, Layer, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
 import { CodexRunError } from "./errors.js";
-import { EMPTY_USAGE, PROVIDER_ID, STOP_REASON } from "./provider-shared.js";
+import { EMPTY_USAGE, PROVIDER_ID, STOP_REASON, buildAgentStream } from "./provider-shared.js";
 import type { AgentProviderSettings } from "./types.js";
 
 const runGenerate = Effect.fn("CodexAgent.generate")(function* (
   options: LanguageModelV3CallOptions,
   settings: AgentProviderSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: "codex" });
   const { thread, input, userPrompt } = prepareRun(settings, options);
 
   const result = yield* Effect.tryPromise({
     try: () => thread.run(input, { signal: options.abortSignal }),
-    catch: (cause) => new CodexRunError({ cause }),
+    catch: (cause) => new CodexRunError({ cause: String(cause) }),
   });
 
   return {
@@ -52,50 +53,39 @@ const runStream = Effect.fn("CodexAgent.stream")(function* (
   options: LanguageModelV3CallOptions,
   settings: AgentProviderSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: "codex" });
   const { thread, input, userPrompt } = prepareRun(settings, options);
 
-  const stream = new ReadableStream<LanguageModelV3StreamPart>({
-    start: (controller) => {
+  const stream = buildAgentStream(
+    async (controller) => {
       let sessionId: string | undefined;
 
-      return Effect.runPromise(
-        Effect.tryPromise({
-          try: async () => {
-            controller.enqueue({ type: "stream-start", warnings: [] });
-            const { events } = await thread.runStreamed(input, { signal: options.abortSignal });
+      controller.enqueue({ type: "stream-start", warnings: [] });
+      const { events } = await thread.runStreamed(input, { signal: options.abortSignal });
 
-            for await (const event of events) {
-              if (event.type === "thread.started") {
-                sessionId = event.thread_id;
-                controller.enqueue({
-                  type: "response-metadata",
-                  id: sessionId,
-                  timestamp: new Date(),
-                  modelId: "codex",
-                });
-              }
-              if (event.type === "item.completed") emitItemParts(event.item, controller);
-            }
+      for await (const event of events) {
+        if (event.type === "thread.started") {
+          sessionId = event.thread_id;
+          controller.enqueue({
+            type: "response-metadata",
+            id: sessionId,
+            timestamp: new Date(),
+            modelId: "codex",
+          });
+        }
+        if (event.type === "item.completed") emitItemParts(event.item, controller);
+      }
 
-            if (!sessionId && thread.id) sessionId = thread.id;
-            controller.enqueue({
-              type: "finish",
-              finishReason: STOP_REASON,
-              usage: EMPTY_USAGE,
-              providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
-            });
-          },
-          catch: (cause) => new CodexRunError({ cause }),
-        }).pipe(
-          Effect.catchTag("CodexRunError", (error) =>
-            Effect.sync(() => controller.enqueue({ type: "error", error })),
-          ),
-        ),
-      )
-        .catch((defect) => controller.enqueue({ type: "error", error: defect }))
-        .finally(() => controller.close());
+      if (!sessionId && thread.id) sessionId = thread.id;
+      controller.enqueue({
+        type: "finish",
+        finishReason: STOP_REASON,
+        usage: EMPTY_USAGE,
+        providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
+      });
     },
-  });
+    (cause) => new CodexRunError({ cause: String(cause) }),
+  );
 
   return { stream, request: { body: userPrompt } };
 });

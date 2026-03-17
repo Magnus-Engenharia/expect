@@ -6,7 +6,6 @@ import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
-  LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { Effect, Layer, Predicate, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
@@ -15,6 +14,7 @@ import {
   EMPTY_USAGE,
   PROVIDER_ID,
   STOP_REASON,
+  buildAgentStream,
   convertAssistantBlocks,
   convertToolResultBlocks,
   emitAssistantParts,
@@ -32,6 +32,7 @@ const runGenerate = Effect.fn("CursorAgent.generate")(function* (
   options: LanguageModelV3CallOptions,
   settings: CursorSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: settings.model ?? "cursor" });
   const { userPrompt } = convertPrompt(options.prompt);
   const content: LanguageModelV3Content[] = [];
   let sessionId: string | undefined;
@@ -51,7 +52,10 @@ const runGenerate = Effect.fn("CursorAgent.generate")(function* (
       }
     },
     catch: (cause) =>
-      new CursorSpawnError({ executable: settings.executable ?? "cursor-agent", cause }),
+      new CursorSpawnError({
+        executable: settings.executable ?? "cursor-agent",
+        cause: String(cause),
+      }),
   });
 
   return {
@@ -73,70 +77,62 @@ const runStream = Effect.fn("CursorAgent.stream")(function* (
   options: LanguageModelV3CallOptions,
   settings: CursorSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: settings.model ?? "cursor" });
   const { userPrompt } = convertPrompt(options.prompt);
 
-  const stream = new ReadableStream<LanguageModelV3StreamPart>({
-    start: (controller) => {
+  const stream = buildAgentStream(
+    async (controller) => {
       let sessionId: string | undefined;
       let blockCounter = 0;
 
-      return Effect.runPromise(
-        Effect.tryPromise({
-          try: async () => {
-            controller.enqueue({ type: "stream-start", warnings: [] });
+      controller.enqueue({ type: "stream-start", warnings: [] });
 
-            for await (const event of spawnCursorAgent(userPrompt, settings, options.abortSignal)) {
-              const eventSessionId = extractSessionId(event);
-              if (eventSessionId) {
-                if (!sessionId)
-                  controller.enqueue({
-                    type: "response-metadata",
-                    id: eventSessionId,
-                    timestamp: new Date(),
-                    modelId: settings.model ?? "cursor",
-                  });
-                sessionId = eventSessionId;
-              }
-
-              if (
-                event.type === "thinking" &&
-                event.subtype === "delta" &&
-                typeof event.text === "string"
-              ) {
-                const blockId = `block-${blockCounter++}`;
-                controller.enqueue({ type: "reasoning-start", id: blockId });
-                controller.enqueue({ type: "reasoning-delta", id: blockId, delta: event.text });
-                controller.enqueue({ type: "reasoning-end", id: blockId });
-              }
-
-              if (event.type === "assistant") {
-                const messageContent = extractMessageContent(event);
-                if (messageContent) {
-                  blockCounter = emitAssistantParts(messageContent, controller, blockCounter);
-                  emitToolResultParts(messageContent, controller);
-                }
-              }
-            }
-
+      for await (const event of spawnCursorAgent(userPrompt, settings, options.abortSignal)) {
+        const eventSessionId = extractSessionId(event);
+        if (eventSessionId) {
+          if (!sessionId)
             controller.enqueue({
-              type: "finish",
-              finishReason: STOP_REASON,
-              usage: EMPTY_USAGE,
-              providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
+              type: "response-metadata",
+              id: eventSessionId,
+              timestamp: new Date(),
+              modelId: settings.model ?? "cursor",
             });
-          },
-          catch: (cause) =>
-            new CursorSpawnError({ executable: settings.executable ?? "cursor-agent", cause }),
-        }).pipe(
-          Effect.catchTag("CursorSpawnError", (error) =>
-            Effect.sync(() => controller.enqueue({ type: "error", error })),
-          ),
-        ),
-      )
-        .catch((defect) => controller.enqueue({ type: "error", error: defect }))
-        .finally(() => controller.close());
+          sessionId = eventSessionId;
+        }
+
+        if (
+          event.type === "thinking" &&
+          event.subtype === "delta" &&
+          typeof event.text === "string"
+        ) {
+          const blockId = `block-${blockCounter++}`;
+          controller.enqueue({ type: "reasoning-start", id: blockId });
+          controller.enqueue({ type: "reasoning-delta", id: blockId, delta: event.text });
+          controller.enqueue({ type: "reasoning-end", id: blockId });
+        }
+
+        if (event.type === "assistant") {
+          const messageContent = extractMessageContent(event);
+          if (messageContent) {
+            blockCounter = emitAssistantParts(messageContent, controller, blockCounter);
+            emitToolResultParts(messageContent, controller);
+          }
+        }
+      }
+
+      controller.enqueue({
+        type: "finish",
+        finishReason: STOP_REASON,
+        usage: EMPTY_USAGE,
+        providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
+      });
     },
-  });
+    (cause) =>
+      new CursorSpawnError({
+        executable: settings.executable ?? "cursor-agent",
+        cause: String(cause),
+      }),
+  );
 
   return { stream, request: { body: userPrompt } };
 });

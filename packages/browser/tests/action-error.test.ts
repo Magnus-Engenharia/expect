@@ -27,9 +27,7 @@ describe("toActionError", () => {
 
   describe("RefBlockedError", () => {
     it("matches '{desc} intercepts pointer events'", () => {
-      const error = new Error(
-        '<div class="overlay">overlay</div> intercepts pointer events',
-      );
+      const error = new Error('<div class="overlay">overlay</div> intercepts pointer events');
       const result = toActionError(error, "e2");
       expect(result._tag).toBe("RefBlockedError");
       expect(result.ref).toBe("e2");

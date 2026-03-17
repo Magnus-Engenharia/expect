@@ -1,5 +1,6 @@
 import {
   ActionTimeoutError,
+  ActionUnknownError,
   RefAmbiguousError,
   RefBlockedError,
   RefNotVisibleError,
@@ -114,5 +115,5 @@ export const toActionError = (error: unknown, ref: string): ActionError => {
     return new ActionTimeoutError({ ref });
   }
 
-  return new ActionTimeoutError({ ref });
+  return new ActionUnknownError({ ref, cause: errorMessage });
 };

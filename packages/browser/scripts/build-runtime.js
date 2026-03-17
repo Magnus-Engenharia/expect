@@ -8,7 +8,9 @@ const emitPlugin = {
   setup(build) {
     build.onEnd((result) => {
       if (result.errors.length > 0) return;
-      const runtimeCode = result.outputFiles[0].text;
+      const runtimeCode =
+        `${result.outputFiles[0].text}\n` +
+        "globalThis.__browserTesterRuntime = __browserTesterRuntime;\n";
       mkdirSync("src/generated", { recursive: true });
       writeFileSync(
         "src/generated/runtime-script.ts",

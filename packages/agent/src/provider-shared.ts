@@ -1,5 +1,5 @@
 import type { LanguageModelV3Content, LanguageModelV3StreamPart } from "@ai-sdk/provider";
-import { Predicate } from "effect";
+import { Effect, Predicate } from "effect";
 import { serializeToolResult } from "./utils/serialize-tool-result.js";
 
 export const PROVIDER_ID = "browser-tester-agent";
@@ -129,3 +129,23 @@ export const emitToolResultParts = (
     });
   }
 };
+
+export const buildAgentStream = (
+  execute: (
+    controller: ReadableStreamDefaultController<LanguageModelV3StreamPart>,
+  ) => Promise<void>,
+  toError: (cause: unknown) => { readonly _tag: string },
+): ReadableStream<LanguageModelV3StreamPart> =>
+  new ReadableStream<LanguageModelV3StreamPart>({
+    start: (controller) =>
+      Effect.runPromise(
+        Effect.tryPromise({
+          try: () => execute(controller),
+          catch: (cause) => toError(cause),
+        }).pipe(
+          Effect.catch((error) => Effect.sync(() => controller.enqueue({ type: "error", error }))),
+        ),
+      )
+        .catch((defect) => controller.enqueue({ type: "error", error: defect }))
+        .finally(() => controller.close()),
+  });

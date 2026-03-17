@@ -186,7 +186,10 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
           catch: toBrowserLaunchError,
         });
 
-        yield* Effect.promise(() => context.addInitScript(RUNTIME_SCRIPT));
+        yield* Effect.tryPromise({
+          try: () => context.addInitScript(RUNTIME_SCRIPT),
+          catch: toBrowserLaunchError,
+        });
 
         if (options.cookies) {
           const cookies: Cookie[] = Array.isArray(options.cookies)
@@ -326,9 +329,10 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
 
       yield* injectOverlayLabels(page, labelPositions);
       return yield* Effect.ensuring(
-        Effect.promise(() => page.screenshot({ fullPage: options.fullPage })).pipe(
-          Effect.map((screenshotBuffer) => ({ screenshot: screenshotBuffer, annotations })),
-        ),
+        Effect.tryPromise({
+          try: () => page.screenshot({ fullPage: options.fullPage }),
+          catch: toBrowserLaunchError,
+        }).pipe(Effect.map((screenshotBuffer) => ({ screenshot: screenshotBuffer, annotations }))),
         evaluateRuntime(page, "removeOverlay", OVERLAY_CONTAINER_ID).pipe(Effect.ignore),
       );
     });
@@ -336,8 +340,14 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
     const saveVideo = Effect.fn("Browser.saveVideo")(function* (page: Page, outputPath: string) {
       const video = page.video();
       if (!video) return undefined;
-      yield* Effect.promise(() => page.close());
-      yield* Effect.promise(() => video.saveAs(outputPath));
+      yield* Effect.tryPromise({
+        try: () => page.close(),
+        catch: toBrowserLaunchError,
+      });
+      yield* Effect.tryPromise({
+        try: () => video.saveAs(outputPath),
+        catch: toBrowserLaunchError,
+      });
       return outputPath;
     });
 
@@ -345,12 +355,18 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       page: Page,
       urlBefore: string,
     ) {
-      yield* Effect.promise(() => page.waitForTimeout(NAVIGATION_DETECT_DELAY_MS));
+      yield* Effect.tryPromise({
+        try: () => page.waitForTimeout(NAVIGATION_DETECT_DELAY_MS),
+        catch: toBrowserLaunchError,
+      });
       if (page.url() !== urlBefore) {
         yield* Effect.tryPromise(() => page.waitForLoadState("domcontentloaded")).pipe(
           Effect.ignore,
         );
-        yield* Effect.promise(() => page.waitForTimeout(POST_NAVIGATION_SETTLE_MS));
+        yield* Effect.tryPromise({
+          try: () => page.waitForTimeout(POST_NAVIGATION_SETTLE_MS),
+          catch: toBrowserLaunchError,
+        });
       }
     });
 

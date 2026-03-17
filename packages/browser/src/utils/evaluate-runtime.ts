@@ -11,8 +11,17 @@ export const evaluateRuntime = <K extends keyof BrowserTesterRuntime>(
     () =>
       page.evaluate(
         ({ method, args }: { method: string; args: unknown[] }) => {
-          const fn = __browserTesterRuntime[method as keyof BrowserTesterRuntime];
-          return (fn as (...params: unknown[]) => unknown)(...args);
+          const runtime = Reflect.get(globalThis, "__browserTesterRuntime");
+          if (!runtime || typeof runtime !== "object") {
+            throw new Error("Browser runtime is not initialized");
+          }
+
+          const fn = Reflect.get(runtime, method);
+          if (typeof fn !== "function") {
+            throw new Error(`Browser runtime method not found: ${method}`);
+          }
+
+          return fn(...args);
         },
         { method, args: args as unknown[] },
       ) as Promise<ReturnType<BrowserTesterRuntime[K]>>,

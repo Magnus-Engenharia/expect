@@ -206,5 +206,4 @@ describe("Browser.createPage video recording", () => {
       },
     });
   });
-
 });

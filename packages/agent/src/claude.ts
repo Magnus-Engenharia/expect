@@ -7,7 +7,6 @@ import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
-  LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { Effect, Layer, ServiceMap } from "effect";
 import { convertPrompt } from "./convert-prompt.js";
@@ -16,6 +15,7 @@ import {
   EMPTY_USAGE,
   PROVIDER_ID,
   STOP_REASON,
+  buildAgentStream,
   convertAssistantBlocks,
   convertToolResultBlocks,
   createLinkedAbortController,
@@ -51,6 +51,7 @@ const runGenerate = Effect.fn("ClaudeAgent.generate")(function* (
   options: LanguageModelV3CallOptions,
   settings: AgentProviderSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: settings.model ?? "claude-opus-4-6" });
   const { userPrompt, systemPrompt } = convertPrompt(options.prompt);
   const abortController = createLinkedAbortController(options.abortSignal);
   const content: LanguageModelV3Content[] = [];
@@ -73,7 +74,7 @@ const runGenerate = Effect.fn("ClaudeAgent.generate")(function* (
         }
       }
     },
-    catch: (cause) => new ClaudeQueryError({ cause }),
+    catch: (cause) => new ClaudeQueryError({ cause: String(cause) }),
   });
 
   if (settings.permissionMode === "plan") {
@@ -107,59 +108,48 @@ const runStream = Effect.fn("ClaudeAgent.stream")(function* (
   options: LanguageModelV3CallOptions,
   settings: AgentProviderSettings,
 ) {
+  yield* Effect.annotateCurrentSpan({ model: settings.model ?? "claude-opus-4-6" });
   const { userPrompt, systemPrompt } = convertPrompt(options.prompt);
   const abortController = createLinkedAbortController(options.abortSignal);
 
-  const stream = new ReadableStream<LanguageModelV3StreamPart>({
-    start: (controller) => {
+  const stream = buildAgentStream(
+    async (controller) => {
       let sessionId: string | undefined;
       let blockCounter = 0;
 
-      return Effect.runPromise(
-        Effect.tryPromise({
-          try: async () => {
-            controller.enqueue({ type: "stream-start", warnings: [] });
+      controller.enqueue({ type: "stream-start", warnings: [] });
 
-            for await (const event of query({
-              prompt: userPrompt,
-              options: buildQueryOptions(settings, abortController, systemPrompt),
-            })) {
-              const eventSessionId = extractSessionId(event);
-              if (eventSessionId) {
-                if (!sessionId)
-                  controller.enqueue({
-                    type: "response-metadata",
-                    id: eventSessionId,
-                    timestamp: new Date(),
-                    modelId: settings.model ?? "claude-opus-4-6",
-                  });
-                sessionId = eventSessionId;
-              }
-
-              if (event.type === "assistant")
-                blockCounter = emitAssistantParts(event.message.content, controller, blockCounter);
-              if (event.type === "user" && Array.isArray(event.message.content))
-                emitToolResultParts(event.message.content, controller);
-            }
-
+      for await (const event of query({
+        prompt: userPrompt,
+        options: buildQueryOptions(settings, abortController, systemPrompt),
+      })) {
+        const eventSessionId = extractSessionId(event);
+        if (eventSessionId) {
+          if (!sessionId)
             controller.enqueue({
-              type: "finish",
-              finishReason: STOP_REASON,
-              usage: EMPTY_USAGE,
-              providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
+              type: "response-metadata",
+              id: eventSessionId,
+              timestamp: new Date(),
+              modelId: settings.model ?? "claude-opus-4-6",
             });
-          },
-          catch: (cause) => new ClaudeQueryError({ cause }),
-        }).pipe(
-          Effect.catchTag("ClaudeQueryError", (error) =>
-            Effect.sync(() => controller.enqueue({ type: "error", error })),
-          ),
-        ),
-      )
-        .catch((defect) => controller.enqueue({ type: "error", error: defect }))
-        .finally(() => controller.close());
+          sessionId = eventSessionId;
+        }
+
+        if (event.type === "assistant")
+          blockCounter = emitAssistantParts(event.message.content, controller, blockCounter);
+        if (event.type === "user" && Array.isArray(event.message.content))
+          emitToolResultParts(event.message.content, controller);
+      }
+
+      controller.enqueue({
+        type: "finish",
+        finishReason: STOP_REASON,
+        usage: EMPTY_USAGE,
+        providerMetadata: sessionId ? { [PROVIDER_ID]: { sessionId } } : undefined,
+      });
     },
-  });
+    (cause) => new ClaudeQueryError({ cause: String(cause) }),
+  );
 
   return { stream, request: { body: userPrompt } };
 });
