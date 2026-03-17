@@ -10,4 +10,5 @@ export default defineConfig({
       "require-yield": "off",
     },
   },
+  fmt: {},
 });
