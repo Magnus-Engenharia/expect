@@ -23,15 +23,18 @@ import {
   parseBrowserToolName,
   parseMarkerLine,
   parseTextDelta,
-} from "./parse-execution-stream";
-import type { ExecutionStreamContext, ExecutionStreamState } from "./parse-execution-stream";
-import { retrieveExecutorMemory } from "./memory/retrieve-executor-memory";
-import type { ExecuteBrowserFlowOptions } from "./types";
-import { detectAuthError } from "./utils/detect-auth-error";
-import { resolveAgentProvider } from "./utils/resolve-agent-provider";
-import { saveBrowserImageResult } from "./utils/save-browser-image-result";
-import { serializeToolResult } from "./utils/serialize-tool-result";
-import { resolveLiveViewUrl } from "./utils/resolve-live-view-url";
+} from "./parse-execution-stream.js";
+import type { ExecutionStreamContext, ExecutionStreamState } from "./parse-execution-stream.js";
+import { retrieveExecutorMemory } from "./memory/retrieve-executor-memory.js";
+import type { AgentProvider, ExecuteBrowserFlowOptions } from "./types.js";
+import { detectAuthError } from "./utils/detect-auth-error.js";
+import {
+  resolveAgentProvider,
+  type ResolvedAgentProvider,
+} from "./utils/resolve-agent-provider.js";
+import { saveBrowserImageResult } from "./utils/save-browser-image-result.js";
+import { serializeToolResult } from "./utils/serialize-tool-result.js";
+import { resolveLiveViewUrl } from "./utils/resolve-live-view-url.js";
 
 export const buildExecutionModelSettings = (
   options: Pick<
@@ -51,7 +54,7 @@ export const buildExecutionModelSettings = (
     providerSettings: {
       cwd: options.target.cwd,
       ...(provider === "claude" ? { model: BROWSER_TEST_MODEL } : {}),
-      ...(options.providerSettings ?? {}),
+      ...options.providerSettings,
       effort: EXECUTION_MODEL_EFFORT,
       tools: ["open", "playwright", "screenshot", "close"].map(
         (toolName) => `mcp__${browserMcpServerName}__${toolName}`,
@@ -454,6 +457,16 @@ interface ExecutionStreamFailure {
   authMessage?: string;
 }
 
+const preferClaudeForExecution = (resolved: ResolvedAgentProvider): AgentProvider[] => {
+  if (resolved.explicit) return [resolved.provider, ...resolved.fallbackProviders];
+
+  const allProviders = [resolved.provider, ...resolved.fallbackProviders];
+  const claudeIndex = allProviders.indexOf("claude");
+  if (claudeIndex <= 0) return allProviders;
+
+  return ["claude" as AgentProvider, ...allProviders.filter((provider) => provider !== "claude")];
+};
+
 const createModelStreamResult = Effect.fn("createModelStreamResult")(function* (
   options: ExecuteBrowserFlowOptions,
   prompt: string,
@@ -522,10 +535,7 @@ const resolveExecutionStreamResult = Effect.fn("resolveExecutionStreamResult")(f
   const resolvedAgentProvider = yield* resolveAgentProvider(options.provider).pipe(
     Effect.mapError((cause) => new ExecutionError({ stage: "agent selection", cause })),
   );
-  const providersToTry = [
-    resolvedAgentProvider.provider,
-    ...resolvedAgentProvider.fallbackProviders,
-  ] as const;
+  const providersToTry = preferClaudeForExecution(resolvedAgentProvider);
 
   for (const [providerIndex, provider] of providersToTry.entries()) {
     const attempt = yield* Effect.result(
