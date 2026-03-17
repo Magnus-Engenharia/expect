@@ -136,22 +136,40 @@ const runStream = Effect.fn("ClaudeAgent.stream")(function* (
 
   const stream = buildAgentStream(
     async (controller) => {
+      const debugDir = path.join(
+        ensureSafeCurrentWorkingDirectory(settings.cwd),
+        AGENT_TRACES_DIRECTORY_NAME,
+      );
+      fs.mkdirSync(debugDir, { recursive: true });
+      try {
+        fs.writeFileSync(
+          path.join(debugDir, "_debug-stream-entered.json"),
+          JSON.stringify(
+            {
+              timestamp: new Date().toISOString(),
+              phase: "before-loadClaudeQuery",
+              settingsCwd: settings.cwd,
+              hasMcpServers: Boolean(settings.mcpServers),
+              mcpServerKeys: settings.mcpServers ? Object.keys(settings.mcpServers) : [],
+              permissionMode: settings.permissionMode,
+            },
+            undefined,
+            2,
+          ),
+        );
+      } catch {}
       const query = await loadClaudeQuery(settings.cwd);
       const queryOptions = buildQueryOptions(settings, abortController, systemPrompt);
       fs.writeFileSync(
-        path.join(
-          ensureSafeCurrentWorkingDirectory(settings.cwd),
-          AGENT_TRACES_DIRECTORY_NAME,
-          "_debug-query-options.json",
-        ),
+        path.join(debugDir, "_debug-query-options.json"),
         JSON.stringify(
           {
             timestamp: new Date().toISOString(),
+            phase: "after-buildQueryOptions",
             permissionMode: queryOptions.permissionMode,
             allowDangerouslySkipPermissions: queryOptions.allowDangerouslySkipPermissions,
             model: queryOptions.model,
             mcpServers: queryOptions.mcpServers ?? "NOT SET",
-            debugFile: queryOptions.debugFile,
           },
           undefined,
           2,

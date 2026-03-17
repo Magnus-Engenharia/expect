@@ -32,7 +32,6 @@
   "dependencies": {
     "@browser-tester/cookies": "workspace:*",
     "@effect/platform-node": "4.0.0-beta.28",
-    "@effect/vitest": "4.0.0-beta.28",
     "@medv/finder": "^4.0.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "effect": "4.0.0-beta.28",

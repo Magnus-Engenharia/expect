@@ -11,7 +11,6 @@
     "format:check": "vp fmt --check",
     "check": "vp check",
     "test": "vp test",
-    "eval": "pnpm --filter @browser-tester/evals eval",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish"

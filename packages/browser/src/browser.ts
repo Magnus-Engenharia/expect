@@ -1,5 +1,5 @@
 import { Browsers, Cookies, layerLive } from "@browser-tester/cookies";
-import type { Browser as BrowserProfile, Cookie } from "@browser-tester/cookies";
+import type { Browser as BrowserProfile } from "@browser-tester/cookies";
 import { tmpdir } from "node:os";
 import { chromium } from "playwright";
 import type { Locator, Page } from "playwright";
