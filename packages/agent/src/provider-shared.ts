@@ -143,9 +143,9 @@ export const buildAgentStream = (
           try: () => execute(controller),
           catch: (cause) => toError(cause),
         }).pipe(
-          Effect.catch((error) => Effect.sync(() => controller.enqueue({ type: "error", error }))),
+          Effect.catchCause((cause) =>
+            Effect.sync(() => controller.enqueue({ type: "error", error: cause })),
+          ),
         ),
-      )
-        .catch((defect) => controller.enqueue({ type: "error", error: defect }))
-        .finally(() => controller.close()),
+      ).finally(() => controller.close()),
   });

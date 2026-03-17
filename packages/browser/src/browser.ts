@@ -49,8 +49,8 @@ const toBrowserLaunchError = (cause: unknown) =>
     cause: cause instanceof Error ? cause.message : String(cause),
   });
 
-const resolveDefaultBrowserContext = () =>
-  Effect.gen(function* () {
+const resolveDefaultBrowserContext = Effect.fn("Browser.resolveDefaultBrowserContext")(
+  function* () {
     const browsers = yield* Browsers;
     const maybeDefault = yield* browsers
       .defaultBrowser()
@@ -58,48 +58,48 @@ const resolveDefaultBrowserContext = () =>
         Effect.catchTag("ListBrowsersError", () => Effect.succeed(Option.none<BrowserProfile>())),
       );
 
-    return Option.match(maybeDefault, {
-      onNone: () => ({ preferredProfile: undefined as BrowserProfile | undefined }),
-      onSome: (profile) => ({ preferredProfile: profile as BrowserProfile | undefined }),
-    });
-  }).pipe(Effect.provide(layerLive), Effect.withSpan("Browser.resolveDefaultBrowserContext"));
+    return { preferredProfile: Option.getOrUndefined(maybeDefault) };
+  },
+  Effect.provide(layerLive),
+);
 
-const extractCookiesSafe = (cookiesService: typeof Cookies.Service, profile: BrowserProfile) =>
-  Effect.gen(function* () {
-    const result = yield* cookiesService.extract(profile);
-    return result as Cookie[];
-  }).pipe(
-    Effect.catchTag("ExtractionError", () => Effect.succeed([] as Cookie[])),
-    Effect.catchTag("PlatformError", () => Effect.succeed([] as Cookie[])),
+const extractCookiesSafe = Effect.fn("Browser.extractCookiesSafe")(
+  function* (cookiesService: typeof Cookies.Service, profile: BrowserProfile) {
+    return yield* cookiesService.extract(profile);
+  },
+  Effect.catchTag("ExtractionError", () => Effect.succeed([])),
+  Effect.catchTag("PlatformError", () => Effect.succeed([])),
+);
+
+const extractDefaultBrowserCookies = Effect.fn("Browser.extractDefaultBrowserCookies")(function* (
+  url: string,
+  preferredProfile: BrowserProfile | undefined,
+) {
+  if (!preferredProfile) return [] as Cookie[];
+
+  const cookiesService = yield* Cookies;
+
+  const profileCookies = yield* extractCookiesSafe(cookiesService, preferredProfile);
+  if (profileCookies.length > 0) return profileCookies;
+
+  const browsers = yield* Browsers;
+  const allProfiles = yield* browsers.list.pipe(
+    Effect.catchTag("ListBrowsersError", () => Effect.succeed([] as BrowserProfile[])),
   );
+  const matchingProfiles = allProfiles.filter((profile) => {
+    if (preferredProfile._tag === "ChromiumBrowser" && profile._tag === "ChromiumBrowser") {
+      return profile.key === preferredProfile.key;
+    }
+    return profile._tag === preferredProfile._tag;
+  });
 
-const extractDefaultBrowserCookies = (url: string, preferredProfile: BrowserProfile | undefined) =>
-  Effect.gen(function* () {
-    if (!preferredProfile) return [] as Cookie[];
-
-    const cookiesService = yield* Cookies;
-
-    const profileCookies = yield* extractCookiesSafe(cookiesService, preferredProfile);
-    if (profileCookies.length > 0) return profileCookies;
-
-    const browsers = yield* Browsers;
-    const allProfiles = yield* browsers.list.pipe(
-      Effect.catchTag("ListBrowsersError", () => Effect.succeed([] as BrowserProfile[])),
-    );
-    const matchingProfiles = allProfiles.filter((profile) => {
-      if (preferredProfile._tag === "ChromiumBrowser" && profile._tag === "ChromiumBrowser") {
-        return profile.key === preferredProfile.key;
-      }
-      return profile._tag === preferredProfile._tag;
-    });
-
-    const results = yield* Effect.forEach(
-      matchingProfiles,
-      (profile) => extractCookiesSafe(cookiesService, profile),
-      { concurrency: "unbounded" },
-    );
-    return results.flat() as Cookie[];
-  }).pipe(Effect.provide(cookiesLayer), Effect.withSpan("Browser.extractDefaultBrowserCookies"));
+  const results = yield* Effect.forEach(
+    matchingProfiles,
+    (profile) => extractCookiesSafe(cookiesService, profile),
+    { concurrency: "unbounded" },
+  );
+  return results.flat();
+}, Effect.provide(cookiesLayer));
 
 const resolveContextOptions = (
   video: boolean | VideoOptions | undefined,
@@ -178,7 +178,7 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
         const defaultBrowserContext =
           options.cookies === true
             ? yield* resolveDefaultBrowserContext()
-            : { preferredProfile: undefined as BrowserProfile | undefined };
+            : { preferredProfile: undefined };
 
         const profileLocale =
           defaultBrowserContext.preferredProfile?._tag === "ChromiumBrowser"
@@ -325,7 +325,7 @@ export class Browser extends ServiceMap.Service<Browser>()("@browser/Browser", {
       for (const [ref, entry] of Object.entries(snapshotResult.refs)) {
         const locator = yield* snapshotResult.locator(ref);
         const box = yield* Effect.tryPromise(() => locator.boundingBox()).pipe(
-          Effect.orElseSucceed(() => null),
+          Effect.orElseSucceed(() => undefined),
         );
         if (!box) continue;
 
