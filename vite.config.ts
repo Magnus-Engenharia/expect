@@ -9,6 +9,19 @@ export default defineConfig({
     plugins: ["typescript", "react", "import"],
     rules: {
       "require-yield": "off",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react",
+              importNames: ["useEffect"],
+              message:
+                "useEffect is banned. Use derived state, event handlers, data-fetching libraries, or useMountEffect. See .agents/skills/react-best-practices/rules/no-use-effect.md",
+            },
+          ],
+        },
+      ],
     },
   },
   fmt: {

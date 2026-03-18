@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
-import { BROWSER_TEST_MODEL } from "../src/constants.js";
+import { CLAUDE_PLANNER_MODEL } from "../src/constants.js";
 import { buildPlannerModelSettings, planBrowserFlow } from "../src/plan-browser-flow.js";
 import type { TestTarget } from "../src/types.js";
 
@@ -98,7 +98,7 @@ describe("planBrowserFlow", () => {
       provider: "claude",
     });
 
-    expect(settings.model).toBe(BROWSER_TEST_MODEL);
+    expect(settings.model).toBe(CLAUDE_PLANNER_MODEL);
     expect(settings.permissionMode).toBe("plan");
   });
 

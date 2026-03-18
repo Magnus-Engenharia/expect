@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { BROWSER_TEST_MODEL, CODEX_PLANNER_MODEL, DEFAULT_AGENT_PROVIDER } from "./constants.js";
+import { CLAUDE_PLANNER_MODEL, CODEX_PLANNER_MODEL, DEFAULT_AGENT_PROVIDER } from "./constants.js";
 import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { createAgentModel } from "./create-agent-model.js";
 import { extractJsonObject } from "./json.js";
@@ -65,7 +65,7 @@ export const generateFlowSuggestions = async (
       effort: "low",
       maxTurns: 1,
       ...(provider === "claude"
-        ? { model: BROWSER_TEST_MODEL }
+        ? { model: CLAUDE_PLANNER_MODEL }
         : provider === "codex"
           ? { model: CODEX_PLANNER_MODEL }
           : {}),

@@ -58,8 +58,8 @@ const program = new Command()
     parseAgentProvider,
     "codex",
   )
-  .option("--planning-model <model>", "specific model for the planning agent", "composer-1.5")
-  .option("--execution-model <model>", "specific model for the execution agent", "composer-1.5")
+  .option("--planning-model <model>", "specific model for the planning agent")
+  .option("--execution-model <model>", "specific model for the execution agent")
   .option("--base-url <url>", "browser base URL (overrides BROWSER_TESTER_BASE_URL)")
   .option("--headed", "run browser visibly instead of headless")
   .option("--cookies", "sync cookies from your browser profile")

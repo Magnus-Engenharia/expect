@@ -1,5 +1,6 @@
 export const DEFAULT_AGENT_PROVIDER = "codex";
 export const BROWSER_TEST_MODEL = "claude-sonnet-4-6";
+export const CLAUDE_PLANNER_MODEL = "claude-code-sonnet";
 export const CODEX_PLANNER_MODEL = "gpt-5.3-codex-spark";
 export const VIDEO_DIRECTORY_PREFIX = "browser-tester-run-";
 export const VIDEO_FILE_NAME = "browser-flow.webm";

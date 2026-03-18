@@ -2,7 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { AgentProviderSettings } from "@browser-tester/agent";
 import { Effect, Result, Schema } from "effect";
 import {
-  BROWSER_TEST_MODEL,
+  CLAUDE_PLANNER_MODEL,
   CODEX_PLANNER_MODEL,
   DEFAULT_AGENT_PROVIDER,
   PLANNER_CHANGED_FILE_LIMIT,
@@ -63,7 +63,7 @@ export const buildPlannerModelSettings = (
   const provider = options.provider ?? DEFAULT_AGENT_PROVIDER;
   const providerSpecificSettings: Record<string, unknown> =
     provider === "claude"
-      ? { model: BROWSER_TEST_MODEL, permissionMode: "plan" as const }
+      ? { model: CLAUDE_PLANNER_MODEL, permissionMode: "plan" as const }
       : provider === "codex"
         ? { model: CODEX_PLANNER_MODEL }
         : {};
