@@ -36,7 +36,16 @@ const createAgentDebugLogPath = (cwd?: string): string => {
   return path.join(tracesDirectory, `${timestamp}.log`);
 };
 
-const isMcpServerError = (errorMessage: string): boolean => errorMessage.startsWith("MCP server ");
+const IGNORED_DEBUG_ERROR_PATTERNS = [
+  /^MCP server /,
+  /event logging:.*failed to export/i,
+  /telemetry.*OTEL/i,
+  /OTEL.*diag/i,
+  /Failed to export \d+ events/i,
+];
+
+const isIgnoredDebugError = (errorMessage: string): boolean =>
+  IGNORED_DEBUG_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
 
 const assertNoDebugLogErrors = (debugLogPath: string) => {
   let content: string;
@@ -49,7 +58,7 @@ const assertNoDebugLogErrors = (debugLogPath: string) => {
   for (const line of content.split("\n")) {
     if (line.includes("[ERROR]")) {
       const errorMessage = line.replace(/^\S+\s+\[ERROR\]\s*/, "");
-      if (!isMcpServerError(errorMessage)) {
+      if (!isIgnoredDebugError(errorMessage)) {
         uniqueErrors.add(errorMessage);
       }
     }
