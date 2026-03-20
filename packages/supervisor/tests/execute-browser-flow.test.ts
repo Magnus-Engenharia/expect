@@ -8,7 +8,7 @@ import type {
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { buildExecutionModelSettings, executeBrowserFlow } from "../src/execute-browser-flow";
-import type { BrowserFlowPlan, TestTarget } from "../src/types";
+import type { TestTarget } from "../src/types";
 
 const createStreamModel = (
   parts: LanguageModelV3StreamPart[],
@@ -113,30 +113,6 @@ const testTarget: TestTarget = {
   diffPreview: "src/onboarding.tsx | 9 ++++++++-",
 };
 
-const testPlan: BrowserFlowPlan = {
-  title: "Onboarding import regression plan",
-  rationale: "Verify onboarding import still works after the changes.",
-  targetSummary: "Cover onboarding and import entry points.",
-  userInstruction: "Go through onboarding and click Import Projects.",
-  assumptions: [],
-  riskAreas: ["Onboarding", "Project import"],
-  targetUrls: ["/onboarding"],
-  cookieSync: {
-    required: false,
-    reason: "This test can run without an existing signed-in session.",
-  },
-  steps: [
-    {
-      id: "step-01",
-      title: "Open onboarding",
-      instruction: "Navigate to onboarding.",
-      expectedOutcome: "The onboarding page loads.",
-      routeHint: "/onboarding",
-      changedFileEvidence: ["src/onboarding.tsx"],
-    },
-  ],
-};
-
 describe("executeBrowserFlow", () => {
   it("limits execution to browser tools and medium effort", () => {
     const settings = buildExecutionModelSettings({
@@ -188,7 +164,7 @@ describe("executeBrowserFlow", () => {
       Stream.runCollect(
         executeBrowserFlow({
           target: testTarget,
-          plan: testPlan,
+          userInstruction: "Go through onboarding and click Import Projects.",
           environment: {
             baseUrl: "http://localhost:3000",
             cookies: true,
@@ -207,7 +183,8 @@ describe("executeBrowserFlow", () => {
     expect(promptText).toContain("STEP_START|<step-id>|<step-title>");
     expect(promptText).toContain("Go through onboarding and click Import Projects.");
     expect(promptText).toContain("call the close tool exactly once");
-    expect(promptText).toContain("Execution style: assertion-first");
+    expect(promptText).toContain("First master the primary flow the developer asked for.");
+    expect(promptText).toContain("test 1-2 additional nearby flows");
     expect(promptText).toContain("Allowed failure categories: app-bug");
     expect(promptText).toContain(videoOutputPath);
     expect(events.some((event) => event.type === "step-started")).toBe(true);
@@ -256,7 +233,7 @@ describe("executeBrowserFlow", () => {
       Stream.runCollect(
         executeBrowserFlow({
           target: testTarget,
-          plan: testPlan,
+          userInstruction: "Capture the onboarding UI.",
           model: createStreamModel(
             [
               { type: "stream-start", warnings: [] },
@@ -345,7 +322,7 @@ describe("executeBrowserFlow", () => {
       Stream.runCollect(
         executeBrowserFlow({
           target: testTarget,
-          plan: testPlan,
+          userInstruction: "Open onboarding and verify the response payload.",
           model: createStreamModel(
             [
               { type: "stream-start", warnings: [] },

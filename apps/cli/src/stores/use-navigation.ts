@@ -4,8 +4,6 @@ export type Screen =
   | "main"
   | "select-pr"
   | "saved-flow-picker"
-  | "planning"
-  | "review-plan"
   | "cookie-sync-confirm"
   | "testing"
   | "results"

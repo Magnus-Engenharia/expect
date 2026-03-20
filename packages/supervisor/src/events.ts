@@ -4,7 +4,7 @@ export interface BrowserRunBaseEvent {
 
 export interface BrowserRunStartedEvent extends BrowserRunBaseEvent {
   type: "run-started";
-  planTitle: string;
+  title: string;
   liveViewUrl?: string;
 }
 

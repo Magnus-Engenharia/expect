@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import * as path from "node:path";
+import * as url from "node:url";
 import { Text } from "ink";
 import Link from "ink-link";
 
@@ -8,9 +8,13 @@ interface FileLinkProps {
   label?: string;
 }
 
-export const FileLink = ({ path, label }: FileLinkProps) => {
-  const absolutePath = resolve(path);
-  const fileUrl = pathToFileURL(absolutePath).href;
+const isFileUrl = (value: string): boolean => value.startsWith("file://");
+
+export const FileLink = ({ path: filePath, label }: FileLinkProps) => {
+  const absolutePath = isFileUrl(filePath)
+    ? url.fileURLToPath(filePath)
+    : path.resolve(filePath);
+  const fileUrl = isFileUrl(filePath) ? filePath : url.pathToFileURL(absolutePath).href;
 
   return (
     <Link url={fileUrl}>

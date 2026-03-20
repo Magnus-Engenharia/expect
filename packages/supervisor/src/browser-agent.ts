@@ -1,10 +1,6 @@
-import { Effect } from "effect";
-import { planBrowserFlow } from "./plan-browser-flow";
 import { resolveTestTarget } from "./resolve-test-target";
 import type {
-  AgentProvider,
   BrowserEnvironmentHints,
-  BrowserFlowPlan,
   CommitSummary,
   TestAction,
   TestTarget,
@@ -15,21 +11,6 @@ export interface EnvironmentOverrides {
   baseUrl?: string;
   headed?: boolean;
   cookies?: boolean;
-}
-
-interface GenerateBrowserPlanOptions {
-  action: TestAction;
-  commit?: CommitSummary;
-  userInstruction: string;
-  environmentOverrides?: EnvironmentOverrides;
-  provider?: AgentProvider;
-  model?: string;
-}
-
-export interface GenerateBrowserPlanResult {
-  target: TestTarget;
-  plan: BrowserFlowPlan;
-  environment: BrowserEnvironmentHints;
 }
 
 const parseBooleanEnvironmentValue = (value: string | undefined): boolean | undefined => {
@@ -71,23 +52,4 @@ export const resolveBrowserTarget = (options: {
   resolveTestTarget({
     cwd: options.cwd,
     selection: createTargetSelection(options.action, options.commit),
-  });
-
-export const generateBrowserPlan = (options: GenerateBrowserPlanOptions) =>
-  Effect.gen(function* () {
-    const target = resolveBrowserTarget(options);
-    const environment = getBrowserEnvironment(options.environmentOverrides);
-    const plan = yield* planBrowserFlow({
-      target,
-      userInstruction: options.userInstruction,
-      environment,
-      provider: options.provider,
-      ...(options.model ? { providerSettings: { model: options.model } } : {}),
-    });
-
-    return {
-      target,
-      plan,
-      environment,
-    } satisfies GenerateBrowserPlanResult;
   });

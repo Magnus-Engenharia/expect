@@ -52,32 +52,6 @@ export interface ResolveTestTargetOptions {
   selection: TestTargetSelection;
 }
 
-export interface PlanStep {
-  id: string;
-  title: string;
-  instruction: string;
-  expectedOutcome: string;
-  routeHint?: string;
-  changedFileEvidence?: string[];
-}
-
-export interface BrowserFlowCookieSync {
-  required: boolean;
-  reason: string;
-}
-
-export interface BrowserFlowPlan {
-  title: string;
-  rationale: string;
-  targetSummary: string;
-  userInstruction: string;
-  assumptions: string[];
-  riskAreas: string[];
-  targetUrls: string[];
-  cookieSync: BrowserFlowCookieSync;
-  steps: PlanStep[];
-}
-
 export interface BrowserRunFinding {
   id: string;
   severity: "error" | "warning" | "info";
@@ -116,9 +90,6 @@ export interface BrowserRunReport {
   summary: string;
   findings: BrowserRunFinding[];
   stepResults: BrowserRunStepResult[];
-  confirmedRiskAreas: string[];
-  clearedRiskAreas: string[];
-  unresolvedRiskAreas: string[];
   warnings: string[];
   pullRequest: BrowserRunPullRequest | null;
   artifacts: BrowserRunArtifacts;
@@ -130,19 +101,46 @@ export interface BrowserEnvironmentHints {
   cookies?: boolean;
 }
 
-export interface PlanBrowserFlowOptions {
-  target: TestTarget;
+export interface FlowStep {
+  id: string;
+  title: string;
+  instruction: string;
+  expectedOutcome: string;
+}
+
+export interface SavedFlow {
+  title: string;
   userInstruction: string;
-  environment?: BrowserEnvironmentHints;
-  provider?: AgentProvider;
-  providerSettings?: AgentProviderSettings;
-  model?: LanguageModelV3;
+  steps: FlowStep[];
+}
+
+export interface SavedFlowSummary {
+  title: string;
+  description: string;
+  slug: string;
+  filePath: string;
+  modifiedAtMs: number;
+  savedTargetScope: TestTarget["scope"];
+  savedTargetDisplayName: string;
+}
+
+export interface SavedFlowFileData {
+  formatVersion: number;
+  title: string;
+  description: string;
+  slug: string;
+  savedTargetScope: TestTarget["scope"];
+  savedTargetDisplayName: string;
+  selectedCommit?: CommitSummary;
+  flow: SavedFlow;
+  environment: BrowserEnvironmentHints;
 }
 
 export interface ExecuteBrowserFlowOptions {
   target: TestTarget;
-  plan: BrowserFlowPlan;
+  userInstruction: string;
   environment?: BrowserEnvironmentHints;
+  savedFlow?: SavedFlow;
   provider?: AgentProvider;
   providerSettings?: AgentProviderSettings;
   model?: LanguageModelV3;

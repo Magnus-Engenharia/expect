@@ -5,12 +5,7 @@ export interface McpServerConfig {
   env?: Record<string, string>;
 }
 
-export type AgentPermissionMode =
-  | "default"
-  | "acceptEdits"
-  | "bypassPermissions"
-  | "plan"
-  | "dontAsk";
+export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions" | "dontAsk";
 
 export type AgentEffort = "low" | "medium" | "high" | "max";
 

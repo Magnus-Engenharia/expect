@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useFlowSessionStore } from "../../stores/use-flow-session";
-import { usePreferencesStore } from "../../stores/use-preferences";
 import { useGitState } from "../../hooks/use-git-state";
 import { useColors } from "../theme-context";
 import { Clickable } from "../ui/clickable";
@@ -27,14 +26,12 @@ export const MainMenu = () => {
   const COLORS = useColors();
   const [columns] = useStdoutDimensions();
   const { data: gitState } = useGitState();
-  const toggleSkipPlanning = usePreferencesStore((state) => state.toggleSkipPlanning);
   const submitFlowInstruction = useFlowSessionStore((state) => state.submitFlowInstruction);
   const selectAction = useFlowSessionStore((state) => state.selectAction);
   const storeSelectContext = useFlowSessionStore((state) => state.selectContext);
   const selectedContext = useFlowSessionStore((state) => state.selectedContext);
   const switchBranch = useFlowSessionStore((state) => state.switchBranch);
   const flowInstruction = useFlowSessionStore((state) => state.flowInstruction);
-  const planningProvider = usePreferencesStore((state) => state.planningProvider);
 
   const [value, setValue] = useState(flowInstruction);
   const [inputKey, setInputKey] = useState(0);
@@ -130,7 +127,6 @@ export const MainMenu = () => {
       currentBranch: gitState.currentBranch,
       contextType: activeContext?.type ?? null,
       contextLabel: activeContext?.label ?? null,
-      provider: planningProvider,
       signal: abortController.signal,
     })
       .then((result) => {
@@ -147,7 +143,7 @@ export const MainMenu = () => {
           setIsGenerating(false);
         }
       });
-  }, [activeContext, gitState, isGenerating, planningProvider]);
+  }, [activeContext, gitState, isGenerating]);
 
   const openPicker = useCallback(() => {
     setPickerOpen(true);
@@ -260,10 +256,6 @@ export const MainMenu = () => {
       if (key.tab && !key.shift && showSuggestion && currentSuggestion) {
         setValue(currentSuggestion);
         setInputKey((previous) => previous + 1);
-        return;
-      }
-      if (key.tab && key.shift) {
-        toggleSkipPlanning();
         return;
       }
       if (!showSuggestion) return;

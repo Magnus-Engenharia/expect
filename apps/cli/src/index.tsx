@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { Command, InvalidOptionArgumentError } from "commander";
 import { render } from "ink";
@@ -8,12 +7,9 @@ import { ALT_SCREEN_OFF, ALT_SCREEN_ON, VERSION } from "./constants";
 import { ThemeProvider } from "./components/theme-context";
 import { loadThemeName } from "./utils/load-theme";
 import {
-  createDirectRunPlan,
-  getBrowserEnvironment,
   getCommitSummary,
   isRunningInAgent,
-  loadSavedFlowBySlug,
-  resolveBrowserTarget,
+  loadFlowBySlug,
   type AgentProvider,
   type TestAction,
 } from "@browser-tester/supervisor";
@@ -24,14 +20,7 @@ import { usePreferencesStore } from "./stores/use-preferences";
 import { useFlowSessionStore } from "./stores/use-flow-session";
 import { queryClient } from "./query-client";
 import { resolveTestRunConfig, type TestRunConfig } from "./utils/test-run-config";
-import { NodeServices } from "@effect/platform-node";
-import { CliRuntime } from "./runtime";
 import { setInkInstance } from "./utils/clear-ink-display";
-import { loadPreferences } from "./utils/load-preferences";
-
-const persistedPreferences = await Effect.runPromise(
-  loadPreferences.pipe(Effect.provide(NodeServices.layer)),
-);
 
 const parseAgentProvider = (value: string): AgentProvider => {
   if (value === "claude" || value === "codex" || value === "cursor") {
@@ -47,22 +36,14 @@ const program = new Command()
   .name("testie")
   .description("AI-powered browser testing for your changes")
   .version(VERSION, "-v, --version")
+  .option("-f, --flow <slug>", "load a saved flow by slug")
   .option("-m, --message <instruction>", "natural language instruction for what to test")
-  .option("-f, --flow <slug>", "reuse a saved flow by its slug")
-  .option("-y, --yes", "skip plan review and run immediately")
-  .option(
-    "--planner <provider>",
-    "agent for planning (claude, codex, cursor)",
-    parseAgentProvider,
-    "codex",
-  )
   .option(
     "--executor <provider>",
     "agent for execution (claude, codex, cursor)",
     parseAgentProvider,
     "codex",
   )
-  .option("--planning-model <model>", "specific model for the planning agent")
   .option("--execution-model <model>", "specific model for the execution agent")
   .option("--base-url <url>", "browser base URL (overrides BROWSER_TESTER_BASE_URL)")
   .option("--headed", "run browser visibly instead of headless")
@@ -73,9 +54,9 @@ const program = new Command()
     `
 Examples:
   $ testie                                    open interactive TUI
-  $ testie -m "test the login flow" -y        plan and run immediately
-  $ testie branch -m "verify signup" -y       test all branch changes
-  $ testie -f my-flow                         reuse a saved flow
+  $ testie -m "test the login flow"           run a direct browser test
+  $ testie --flow checkout-happy-path         replay a saved flow
+  $ testie branch -m "verify signup"          test all branch changes
 
 Environment variables:
   BROWSER_TESTER_BASE_URL     base URL for the browser (e.g. http://localhost:3000)
@@ -101,68 +82,32 @@ const renderApp = () => {
   setInkInstance(instance);
 };
 
-const resolveInitialScreen = (config: TestRunConfig, hasSavedFlow: boolean): Screen => {
-  if (hasSavedFlow) return config.autoRun ? "testing" : "review-plan";
-  if (config.message) return persistedPreferences.skipPlanning ? "testing" : "planning";
-  return "main";
-};
-
 const seedStoreFromConfig = async (config: TestRunConfig): Promise<void> => {
   const resolvedCommit =
     config.action === "select-commit" && config.commitHash
       ? (getCommitSummary(process.cwd(), config.commitHash) ?? null)
       : null;
 
-  const savedFlow = config.flowSlug
-    ? await CliRuntime.runPromise(
-        loadSavedFlowBySlug(config.flowSlug).pipe(
-          Effect.catchTag("FlowNotFoundError", () => Effect.succeed(null)),
-        ),
-      )
-    : null;
-  const resolvedTarget = resolveBrowserTarget({
-    action: config.action,
-    commit: resolvedCommit ?? undefined,
-  });
-  const browserEnvironment = getBrowserEnvironment(config.environmentOverrides);
-  const directRunPlan =
-    !savedFlow && config.message && persistedPreferences.skipPlanning
-      ? createDirectRunPlan({ userInstruction: config.message, target: resolvedTarget })
-      : null;
-
-  const screen = resolveInitialScreen(config, Boolean(savedFlow));
-
-  useNavigationStore.setState({ screen });
+  useNavigationStore.setState({ screen: "main" satisfies Screen });
   usePreferencesStore.setState({
-    autoRunAfterPlanning: config.autoRun ?? false,
-    skipPlanning: persistedPreferences.skipPlanning,
-    planningProvider: config.planningProvider,
     executionProvider: config.executionProvider,
-    planningModel: config.planningModel,
     executionModel: config.executionModel,
     environmentOverrides: config.environmentOverrides,
   });
   useFlowSessionStore.setState({
     testAction: config.action,
     selectedCommit: resolvedCommit,
-    ...(config.message && { flowInstruction: config.message }),
-    ...(savedFlow && {
-      generatedPlan: savedFlow.plan,
-      resolvedTarget,
-      browserEnvironment: {
-        ...browserEnvironment,
-        ...savedFlow.environment,
-      },
-      planOrigin: "saved" as const,
-    }),
-    ...(directRunPlan && {
-      generatedPlan: directRunPlan,
-      resolvedTarget,
-      browserEnvironment,
-      planOrigin: "generated" as const,
-    }),
-    ...(!savedFlow && config.message && !directRunPlan && { planOrigin: "generated" as const }),
   });
+
+  if (config.flowSlug) {
+    const savedFlow = await loadFlowBySlug(config.flowSlug, process.cwd());
+    useFlowSessionStore.getState().applySavedFlow(savedFlow);
+    return;
+  }
+
+  if (config.message) {
+    useFlowSessionStore.getState().submitFlowInstruction(config.message);
+  }
 };
 
 const createCommandAction =
@@ -211,12 +156,8 @@ program.action(async () => {
   if (isHeadless()) return autoDetectAndTest(config);
   if (
     config.message ||
-    config.flowSlug ||
-    config.autoRun ||
     config.environmentOverrides ||
-    config.planningProvider ||
     config.executionProvider ||
-    config.planningModel ||
     config.executionModel
   ) {
     await seedStoreFromConfig(config);

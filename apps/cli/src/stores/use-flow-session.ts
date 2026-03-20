@@ -1,15 +1,17 @@
 import { create } from "zustand";
 import {
   checkoutBranch,
-  createDirectRunPlan,
+  generateFlow,
   getBrowserEnvironment,
   resolveBrowserTarget,
+  saveFlow,
   type AgentProvider,
   type BrowserEnvironmentHints,
-  type BrowserFlowPlan,
+  type BrowserRunEvent,
   type BrowserRunReport,
   type CommitSummary,
-  type LoadedSavedFlow,
+  type SavedFlow,
+  type SavedFlowFileData,
   type TestAction,
   type TestTarget,
 } from "@browser-tester/supervisor";
@@ -24,73 +26,101 @@ interface FlowSessionStore {
   selectedCommit: CommitSummary | null;
   flowInstruction: string;
   flowInstructionHistory: string[];
-  planOrigin: "generated" | "saved" | null;
-  generatedPlan: BrowserFlowPlan | null;
   resolvedTarget: TestTarget | null;
   browserEnvironment: BrowserEnvironmentHints | null;
-  resolvedPlanningProvider: AgentProvider | null;
   resolvedExecutionProvider: AgentProvider | null;
-  planningError: string | null;
-  pendingSavedFlow: LoadedSavedFlow | null;
   latestRunReport: BrowserRunReport | null;
-  autoSaveStatus: "idle" | "saving" | "saved" | "error";
+  latestRunEvents: BrowserRunEvent[];
   liveViewUrl: string | null;
-  mainMenuOnAction: boolean;
+  flowSaveStatus: "idle" | "generating" | "saved" | "error";
+  savedFlowPath: string | null;
+  flowSaveError: string | null;
+  pendingSavedFlow: SavedFlow | null;
   selectedContext: ContextOption | null;
   checkedOutBranch: string | null;
   checkedOutPrNumber: number | null;
   checkoutError: string | null;
-
-  setMainMenuOnAction: (value: boolean) => void;
   selectContext: (context: ContextOption | null) => void;
   setLiveViewUrl: (url: string | null) => void;
   goBack: () => void;
   selectAction: (action: TestAction) => void;
   selectCommit: (commit: CommitSummary) => void;
-  beginSavedFlowReuse: (action: TestAction) => void;
-  applySavedFlow: (savedFlow: LoadedSavedFlow) => void;
   submitFlowInstruction: (instruction: string) => void;
-  completePlanning: (result: {
-    target: TestTarget;
-    plan: BrowserFlowPlan;
-    environment: BrowserEnvironmentHints;
-  }) => void;
-  failPlanning: (error: string) => void;
-  updatePlan: (plan: BrowserFlowPlan) => void;
   updateEnvironment: (environment: BrowserEnvironmentHints | null) => void;
-  requestPlanApproval: () => void;
-  approvePlan: () => void;
-  completeTestingRun: (report: BrowserRunReport) => void;
+  startTesting: () => void;
+  setFlowSaveStatus: (
+    status: "idle" | "generating" | "saved" | "error",
+    savedFlowPath?: string | null,
+    flowSaveError?: string | null,
+  ) => void;
+  saveCurrentFlow: () => Promise<void>;
+  applySavedFlow: (flow: SavedFlowFileData) => void;
+  completeTestingRun: (report: BrowserRunReport, events: BrowserRunEvent[]) => void;
   exitTesting: () => void;
   switchBranch: (branch: string, prNumber?: number | null) => void;
   clearCheckoutError: () => void;
 }
 
-const needsCookieConfirmation = (
-  plan: BrowserFlowPlan | null,
-  environment: BrowserEnvironmentHints | null,
-): boolean => Boolean(plan?.cookieSync.required) && environment?.cookies !== true;
+const COOKIE_SYNC_KEYWORDS = [
+  "login",
+  "log in",
+  "sign in",
+  "signup",
+  "sign up",
+  "account",
+  "dashboard",
+  "profile",
+  "settings",
+  "billing",
+  "workspace",
+  "organization",
+  "admin",
+  "project",
+];
 
-const RESET_PLAN_STATE = {
-  generatedPlan: null,
+const shouldConfirmCookieSync = (
+  instruction: string,
+  environment: BrowserEnvironmentHints | null,
+): boolean => {
+  if (environment?.cookies === true) return false;
+  const normalizedInstruction = instruction.toLowerCase();
+  return COOKIE_SYNC_KEYWORDS.some((keyword) => normalizedInstruction.includes(keyword));
+};
+
+const getTestActionForSavedFlowScope = (
+  scope: SavedFlowFileData["savedTargetScope"],
+): TestAction => {
+  switch (scope) {
+    case "unstaged":
+      return "test-unstaged";
+    case "branch":
+      return "test-branch";
+    case "commit":
+      return "select-commit";
+    default:
+      return "test-changes";
+  }
+};
+
+const RESET_RUN_STATE = {
   resolvedTarget: null,
   browserEnvironment: null,
-  resolvedPlanningProvider: null,
   resolvedExecutionProvider: null,
-  pendingSavedFlow: null,
   latestRunReport: null,
-  autoSaveStatus: "idle" as const,
+  latestRunEvents: [],
   liveViewUrl: null,
+  flowSaveStatus: "idle" as const,
+  savedFlowPath: null,
+  flowSaveError: null,
+  pendingSavedFlow: null,
 };
 
 const RESET_FLOW_STATE = {
-  ...RESET_PLAN_STATE,
+  ...RESET_RUN_STATE,
   testAction: null,
   selectedCommit: null,
   selectedContext: null,
   flowInstruction: "",
-  planningError: null,
-  planOrigin: null,
 };
 
 const rememberFlowInstruction = (history: string[], instruction: string): string[] => {
@@ -108,59 +138,38 @@ export const useFlowSessionStore = create<FlowSessionStore>((set, get) => ({
   selectedCommit: null,
   flowInstruction: "",
   flowInstructionHistory: [],
-  planOrigin: null,
-  generatedPlan: null,
   resolvedTarget: null,
   browserEnvironment: null,
-  resolvedPlanningProvider: null,
   resolvedExecutionProvider: null,
-  planningError: null,
-  pendingSavedFlow: null,
   latestRunReport: null,
-  autoSaveStatus: "idle",
+  latestRunEvents: [],
   liveViewUrl: null,
-  mainMenuOnAction: true,
+  flowSaveStatus: "idle",
+  savedFlowPath: null,
+  flowSaveError: null,
+  pendingSavedFlow: null,
   selectedContext: null,
   checkedOutBranch: null,
   checkedOutPrNumber: null,
   checkoutError: null,
 
-  setMainMenuOnAction: (value) => set({ mainMenuOnAction: value }),
   selectContext: (context) => set({ selectedContext: context }),
   setLiveViewUrl: (url) => set({ liveViewUrl: url }),
 
   goBack: () => {
     const { screen } = useNavigationStore.getState();
-    const { skipPlanning } = usePreferencesStore.getState();
-    const { planOrigin } = get();
 
-    if (screen === "review-plan") {
-      setScreen(planOrigin === "saved" ? "saved-flow-picker" : "main");
-      return;
-    }
-    if (screen === "planning") {
+    if (screen === "cookie-sync-confirm") {
       setScreen("main");
       return;
     }
-    if (screen === "cookie-sync-confirm") {
-      setScreen(skipPlanning ? "main" : "review-plan");
-      return;
-    }
+
     if (screen === "results") {
       set(RESET_FLOW_STATE);
       setScreen("main");
       return;
     }
-    if (screen === "saved-flow-picker") {
-      set({
-        ...RESET_PLAN_STATE,
-        testAction: null,
-        selectedCommit: null,
-        planOrigin: null,
-      });
-      setScreen("main");
-      return;
-    }
+
     if (screen !== "testing") {
       setScreen("main");
     }
@@ -168,77 +177,25 @@ export const useFlowSessionStore = create<FlowSessionStore>((set, get) => ({
 
   selectAction: (action) => {
     set({
-      ...RESET_PLAN_STATE,
+      ...RESET_RUN_STATE,
       testAction: action,
       selectedCommit: null,
-      planOrigin: null,
     });
     setScreen("main");
   },
 
   selectCommit: (commit) => {
-    const state = get();
-    if (state.pendingSavedFlow) {
-      const { environmentOverrides } = usePreferencesStore.getState();
-      set({
-        testAction: "select-commit",
-        selectedCommit: commit,
-        generatedPlan: state.pendingSavedFlow.plan,
-        resolvedTarget: resolveBrowserTarget({
-          action: "select-commit",
-          commit,
-        }),
-        browserEnvironment: {
-          ...getBrowserEnvironment(environmentOverrides),
-          ...state.pendingSavedFlow.environment,
-        },
-        pendingSavedFlow: null,
-      });
-      setScreen("review-plan");
-      return;
-    }
-
     set({
-      ...RESET_PLAN_STATE,
+      ...RESET_RUN_STATE,
       testAction: "select-commit",
       selectedCommit: commit,
-      planOrigin: null,
     });
     setScreen("main");
   },
 
-  beginSavedFlowReuse: (action) => {
-    set({
-      ...RESET_PLAN_STATE,
-      testAction: action,
-      selectedCommit: null,
-      planningError: null,
-      planOrigin: "saved",
-    });
-    setScreen("saved-flow-picker");
-  },
-
-  applySavedFlow: (savedFlow) => {
-    const state = get();
-    if (!state.testAction) return;
-
-    const { environmentOverrides } = usePreferencesStore.getState();
-    set({
-      generatedPlan: savedFlow.plan,
-      resolvedTarget: resolveBrowserTarget({ action: state.testAction }),
-      browserEnvironment: {
-        ...getBrowserEnvironment(environmentOverrides),
-        ...savedFlow.environment,
-      },
-      pendingSavedFlow: null,
-      selectedCommit: null,
-    });
-    setScreen("review-plan");
-  },
-
   submitFlowInstruction: (instruction) => {
     const state = get();
-    const { skipPlanning, environmentOverrides } = usePreferencesStore.getState();
+    const { environmentOverrides } = usePreferencesStore.getState();
     const flowInstructionHistory = rememberFlowInstruction(
       state.flowInstructionHistory,
       instruction,
@@ -246,84 +203,129 @@ export const useFlowSessionStore = create<FlowSessionStore>((set, get) => ({
 
     if (!state.testAction) {
       set({
-        ...RESET_PLAN_STATE,
+        ...RESET_RUN_STATE,
         flowInstruction: instruction,
         flowInstructionHistory,
-        planningError: null,
-        planOrigin: "generated",
       });
       setScreen("main");
       return;
     }
 
-    if (skipPlanning) {
-      const resolvedTarget = resolveBrowserTarget({
-        action: state.testAction,
-        commit: state.selectedCommit ?? undefined,
-      });
-      const browserEnvironment = getBrowserEnvironment(environmentOverrides);
-      const directPlan = createDirectRunPlan({
-        userInstruction: instruction,
-        target: resolvedTarget,
-      });
+    const resolvedTarget = resolveBrowserTarget({
+      action: state.testAction,
+      commit: state.selectedCommit ?? undefined,
+    });
+    const browserEnvironment = getBrowserEnvironment(environmentOverrides);
 
-      set({
-        ...RESET_PLAN_STATE,
-        flowInstruction: instruction,
-        flowInstructionHistory,
-        planningError: null,
-        planOrigin: "generated",
-        resolvedTarget,
-        generatedPlan: directPlan,
-        browserEnvironment,
-      });
-      setScreen(
-        needsCookieConfirmation(directPlan, browserEnvironment) ? "cookie-sync-confirm" : "testing",
-      );
+    set({
+      ...RESET_RUN_STATE,
+      testAction: state.testAction,
+      selectedCommit: state.selectedCommit,
+      flowInstruction: instruction,
+      flowInstructionHistory,
+      resolvedTarget,
+      browserEnvironment,
+    });
+
+    setScreen(
+      shouldConfirmCookieSync(instruction, browserEnvironment) ? "cookie-sync-confirm" : "testing",
+    );
+  },
+
+  updateEnvironment: (environment) => set({ browserEnvironment: environment }),
+
+  startTesting: () => {
+    setScreen("testing");
+  },
+
+  setFlowSaveStatus: (flowSaveStatus, savedFlowPath = null, flowSaveError = null) => {
+    set({ flowSaveStatus, savedFlowPath, flowSaveError });
+  },
+
+  saveCurrentFlow: async () => {
+    const state = get();
+    if (
+      state.flowSaveStatus === "generating" ||
+      !state.latestRunReport ||
+      !state.resolvedTarget ||
+      !state.flowInstruction
+    ) {
       return;
     }
 
     set({
-      ...RESET_PLAN_STATE,
-      flowInstruction: instruction,
-      flowInstructionHistory,
-      planningError: null,
-      planOrigin: "generated",
+      flowSaveStatus: "generating",
+      savedFlowPath: null,
+      flowSaveError: null,
     });
-    setScreen("planning");
+
+    try {
+      const generatedFlow = await generateFlow({
+        cwd: state.resolvedTarget.cwd,
+        events: state.latestRunEvents,
+        report: state.latestRunReport,
+        userInstruction: state.flowInstruction,
+        target: state.resolvedTarget,
+      });
+      const savedFlowPath = await saveFlow({
+        cwd: state.resolvedTarget.cwd,
+        title: generatedFlow.title,
+        description: state.latestRunReport.summary,
+        flow: {
+          title: generatedFlow.title,
+          userInstruction: state.flowInstruction,
+          steps: generatedFlow.steps,
+        },
+        environment: state.browserEnvironment ?? {},
+        target: state.resolvedTarget,
+      });
+
+      set({
+        flowSaveStatus: "saved",
+        savedFlowPath,
+        flowSaveError: null,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["saved-flows"] });
+    } catch (error) {
+      set({
+        flowSaveStatus: "error",
+        savedFlowPath: null,
+        flowSaveError: error instanceof Error ? error.message : String(error),
+      });
+    }
   },
 
-  completePlanning: (result) => {
-    const { autoRunAfterPlanning } = usePreferencesStore.getState();
+  applySavedFlow: (savedFlowFile) => {
+    const { environmentOverrides } = usePreferencesStore.getState();
+    const testAction = getTestActionForSavedFlowScope(savedFlowFile.savedTargetScope);
+    const selectedCommit = savedFlowFile.selectedCommit ?? null;
+    const resolvedTarget = resolveBrowserTarget({
+      action: testAction,
+      commit: selectedCommit ?? undefined,
+    });
     set({
-      resolvedTarget: result.target,
-      generatedPlan: result.plan,
-      browserEnvironment: result.environment,
+      ...RESET_FLOW_STATE,
+      testAction,
+      selectedCommit,
+      flowInstruction: savedFlowFile.flow.userInstruction,
+      resolvedTarget,
+      browserEnvironment: getBrowserEnvironment({
+        ...savedFlowFile.environment,
+        ...environmentOverrides,
+      }),
+      pendingSavedFlow: savedFlowFile.flow,
     });
-    setScreen(autoRunAfterPlanning && !result.plan.cookieSync.required ? "testing" : "review-plan");
-  },
-
-  failPlanning: (error) => set({ planningError: error }),
-
-  updatePlan: (plan) => set({ generatedPlan: plan }),
-
-  updateEnvironment: (environment) => set({ browserEnvironment: environment }),
-
-  requestPlanApproval: () => {
-    const { generatedPlan, browserEnvironment } = get();
-    setScreen(
-      needsCookieConfirmation(generatedPlan, browserEnvironment)
-        ? "cookie-sync-confirm"
-        : "testing",
-    );
-  },
-
-  approvePlan: () => {
     setScreen("testing");
   },
 
-  completeTestingRun: (report) => {
-    set({ latestRunReport: report });
+  completeTestingRun: (report, events) => {
+    set({
+      latestRunReport: report,
+      latestRunEvents: events,
+      flowSaveStatus: "idle",
+      savedFlowPath: null,
+      flowSaveError: null,
+    });
     setScreen("results");
   },
 
@@ -336,21 +338,21 @@ export const useFlowSessionStore = create<FlowSessionStore>((set, get) => ({
     const success = checkoutBranch(process.cwd(), branch);
     if (success) {
       set({
-        ...RESET_PLAN_STATE,
+        ...RESET_RUN_STATE,
         testAction: "test-branch",
         checkedOutBranch: branch,
         checkedOutPrNumber: prNumber ?? null,
         checkoutError: null,
         selectedCommit: null,
-        planOrigin: null,
       });
       void queryClient.invalidateQueries({ queryKey: ["git-state"] });
       setScreen("main");
-    } else {
-      set({
-        checkoutError: `Could not checkout "${branch}". You may have uncommitted changes or the branch may not exist locally.`,
-      });
+      return;
     }
+
+    set({
+      checkoutError: `Could not checkout "${branch}". You may have uncommitted changes or the branch may not exist locally.`,
+    });
   },
 
   clearCheckoutError: () => set({ checkoutError: null }),

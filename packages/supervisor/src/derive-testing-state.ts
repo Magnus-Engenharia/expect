@@ -1,4 +1,3 @@
-import type { BrowserFlowPlan } from "./types";
 import type { BrowserRunEvent } from "./events";
 import { formatBrowserToolCall } from "./utils/format-browser-tool-call";
 
@@ -27,48 +26,55 @@ export interface DerivedTestingState {
 }
 
 export const deriveTestingState = (
-  plan: BrowserFlowPlan,
   events: BrowserRunEvent[],
   toolCallDisplayMode: string,
 ): DerivedTestingState => {
   const stepStateById = new Map<string, StepDisplayState>();
-
-  for (const step of plan.steps) {
-    stepStateById.set(step.id, {
-      stepId: step.id,
-      status: "pending",
-      label: step.title,
-      elapsedMs: null,
-    });
-  }
+  const stepOrder: string[] = [];
 
   let activeStepId: string | null = null;
   let currentToolCallText: string | null = null;
   let runStatusLabel = "Testing";
-  let hasRunStarted = false;
-  let hasRunCompleted = false;
   let runStartedAt: number | null = null;
 
-  const activateNextPendingStep = () => {
-    for (const planStep of plan.steps) {
-      const state = stepStateById.get(planStep.id);
-      if (state?.status === "pending") {
-        state.status = "active";
-        activeStepId = state.stepId;
-        currentToolCallText = null;
-        return;
+  const ensureStepState = (stepId: string, title: string): StepDisplayState => {
+    const existingStepState = stepStateById.get(stepId);
+    if (existingStepState) {
+      if (existingStepState.label !== title && existingStepState.status === "pending") {
+        existingStepState.label = title;
       }
+      return existingStepState;
+    }
+
+    const nextStepState: StepDisplayState = {
+      stepId,
+      status: "pending",
+      label: title,
+      elapsedMs: null,
+    };
+    stepStateById.set(stepId, nextStepState);
+    stepOrder.push(stepId);
+    return nextStepState;
+  };
+
+  const finalizeStep = (
+    stepId: string,
+    status: "passed" | "failed",
+    label: string,
+    timestamp: number,
+  ) => {
+    const stepState = ensureStepState(stepId, stepId);
+    stepState.status = status;
+    stepState.label = label;
+    if (runStartedAt !== null) {
+      stepState.elapsedMs = Math.round(timestamp - runStartedAt);
     }
   };
 
   for (const event of events) {
     switch (event.type) {
       case "run-started": {
-        hasRunStarted = true;
         runStartedAt = event.timestamp;
-        if (activeStepId === null) {
-          activateNextPendingStep();
-        }
         break;
       }
       case "step-started": {
@@ -81,47 +87,26 @@ export const deriveTestingState = (
             }
           }
         }
-        const stepState = stepStateById.get(event.stepId);
-        if (stepState) {
-          stepState.status = "active";
-          activeStepId = event.stepId;
+        const stepState = ensureStepState(event.stepId, event.title);
+        stepState.status = "active";
+        stepState.label = event.title;
+        activeStepId = event.stepId;
+        currentToolCallText = null;
+        break;
+      }
+      case "step-completed": {
+        finalizeStep(event.stepId, "passed", event.summary, event.timestamp);
+        if (activeStepId === event.stepId) {
+          activeStepId = null;
           currentToolCallText = null;
         }
         break;
       }
-      case "step-completed": {
-        const stepState = stepStateById.get(event.stepId);
-        if (stepState) {
-          stepState.status = "passed";
-          stepState.label = event.summary;
-          if (runStartedAt !== null) {
-            stepState.elapsedMs = Math.round(event.timestamp - runStartedAt);
-          }
-          if (activeStepId === event.stepId) {
-            activeStepId = null;
-            currentToolCallText = null;
-          }
-        }
-        if (activeStepId === null) {
-          activateNextPendingStep();
-        }
-        break;
-      }
       case "assertion-failed": {
-        const stepState = stepStateById.get(event.stepId);
-        if (stepState) {
-          stepState.status = "failed";
-          stepState.label = event.message;
-          if (runStartedAt !== null) {
-            stepState.elapsedMs = Math.round(event.timestamp - runStartedAt);
-          }
-          if (activeStepId === event.stepId) {
-            activeStepId = null;
-            currentToolCallText = null;
-          }
-        }
-        if (activeStepId === null) {
-          activateNextPendingStep();
+        finalizeStep(event.stepId, "failed", event.message, event.timestamp);
+        if (activeStepId === event.stepId) {
+          activeStepId = null;
+          currentToolCallText = null;
         }
         break;
       }
@@ -137,7 +122,11 @@ export const deriveTestingState = (
         break;
       }
       case "run-completed": {
-        hasRunCompleted = true;
+        if (activeStepId) {
+          finalizeStep(activeStepId, event.status, event.summary, event.timestamp);
+          activeStepId = null;
+          currentToolCallText = null;
+        }
         break;
       }
       case "text": {
@@ -149,16 +138,12 @@ export const deriveTestingState = (
     }
   }
 
-  if (hasRunStarted && !hasRunCompleted && activeStepId === null) {
-    activateNextPendingStep();
-  }
-
-  const steps = plan.steps.map(
-    (planStep): StepDisplayState =>
-      stepStateById.get(planStep.id) ?? {
-        stepId: planStep.id,
+  const steps = stepOrder.map(
+    (stepId): StepDisplayState =>
+      stepStateById.get(stepId) ?? {
+        stepId,
         status: "pending",
-        label: planStep.title,
+        label: stepId,
         elapsedMs: null,
       },
   );
