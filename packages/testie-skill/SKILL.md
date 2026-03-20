@@ -1,5 +1,5 @@
 ---
-name: testie-cli
+name: testie-skill
 description: Use the testie CLI to run AI-powered browser tests against code changes without the interactive TUI. Covers all commands, flags, environment variables, saved flows, and common headless usage patterns.
 license: MIT
 metadata:

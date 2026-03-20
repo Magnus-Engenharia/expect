@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import {
+  appendPrompt,
   checkoutBranch,
   generateFlow,
   getBrowserEnvironment,
+  loadPromptHistory,
   resolveBrowserTarget,
   saveFlow,
   type AgentProvider,
@@ -59,6 +61,7 @@ interface FlowSessionStore {
   exitTesting: () => void;
   switchBranch: (branch: string, prNumber?: number | null) => void;
   clearCheckoutError: () => void;
+  hydrateHistory: () => void;
 }
 
 const COOKIE_SYNC_KEYWORDS = [
@@ -125,6 +128,7 @@ const RESET_FLOW_STATE = {
 
 const rememberFlowInstruction = (history: string[], instruction: string): string[] => {
   if (!instruction) return history;
+  appendPrompt(instruction).catch(() => {});
   return [instruction, ...history.filter((entry) => entry !== instruction)].slice(
     0,
     FLOW_INPUT_HISTORY_LIMIT,
@@ -356,4 +360,14 @@ export const useFlowSessionStore = create<FlowSessionStore>((set, get) => ({
   },
 
   clearCheckoutError: () => set({ checkoutError: null }),
+
+  hydrateHistory: () => {
+    loadPromptHistory()
+      .then((history: string[]) =>
+        set({ flowInstructionHistory: history.slice(0, FLOW_INPUT_HISTORY_LIMIT) }),
+      )
+      .catch(() => {});
+  },
 }));
+
+useFlowSessionStore.getState().hydrateHistory();

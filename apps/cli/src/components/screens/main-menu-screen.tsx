@@ -33,12 +33,16 @@ export const MainMenu = () => {
   const switchBranch = useFlowSessionStore((state) => state.switchBranch);
   const flowInstruction = useFlowSessionStore((state) => state.flowInstruction);
 
+  const flowInstructionHistory = useFlowSessionStore((state) => state.flowInstructionHistory);
+
   const [value, setValue] = useState(flowInstruction);
   const [inputKey, setInputKey] = useState(0);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [hasCycled, setHasCycled] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [focus, setFocus] = useState<FocusArea>("input");
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const [savedCurrentInput, setSavedCurrentInput] = useState("");
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
@@ -206,6 +210,12 @@ export const MainMenu = () => {
   pickerOpenRef.current = pickerOpen;
   const errorMessageRef = useRef(errorMessage);
   errorMessageRef.current = errorMessage;
+  const historyIndexRef = useRef(historyIndex);
+  historyIndexRef.current = historyIndex;
+  const savedCurrentInputRef = useRef(savedCurrentInput);
+  savedCurrentInputRef.current = savedCurrentInput;
+  const flowInstructionHistoryRef = useRef(flowInstructionHistory);
+  flowInstructionHistoryRef.current = flowInstructionHistory;
 
   const handleInputChange = useCallback(
     (nextValue: string) => {
@@ -243,9 +253,49 @@ export const MainMenu = () => {
 
       setValue(stripped);
       if (errorMessageRef.current) setErrorMessage(null);
+      if (historyIndexRef.current !== null) {
+        setHistoryIndex(null);
+        setSavedCurrentInput("");
+      }
     },
     [openPicker, closePicker],
   );
+
+  const applyHistoryEntry = useCallback((entry: string) => {
+    setValue(entry);
+    setInputKey((previous) => previous + 1);
+  }, []);
+
+  const navigateHistoryBack = useCallback(() => {
+    const history = flowInstructionHistoryRef.current;
+    if (history.length === 0) return;
+
+    const currentIndex = historyIndexRef.current;
+    if (currentIndex === null) {
+      setSavedCurrentInput(valueRef.current);
+      setHistoryIndex(0);
+      applyHistoryEntry(history[0]!);
+    } else if (currentIndex < history.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setHistoryIndex(nextIndex);
+      applyHistoryEntry(history[nextIndex]!);
+    }
+  }, [applyHistoryEntry]);
+
+  const navigateHistoryForward = useCallback(() => {
+    const currentIndex = historyIndexRef.current;
+    if (currentIndex === null) return;
+
+    if (currentIndex > 0) {
+      const nextIndex = currentIndex - 1;
+      setHistoryIndex(nextIndex);
+      applyHistoryEntry(flowInstructionHistoryRef.current[nextIndex]!);
+    } else {
+      setHistoryIndex(null);
+      applyHistoryEntry(savedCurrentInputRef.current);
+      setSavedCurrentInput("");
+    }
+  }, [applyHistoryEntry]);
 
   const showSuggestion = focus === "input" && value === "" && !pickerOpen && suggestions.length > 0;
   const showCycleHint = showSuggestion && !hasCycled;
@@ -334,7 +384,8 @@ export const MainMenu = () => {
                   placeholder={currentSuggestion ? `${currentSuggestion}  [tab]` : ""}
                   value={value}
                   onSubmit={submit}
-                  onDownArrowAtBottom={() => {}}
+                  onUpArrowAtTop={navigateHistoryBack}
+                  onDownArrowAtBottom={navigateHistoryForward}
                   onChange={handleInputChange}
                 />
               </Box>

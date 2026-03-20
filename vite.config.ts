@@ -5,12 +5,12 @@ export default defineConfig({
     "*.{js,ts,tsx}": "vp check --fix",
   },
   lint: {
-    ignorePatterns: ["archive"],
+    ignorePatterns: ["archive", "playground"],
     plugins: ["typescript", "react", "import"],
     jsPlugins: ["./lint-rules/node-namespace-imports.js"],
     rules: {
-      "node-imports/namespace-imports": "error",
       "require-yield": "off",
+      "node-imports/namespace-imports": "error",
       "no-restricted-imports": [
         "error",
         {

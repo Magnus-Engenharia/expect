@@ -45,6 +45,7 @@ export {
 } from "./git";
 export { generateFlowSuggestions } from "./generate-flow-suggestions";
 export { getLearningsFilePath, loadLearnings, saveLearnings } from "./learnings-storage";
+export { loadPromptHistory, appendPrompt } from "./prompt-history";
 export { formatDiffStats } from "./utils/format-diff-stats";
 export { getSavedFlowDirectoryPath } from "./utils/get-saved-flow-directory-path";
 export { isRunningInAgent } from "./utils/is-running-in-agent";

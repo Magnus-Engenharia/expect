@@ -47,3 +47,5 @@ export const SELECT_TRUNCATION_LIMIT = 24;
 export const TESTIE_STATE_DIR = ".testie";
 export const TESTED_FINGERPRINT_FILE = "last-tested";
 export const GIT_FINGERPRINT_TIMEOUT_MS = 5000;
+export const PROMPT_HISTORY_FILE = "prompt-history.json";
+export const PROMPT_HISTORY_LIMIT = 500;
