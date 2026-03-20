@@ -12,7 +12,7 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"],
+      "dependsOn": ["^build", "^lint"],
       "outputs": ["*.ts"]
     },
     "format": {
@@ -24,7 +24,7 @@
       "outputs": ["*.ts"]
     },
     "check": {
-      "dependsOn": ["^check"],
+      "dependsOn": ["^build", "^check"],
       "outputs": ["*.ts"]
     },
     "test": {
