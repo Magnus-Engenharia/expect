@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { Box, Text } from "ink";
 import { lerpColor } from "../../utils/lerp-color";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions";
@@ -17,12 +17,15 @@ export const DotField = ({ rows, dimColor, brightColor }: DotFieldProps) => {
   const [columns] = useStdoutDimensions();
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick((previous) => previous + 1);
-    }, TICK_MS);
-    return () => clearInterval(interval);
-  }, []);
+  const startedRef = useRef(false);
+  if (!startedRef.current) {
+    startedRef.current = true;
+    setTimeout(() => {
+      setInterval(() => {
+        setTick((previous) => previous + 1);
+      }, TICK_MS);
+    }, 0);
+  }
 
   const dotsPerRow = Math.floor(columns / DOT_SPACING_X);
 

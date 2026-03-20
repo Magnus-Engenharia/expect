@@ -1,5 +1,5 @@
 import path from "node:path";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { parse } from "ini";
 import { Effect, Layer, Predicate, Schema, ServiceMap } from "effect";
 import * as FileSystem from "effect/FileSystem";
@@ -29,17 +29,17 @@ export class FirefoxPlatform extends ServiceMap.Service<
   { dataDir: string; executablePaths: readonly string[] }
 >()("@cookies/FirefoxPlatform") {
   static layerDarwin = Layer.succeed(this, {
-    dataDir: path.join(homedir(), FIREFOX_CONFIG.dataDir.darwin),
+    dataDir: path.join(os.homedir(), FIREFOX_CONFIG.dataDir.darwin),
     executablePaths: [FIREFOX_CONFIG.executable.darwin],
   });
 
   static layerLinux = Layer.succeed(this, {
-    dataDir: path.join(homedir(), FIREFOX_CONFIG.dataDir.linux),
+    dataDir: path.join(os.homedir(), FIREFOX_CONFIG.dataDir.linux),
     executablePaths: FIREFOX_CONFIG.executable.linux,
   });
 
   static layerWin32 = Layer.succeed(this, {
-    dataDir: path.join(homedir(), FIREFOX_CONFIG.dataDir.win32),
+    dataDir: path.join(os.homedir(), FIREFOX_CONFIG.dataDir.win32),
     executablePaths: FIREFOX_CONFIG.executable.win32.flatMap((relative) => {
       const programFiles = process.env["ProgramFiles"] ?? "C:\\Program Files";
       const programFilesX86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";

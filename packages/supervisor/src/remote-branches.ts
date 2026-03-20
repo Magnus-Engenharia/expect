@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import * as child_process from "node:child_process";
 import { Data, Effect, Schema } from "effect";
 import { GIT_TIMEOUT_MS, GITHUB_TIMEOUT_MS, PR_LIMIT } from "./constants";
 
@@ -63,7 +63,7 @@ const execCommand = Effect.fn("execCommand")(function* (
   return yield* Effect.tryPromise({
     try: () =>
       new Promise<string>((resolve, reject) => {
-        execFile(
+        child_process.execFile(
           command,
           [...args],
           { cwd, encoding: "utf-8", timeout: timeoutMs },

@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import * as child_process from "node:child_process";
 import {
   CHANGED_FILE_LIMIT,
   DIFF_PREVIEW_CHAR_LIMIT,
@@ -12,7 +12,7 @@ const FIELD_SEPARATOR = "\u001f";
 
 const execGit = (cwd: string, command: string): string => {
   try {
-    return execSync(command, {
+    return child_process.execSync(command, {
       cwd,
       encoding: "utf-8",
       stdio: "pipe",
@@ -145,7 +145,7 @@ export const getLocalBranches = (cwd: string): string[] => {
 
 export const checkoutBranch = (cwd: string, branch: string): boolean => {
   try {
-    execSync(`git checkout ${branch}`, {
+    child_process.execSync(`git checkout ${branch}`, {
       cwd,
       encoding: "utf-8",
       timeout: GIT_TIMEOUT_MS,

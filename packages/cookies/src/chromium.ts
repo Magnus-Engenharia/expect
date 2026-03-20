@@ -1,5 +1,5 @@
 import path from "node:path";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { Array as Arr, Effect, Layer, Option, Predicate, Schema, ServiceMap } from "effect";
 import * as FileSystem from "effect/FileSystem";
 import { ChildProcess } from "effect/unstable/process";
@@ -39,14 +39,14 @@ export class ChromiumPlatform extends ServiceMap.Service<
   static layerDarwin = Layer.succeed(this, {
     executableCandidates: (config: ChromiumConfig) => [config.executable.darwin],
     userDataDir: (config: ChromiumConfig) =>
-      path.join(homedir(), "Library", "Application Support", config.userData.darwin),
+      path.join(os.homedir(), "Library", "Application Support", config.userData.darwin),
   });
 
   static layerLinux = Layer.succeed(this, {
     executableCandidates: (config: ChromiumConfig) => config.executable.linux,
     userDataDir: (config: ChromiumConfig) =>
       path.join(
-        process.env["XDG_CONFIG_HOME"] ?? path.join(homedir(), ".config"),
+        process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config"),
         config.userData.linux,
       ),
   });
@@ -73,7 +73,7 @@ export class ChromiumPlatform extends ServiceMap.Service<
 
       const programFiles = process.env["ProgramFiles"] ?? "C:\\Program Files";
       const programFilesX86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
-      const localAppData = process.env["LOCALAPPDATA"] ?? path.join(homedir(), "AppData", "Local");
+      const localAppData = process.env["LOCALAPPDATA"] ?? path.join(os.homedir(), "AppData", "Local");
 
       return {
         executableCandidates: (config: ChromiumConfig) => {

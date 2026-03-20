@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -22,7 +22,7 @@ const TEST_HTML = `<!DOCTYPE html>
 </html>`;
 
 let testServerUrl: string;
-let httpServer: ReturnType<typeof createServer>;
+let httpServer: ReturnType<typeof http.createServer>;
 
 let mcpClient: Client;
 let mcpCleanup: () => Promise<void>;
@@ -40,7 +40,7 @@ const textContent = (result: Awaited<ReturnType<typeof callTool>>): string => {
 };
 
 beforeAll(async () => {
-  httpServer = createServer((_req, res) => {
+  httpServer = http.createServer((_req, res) => {
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(TEST_HTML);
   });

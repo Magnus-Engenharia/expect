@@ -1,6 +1,4 @@
 import {
-  startRecording,
-  stopRecording,
   getEvents,
   getAllEvents,
   getEventCount,

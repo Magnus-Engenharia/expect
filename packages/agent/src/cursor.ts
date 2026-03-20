@@ -1,7 +1,7 @@
-import { spawn, execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
@@ -272,21 +272,21 @@ const createWorkspaceOverlay = (
   mcpServers: Record<string, McpServerConfig>,
   executable: string,
 ): string => {
-  const overlayDir = join(tmpdir(), `cursor-overlay-${crypto.randomUUID()}`);
-  mkdirSync(overlayDir);
+  const overlayDir = path.join(os.tmpdir(), `cursor-overlay-${crypto.randomUUID()}`);
+  fs.mkdirSync(overlayDir);
 
-  for (const entry of readdirSync(realWorkspace)) {
+  for (const entry of fs.readdirSync(realWorkspace)) {
     if (entry === ".cursor") continue;
-    symlinkSync(join(realWorkspace, entry), join(overlayDir, entry));
+    fs.symlinkSync(path.join(realWorkspace, entry), path.join(overlayDir, entry));
   }
 
-  const cursorDir = join(overlayDir, ".cursor");
-  mkdirSync(cursorDir);
-  writeFileSync(join(cursorDir, "mcp.json"), JSON.stringify({ mcpServers }, null, 2));
+  const cursorDir = path.join(overlayDir, ".cursor");
+  fs.mkdirSync(cursorDir);
+  fs.writeFileSync(path.join(cursorDir, "mcp.json"), JSON.stringify({ mcpServers }, null, 2));
 
   for (const name of Object.keys(mcpServers)) {
     try {
-      execFileSync(executable, ["mcp", "enable", name], { stdio: "ignore" });
+      childProcess.execFileSync(executable, ["mcp", "enable", name], { stdio: "ignore" });
     } catch {
       // HACK: mcp enable may fail if server is already enabled or binary is missing
     }
@@ -326,7 +326,7 @@ const spawnCursorAgent = async function* (
   args.push(prompt);
 
   const executable = settings.executable ?? "cursor-agent";
-  const child = spawn(executable, args, {
+  const child = childProcess.spawn(executable, args, {
     stdio: ["ignore", "pipe", "ignore"],
     env: { ...process.env, ...settings.env },
   });
@@ -368,6 +368,6 @@ const spawnCursorAgent = async function* (
   } finally {
     if (!child.killed) child.kill();
     signal?.removeEventListener("abort", onAbort);
-    if (overlayDir) rmSync(overlayDir, { recursive: true, force: true });
+    if (overlayDir) fs.rmSync(overlayDir, { recursive: true, force: true });
   }
 };

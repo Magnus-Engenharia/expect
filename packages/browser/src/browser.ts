@@ -1,6 +1,6 @@
 import { Browsers, Cookies, layerLive } from "@browser-tester/cookies";
 import type { Browser as BrowserProfile } from "@browser-tester/cookies";
-import { tmpdir } from "node:os";
+import * as os from "node:os";
 import { chromium } from "playwright";
 import type { Locator, Page } from "playwright";
 import { Effect, Layer, Option, ServiceMap } from "effect";
@@ -110,7 +110,7 @@ const resolveContextOptions = (
   const defaultSize = { width: DEFAULT_VIDEO_WIDTH_PX, height: DEFAULT_VIDEO_HEIGHT_PX };
   const recordVideo = video
     ? video === true
-      ? { dir: tmpdir(), size: defaultSize }
+      ? { dir: os.tmpdir(), size: defaultSize }
       : { ...video, size: video.size ?? defaultSize }
     : undefined;
 

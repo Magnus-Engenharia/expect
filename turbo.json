@@ -26,6 +26,10 @@
     "test": {
       "dependsOn": ["^test"],
       "outputs": ["*.ts"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": ["*.ts"]
     }
   }
 }

@@ -1,11 +1,11 @@
-import { accessSync, constants } from "node:fs";
-import { homedir } from "node:os";
+import * as fs from "node:fs";
+import * as os from "node:os";
 
 const isAccessibleDirectory = (directory: string | undefined): directory is string => {
   if (!directory) return false;
 
   try {
-    accessSync(directory, constants.R_OK | constants.X_OK);
+    fs.accessSync(directory, fs.constants.R_OK | fs.constants.X_OK);
     return true;
   } catch {
     return false;
@@ -25,7 +25,7 @@ export const resolveSafeCurrentWorkingDirectory = (preferredDirectory?: string):
     preferredDirectory,
     getProcessWorkingDirectory(),
     process.env.PWD,
-    homedir(),
+    os.homedir(),
     "/",
   ];
 

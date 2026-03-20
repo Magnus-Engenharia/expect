@@ -1,8 +1,8 @@
-import { createServer } from "node:net";
+import * as net from "node:net";
 import { LIVE_VIEW_DEFAULT_PORT, LIVE_VIEW_HOST, LIVE_VIEW_PORT_SEARCH_LIMIT } from "../constants";
 
 const isPortAvailable = async (port: number): Promise<boolean> => {
-  const server = createServer();
+  const server = net.createServer();
 
   return new Promise<boolean>((resolve, reject) => {
     server.once("error", (error: NodeJS.ErrnoException) => {

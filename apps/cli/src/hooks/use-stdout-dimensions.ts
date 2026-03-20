@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useStdout } from "ink";
 import { FALLBACK_TERMINAL_COLUMNS, FALLBACK_TERMINAL_ROWS } from "../constants";
 
@@ -15,13 +15,11 @@ export const useStdoutDimensions = (): [columns: number, rows: number] => {
     safeRows(stdout.rows),
   ]);
 
-  useEffect(() => {
-    const onResize = () => setDimensions([safeColumns(stdout.columns), safeRows(stdout.rows)]);
-    stdout.on("resize", onResize);
-    return () => {
-      stdout.off("resize", onResize);
-    };
-  }, [stdout]);
+  const subscribedRef = useRef(false);
+  if (!subscribedRef.current) {
+    subscribedRef.current = true;
+    stdout.on("resize", () => setDimensions([safeColumns(stdout.columns), safeRows(stdout.rows)]));
+  }
 
   return dimensions;
 };

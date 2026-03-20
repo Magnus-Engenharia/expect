@@ -1,5 +1,5 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
@@ -13,13 +13,13 @@ describe("safe current working directory", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     if (safeDirectory) {
-      rmSync(safeDirectory, { recursive: true, force: true });
+      fs.rmSync(safeDirectory, { recursive: true, force: true });
       safeDirectory = undefined;
     }
   });
 
   it("uses the preferred directory when process.cwd throws", () => {
-    safeDirectory = mkdtempSync(path.join(tmpdir(), "safe-cwd-"));
+    safeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "safe-cwd-"));
     vi.spyOn(process, "cwd").mockImplementation(() => {
       throw new Error("uv_cwd");
     });
@@ -28,7 +28,7 @@ describe("safe current working directory", () => {
   });
 
   it("changes into the resolved directory when the current directory is unavailable", () => {
-    safeDirectory = mkdtempSync(path.join(tmpdir(), "safe-cwd-"));
+    safeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "safe-cwd-"));
     vi.spyOn(process, "cwd").mockImplementation(() => {
       throw new Error("uv_cwd");
     });

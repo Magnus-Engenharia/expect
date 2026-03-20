@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useFlowSessionStore } from "../../stores/use-flow-session";
 import { useGitState } from "../../hooks/use-git-state";
@@ -47,35 +47,27 @@ export const MainMenu = () => {
   const [localOptions, setLocalOptions] = useState<ContextOption[]>([]);
   const [remoteLoading, setRemoteLoading] = useState(false);
 
-  useEffect(() => {
-    if (!gitState) return;
-    let cancelled = false;
-    buildLocalContextOptions(gitState)
-      .then((options) => {
-        if (!cancelled) setLocalOptions(options);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [gitState]);
+  const previousGitStateRef = useRef(gitState);
+  if (previousGitStateRef.current !== gitState) {
+    previousGitStateRef.current = gitState;
+    if (gitState) {
+      buildLocalContextOptions(gitState)
+        .then((options) => setLocalOptions(options))
+        .catch(() => {});
+    }
+  }
 
-  useEffect(() => {
-    if (!pickerOpen || !gitState) return;
-    let cancelled = false;
-    setRemoteLoading(true);
-    fetchRemoteContextOptions(gitState)
-      .then((options) => {
-        if (!cancelled) setRemoteOptions(options);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setRemoteLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pickerOpen, gitState]);
+  const previousPickerDepsRef = useRef({ pickerOpen, gitState });
+  if (previousPickerDepsRef.current.pickerOpen !== pickerOpen || previousPickerDepsRef.current.gitState !== gitState) {
+    previousPickerDepsRef.current = { pickerOpen, gitState };
+    if (pickerOpen && gitState) {
+      setRemoteLoading(true);
+      fetchRemoteContextOptions(gitState)
+        .then((options) => setRemoteOptions(options))
+        .catch(() => {})
+        .finally(() => setRemoteLoading(false));
+    }
+  }
 
   const allOptions = useMemo(
     () => [...localOptions, ...remoteOptions],
@@ -87,9 +79,11 @@ export const MainMenu = () => {
     [allOptions, pickerQuery],
   );
 
-  useEffect(() => {
+  const previousPickerQueryRef = useRef(pickerQuery);
+  if (previousPickerQueryRef.current !== pickerQuery) {
+    previousPickerQueryRef.current = pickerQuery;
     setPickerIndex(0);
-  }, [pickerQuery]);
+  }
 
   const defaultContext = useMemo(() => {
     if (!gitState) return null;
@@ -106,13 +100,15 @@ export const MainMenu = () => {
   const generationAbortRef = useRef<AbortController | null>(null);
   const suggestions = aiSuggestions ?? staticSuggestions;
 
-  useEffect(() => {
+  const previousSuggestionDepsRef = useRef({ activeContext, gitState });
+  if (previousSuggestionDepsRef.current.activeContext !== activeContext || previousSuggestionDepsRef.current.gitState !== gitState) {
+    previousSuggestionDepsRef.current = { activeContext, gitState };
     setSuggestionIndex(0);
     setAiSuggestions(null);
     setIsGenerating(false);
     generationAbortRef.current?.abort();
     generationAbortRef.current = null;
-  }, [activeContext, gitState]);
+  }
 
   const requestSuggestions = useCallback(() => {
     if (!gitState || isGenerating) return;

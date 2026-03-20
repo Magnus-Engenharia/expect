@@ -1,4 +1,4 @@
-import { arch, availableParallelism, cpus, freemem, loadavg, platform, totalmem } from "node:os";
+import * as os from "node:os";
 
 import {
   BROWSER_MEMORY_OVERHEAD_MB,
@@ -26,10 +26,10 @@ export interface BrowserCapacity {
 
 const resolveCpuCoreCount = (): number => {
   try {
-    return availableParallelism();
+    return os.availableParallelism();
   } catch {}
   try {
-    const entries = cpus();
+    const entries = os.cpus();
     if (entries.length > 0) return entries.length;
   } catch {}
   const navigatorCores = globalThis.navigator?.hardwareConcurrency;
@@ -39,7 +39,7 @@ const resolveCpuCoreCount = (): number => {
 
 const resolveCpuModel = (): string => {
   try {
-    return cpus()[0]?.model ?? "unknown";
+    return os.cpus()[0]?.model ?? "unknown";
   } catch {
     return "unknown";
   }
@@ -47,14 +47,14 @@ const resolveCpuModel = (): string => {
 
 export const getSystemStats = (): SystemStats => {
   const coreCount = resolveCpuCoreCount();
-  const totalMemoryMb = Math.floor(totalmem() / BYTES_PER_MB);
-  const freeMemoryMb = Math.min(Math.floor(freemem() / BYTES_PER_MB), totalMemoryMb);
-  const oneMinuteLoad = loadavg()[0];
+  const totalMemoryMb = Math.floor(os.totalmem() / BYTES_PER_MB);
+  const freeMemoryMb = Math.min(Math.floor(os.freemem() / BYTES_PER_MB), totalMemoryMb);
+  const oneMinuteLoad = os.loadavg()[0];
   const cpuLoadPercent = Math.min(100, Math.round((oneMinuteLoad / coreCount) * 100));
 
   return {
-    platform: platform(),
-    arch: arch(),
+    platform: os.platform(),
+    arch: os.arch(),
     cpuCores: coreCount,
     cpuModel: resolveCpuModel(),
     cpuLoadPercent,

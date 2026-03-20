@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import { createContext, useCallback, useContext, useRef } from "react";
 import { CLICK_SUPPORT_ENABLED } from "../constants";
 
 interface MousePosition {
@@ -22,7 +22,6 @@ const NOOP_CONTEXT: MouseContextValue = { subscribeClick: () => NOOP_UNSUBSCRIBE
 const MouseContext = createContext<MouseContextValue>(NOOP_CONTEXT);
 
 const MOUSE_ENABLE = "\u001b[?1003l\u001b[?1002l\u001b[?1000h\u001b[?1006h";
-const MOUSE_DISABLE = "\u001b[?1000l\u001b[?1006l\u001b[?1003l\u001b[?1002l";
 // oxlint-disable-next-line no-control-regex
 const ALL_TERMINAL_SEQUENCES =
   /\x1b\[<(\d+);(\d+);(\d+)([Mm])|\x1b\[[\d;?<>=]*[A-Za-z~]|\[<[\d;]+[Mm]|\[\d+;\d+R|\[\?[\d;]+[a-z]/g;
@@ -32,7 +31,9 @@ export const MouseProvider = ({ children }: { children: React.ReactNode }) => {
 
   const handlersRef = useRef(new Set<ClickHandler>());
 
-  useEffect(() => {
+  const mouseStartedRef = useRef(false);
+  if (!mouseStartedRef.current) {
+    mouseStartedRef.current = true;
     process.stdout.write(MOUSE_ENABLE);
 
     // HACK: override emit so SGR mouse sequences are stripped before ink's useInput sees them
@@ -60,12 +61,7 @@ export const MouseProvider = ({ children }: { children: React.ReactNode }) => {
       }
       return originalEmit(event, ...eventArgs);
     };
-
-    return () => {
-      process.stdin.emit = originalEmit;
-      process.stdout.write(MOUSE_DISABLE);
-    };
-  }, []);
+  }
 
   const subscribeClick = useCallback((handler: ClickHandler) => {
     handlersRef.current.add(handler);

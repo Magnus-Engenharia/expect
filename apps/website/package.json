@@ -10,7 +10,8 @@
     "format": "vp fmt",
     "format:check": "vp fmt --check",
     "check": "vp check",
-    "test": "vp test"
+    "test": "vp test",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

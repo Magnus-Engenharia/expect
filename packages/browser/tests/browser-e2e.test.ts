@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { createServer, type Server } from "node:http";
+import * as http from "node:http";
 import { runBrowser } from "../src/browser";
 
 interface RecordedRequest {
@@ -11,7 +11,7 @@ interface RecordedRequest {
 
 const startBrowserApp = async () => {
   const requests: RecordedRequest[] = [];
-  const server = createServer(async (request, response) => {
+  const server = http.createServer(async (request, response) => {
     const path = request.url ?? "/";
     const method = request.method ?? "GET";
 
@@ -113,7 +113,7 @@ const startBrowserApp = async () => {
 };
 
 describe("browser e2e", () => {
-  let server: Server;
+  let server: http.Server;
   let origin: string;
   let requests: RecordedRequest[];
 

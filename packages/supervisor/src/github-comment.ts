@@ -1,14 +1,14 @@
-import { execFile } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import * as child_process from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as util from "node:util";
 import { Schema } from "effect";
 import { COMMENT_DIRECTORY_PREFIX, GITHUB_TIMEOUT_MS } from "./constants";
 import type { BrowserRunPullRequest, BrowserRunReport } from "./types";
 import { commandExists } from "./utils/command-exists";
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = util.promisify(child_process.execFile);
 
 const PullRequestSchema = Schema.Struct({
   number: Schema.Number,
@@ -74,12 +74,7 @@ export const buildPullRequestCommentBody = (report: BrowserRunReport): string =>
       ? report.findings.slice(0, 5).map((finding) => `- ${finding.title}: ${finding.detail}`)
       : ["- No blocking findings detected."];
 
-  const riskLines =
-    report.confirmedRiskAreas.length > 0
-      ? report.confirmedRiskAreas.map((riskArea) => `- Confirmed risk: ${riskArea}`)
-      : report.unresolvedRiskAreas.length > 0
-        ? report.unresolvedRiskAreas.map((riskArea) => `- Needs follow-up: ${riskArea}`)
-        : ["- No outstanding risk areas called out by the plan."];
+  const riskLines = ["- No outstanding risk areas called out by the plan."];
 
   const artifactLines: string[] = [];
   if (isRemoteShareUrl(report.artifacts.shareUrl)) {
@@ -122,9 +117,9 @@ export const postPullRequestComment = async (
   }
 
   const body = buildPullRequestCommentBody(options.report);
-  const outputDirectoryPath = mkdtempSync(join(tmpdir(), COMMENT_DIRECTORY_PREFIX));
-  const bodyPath = join(outputDirectoryPath, "pull-request-comment.md");
-  writeFileSync(bodyPath, body, "utf-8");
+  const outputDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), COMMENT_DIRECTORY_PREFIX));
+  const bodyPath = path.join(outputDirectoryPath, "pull-request-comment.md");
+  fs.writeFileSync(bodyPath, body, "utf-8");
 
   await runGhCommand(options.cwd, [
     "pr",

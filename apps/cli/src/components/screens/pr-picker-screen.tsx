@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions";
 import figures from "figures";
@@ -38,20 +38,14 @@ export const PrPickerScreen = () => {
   const [remoteBranches, setRemoteBranches] = useState<RemoteBranch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchStartedRef = useRef(false);
+  if (!fetchStartedRef.current) {
+    fetchStartedRef.current = true;
     fetchRemoteBranches(process.cwd())
-      .then((branches) => {
-        if (!cancelled) setRemoteBranches(branches);
-      })
+      .then((branches) => setRemoteBranches(branches))
       .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      .finally(() => setIsLoading(false));
+  }
 
   const filteredBranches = (() => {
     let result = remoteBranches.filter((branch) => {

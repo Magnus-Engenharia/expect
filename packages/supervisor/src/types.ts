@@ -111,7 +111,7 @@ export interface FlowStep {
 export interface SavedFlow {
   title: string;
   userInstruction: string;
-  steps: FlowStep[];
+  steps: readonly FlowStep[];
 }
 
 export interface SavedFlowSummary {

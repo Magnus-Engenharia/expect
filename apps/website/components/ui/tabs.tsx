@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useCallback, useContext, type ComponentProps } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Tabs as TabsPrimitive } from "radix-ui";
 
@@ -11,7 +11,7 @@ function Tabs({
   className,
   orientation = "horizontal",
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
+}: ComponentProps<typeof TabsPrimitive.Root>) {
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
@@ -43,7 +43,7 @@ function TabsList({
   variant = "default",
   children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>) {
+}: ComponentProps<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>) {
   const isLine = variant === "line";
 
   const { contextValue, highlightElement } = useSlidingHighlight(
@@ -67,33 +67,34 @@ function TabsList({
   );
 }
 
-function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
-  const { setActiveElement } = React.useContext(SlidingHighlightContext);
+function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
+  const { setActiveElement } = useContext(SlidingHighlightContext);
 
-  React.useEffect(() => {
-    const element = triggerRef.current;
-    if (!element) return;
+  const setupRef = useCallback(
+    (element: HTMLButtonElement | null) => {
+      if (!element) return;
 
-    const updateIfActive = () => {
-      if (element.dataset.state === "active") {
-        setActiveElement(element);
-      }
-    };
+      const updateIfActive = () => {
+        if (element.dataset.state === "active") {
+          setActiveElement(element);
+        }
+      };
 
-    updateIfActive();
+      updateIfActive();
 
-    const observer = new MutationObserver(updateIfActive);
-    observer.observe(element, {
-      attributes: true,
-      attributeFilter: ["data-state"],
-    });
-    return () => observer.disconnect();
-  }, [setActiveElement]);
+      const observer = new MutationObserver(updateIfActive);
+      observer.observe(element, {
+        attributes: true,
+        attributeFilter: ["data-state"],
+      });
+      return () => observer.disconnect();
+    },
+    [setActiveElement],
+  );
 
   return (
     <TabsPrimitive.Trigger
-      ref={triggerRef}
+      ref={setupRef}
       data-slot="tabs-trigger"
       className={cn(
         "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-[calc(var(--radius-lg)-var(--tabs-padding))] border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-[color] group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start group-data-[variant=line]/tabs-list:flex-initial group-data-[variant=line]/tabs-list:px-0 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -106,7 +107,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
-function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
+function TabsContent({ className, ...props }: ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"

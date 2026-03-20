@@ -24,7 +24,7 @@ jobs:
           - name: Format
             command: pnpm format:check
           - name: Typecheck
-            command: pnpm check
+            command: pnpm typecheck
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

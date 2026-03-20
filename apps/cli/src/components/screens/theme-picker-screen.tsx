@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import figures from "figures";
 import { THEMES, type ThemeDefinition } from "../../themes";
@@ -51,10 +51,12 @@ export const ThemePickerScreen = () => {
     },
   });
 
-  useEffect(() => {
+  const previousThemeDepsRef = useRef({ selectedIndex, variantFilter });
+  if (previousThemeDepsRef.current.selectedIndex !== selectedIndex || previousThemeDepsRef.current.variantFilter !== variantFilter) {
+    previousThemeDepsRef.current = { selectedIndex, variantFilter };
     const nextTheme = filteredThemeNames[selectedIndex];
     if (nextTheme) setTheme(nextTheme);
-  }, [selectedIndex, setTheme, filteredThemeNames]);
+  }
 
   const visibleThemes = filteredThemeNames.slice(
     scrollOffset,

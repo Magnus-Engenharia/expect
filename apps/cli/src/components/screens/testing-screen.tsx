@@ -1,5 +1,5 @@
 import { Cause, Effect, Fiber, Stream } from "effect";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Box, Static, Text, useInput } from "ink";
 import figures from "figures";
 import { executeBrowserFlow, type BrowserRunEvent } from "@browser-tester/supervisor";
@@ -76,61 +76,57 @@ export const TestingScreen = () => {
 
   const elapsedTimeLabel = useMemo(() => formatElapsedTime(elapsedTimeMs), [elapsedTimeMs]);
 
-  useEffect(() => {
-    if (!exitRequested || running) return;
+  const exitTriggeredRef = useRef(false);
+  if (exitRequested && !running && !exitTriggeredRef.current) {
+    exitTriggeredRef.current = true;
     exitTesting();
-  }, [exitRequested, exitTesting, running]);
+  }
 
-  useEffect(() => {
-    if (!running || runStartedAt === null) return;
-
-    setElapsedTimeMs(Date.now() - runStartedAt);
-
-    const interval = setInterval(() => {
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const previousTimerDepsRef = useRef({ running, runStartedAt });
+  if (previousTimerDepsRef.current.running !== running || previousTimerDepsRef.current.runStartedAt !== runStartedAt) {
+    previousTimerDepsRef.current = { running, runStartedAt };
+    if (timerIntervalRef.current !== undefined) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = undefined;
+    }
+    if (running && runStartedAt !== null) {
       setElapsedTimeMs(Date.now() - runStartedAt);
-    }, TESTING_TIMER_UPDATE_INTERVAL_MS);
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedTimeMs(Date.now() - runStartedAt);
+      }, TESTING_TIMER_UPDATE_INTERVAL_MS);
+    }
+  }
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [runStartedAt, running]);
-
-  useEffect(() => {
-    if (!pendingLiveViewUrl) return;
-
-    let cancelled = false;
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(pendingLiveViewUrl);
-        if (response.ok && !cancelled) {
-          setLiveViewUrl(pendingLiveViewUrl);
-          clearInterval(interval);
+  const liveViewPollRef = useRef<{ url: string | null; intervalId: ReturnType<typeof setInterval> | undefined }>({ url: null, intervalId: undefined });
+  if (liveViewPollRef.current.url !== pendingLiveViewUrl) {
+    if (liveViewPollRef.current.intervalId !== undefined) {
+      clearInterval(liveViewPollRef.current.intervalId);
+    }
+    liveViewPollRef.current.url = pendingLiveViewUrl;
+    liveViewPollRef.current.intervalId = undefined;
+    if (pendingLiveViewUrl) {
+      const url = pendingLiveViewUrl;
+      const intervalId = setInterval(async () => {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            setLiveViewUrl(url);
+            clearInterval(intervalId);
+            liveViewPollRef.current.intervalId = undefined;
+          }
+        } catch {
+          // HACK: server not ready yet, keep polling
         }
-      } catch {
-        // HACK: server not ready yet, keep polling
-      }
-    }, LIVE_VIEW_READY_POLL_INTERVAL_MS);
+      }, LIVE_VIEW_READY_POLL_INTERVAL_MS);
+      liveViewPollRef.current.intervalId = intervalId;
+    }
+  }
 
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [pendingLiveViewUrl, setLiveViewUrl]);
-
-  useEffect(() => {
-    if (!target || !userInstruction || !environment) return;
-
-    const startedAt = Date.now();
-    setEvents([]);
-    setRunning(true);
-    setError(null);
-    setVideoPath(null);
-    setScreenshotPaths([]);
-    setRunStartedAt(startedAt);
-    setElapsedTimeMs(0);
-    setShowCancelConfirmation(false);
-    setExitRequested(false);
-    emittedEventsRef.current = [];
+  const flowStartedRef = useRef(false);
+  if (!flowStartedRef.current && target && userInstruction && environment) {
+    flowStartedRef.current = true;
+    setRunStartedAt(Date.now());
     useFlowSessionStore.setState({ resolvedExecutionProvider: executionProvider ?? null });
     runFiberRef.current = Effect.runFork(
       Stream.runForEach(
@@ -186,23 +182,7 @@ export const TestingScreen = () => {
         ),
       ),
     );
-
-    return () => {
-      const runFiber = runFiberRef.current;
-      if (runFiber) {
-        void Effect.runFork(Fiber.interrupt(runFiber));
-      }
-    };
-  }, [
-    completeTestingRun,
-    environment,
-    executionModel,
-    executionProvider,
-    pendingSavedFlow,
-    setLiveViewUrl,
-    target,
-    userInstruction,
-  ]);
+  }
 
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();

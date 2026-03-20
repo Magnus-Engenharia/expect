@@ -1,5 +1,5 @@
-import { EventEmitter } from "node:events";
-import { Readable } from "node:stream";
+import * as events from "node:events";
+import * as stream from "node:stream";
 import { describe, expect, it, vi } from "vite-plus/test";
 import type {
   LanguageModelV3CallOptions,
@@ -12,8 +12,8 @@ let pendingEvents: Record<string, unknown>[] = [];
 vi.mock("node:child_process", () => ({
   spawn: () => {
     const ndjson = pendingEvents.map((event) => JSON.stringify(event)).join("\n") + "\n";
-    const stdout = Readable.from([ndjson]);
-    const emitter = new EventEmitter();
+    const stdout = stream.Readable.from([ndjson]);
+    const emitter = new events.EventEmitter();
     return Object.assign(emitter, {
       stdout,
       stdin: null,

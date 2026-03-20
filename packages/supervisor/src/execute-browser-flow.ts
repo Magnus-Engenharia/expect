@@ -1,6 +1,6 @@
-import { mkdtempSync } from "node:fs";
+import * as fs from "node:fs";
 import * as os from "node:os";
-import path from "node:path";
+import * as path from "node:path";
 import type { LanguageModelV3, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import type { AgentProviderSettings } from "@browser-tester/agent";
 import { Effect, Result, Stream } from "effect";
@@ -619,7 +619,7 @@ const buildExecutionStream = Effect.fn("executeBrowserFlow")(function* (
   const browserMcpServerName = options.browserMcpServerName ?? DEFAULT_BROWSER_MCP_SERVER_NAME;
   const videoOutputPath =
     options.videoOutputPath ??
-    path.join(mkdtempSync(path.join(os.tmpdir(), VIDEO_DIRECTORY_PREFIX)), VIDEO_FILE_NAME);
+    path.join(fs.mkdtempSync(path.join(os.tmpdir(), VIDEO_DIRECTORY_PREFIX)), VIDEO_FILE_NAME);
   const liveViewUrl =
     options.liveViewUrl ??
     (yield* Effect.tryPromise({

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import * as fs from "node:fs";
 import { detectTerminal } from "detect-terminal";
 import { supportsKittyImages, supportsItermImages } from "./supports-inline-images";
 
@@ -58,7 +58,7 @@ export const buildImageSequence = (
   absolutePath: string,
   options: ImageSequenceOptions = {},
 ): string | null => {
-  if (!existsSync(absolutePath)) return null;
+  if (!fs.existsSync(absolutePath)) return null;
 
   if (supportsKittyImages) {
     return createKittySequence(absolutePath, options);
@@ -66,7 +66,7 @@ export const buildImageSequence = (
 
   if (supportsItermImages) {
     try {
-      const imageBuffer = readFileSync(absolutePath);
+      const imageBuffer = fs.readFileSync(absolutePath);
       return createItermSequence(imageBuffer, options);
     } catch {
       return null;

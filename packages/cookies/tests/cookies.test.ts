@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync } from "node:fs";
+import * as fs from "node:fs";
 import { assert, describe, it } from "vite-plus/test";
 import { Effect, Layer } from "effect";
 import { Browsers } from "../src/browser-detector";
@@ -23,7 +23,7 @@ const SAFARI_COOKIE_PATH = `${process.env["HOME"]}/Library/Containers/com.apple.
 
 const canReadFile = (filePath: string) => {
   try {
-    accessSync(filePath, constants.R_OK);
+    fs.accessSync(filePath, fs.constants.R_OK);
     return true;
   } catch {
     return false;
@@ -54,7 +54,7 @@ describe("Cookies", () => {
     }).pipe(Effect.scoped, Effect.provide(CookiesTestLayer), Effect.runPromise),
   );
 
-  it.skipIf(!existsSync(DIA_EXECUTABLE))(
+  it.skipIf(!fs.existsSync(DIA_EXECUTABLE))(
     "regression: works for Dia",
     { timeout: FIVE_MINUTES_MS },
     () =>
@@ -73,7 +73,7 @@ describe("Cookies", () => {
       }).pipe(Effect.scoped, Effect.provide(CookiesTestLayer), Effect.runPromise),
   );
 
-  it.skipIf(!existsSync(FIREFOX_EXECUTABLE))(
+  it.skipIf(!fs.existsSync(FIREFOX_EXECUTABLE))(
     "Firefox: __Secure-YEC on youtube.com has correct expiry",
     { timeout: FIVE_MINUTES_MS },
     () =>
@@ -111,7 +111,7 @@ describe("Cookies", () => {
       }).pipe(Effect.scoped, Effect.provide(CookiesTestLayer), Effect.runPromise),
   );
 
-  it.skipIf(!existsSync(CHROME_EXECUTABLE))(
+  it.skipIf(!fs.existsSync(CHROME_EXECUTABLE))(
     "Chrome: extracted cookies have valid expiry timestamps",
     { timeout: FIVE_MINUTES_MS },
     () =>

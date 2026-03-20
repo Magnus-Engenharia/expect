@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { createContext, useState, useCallback, useContext, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ interface SlidingHighlightContextValue {
   setActiveElement: (element: HTMLElement | null, variant?: string) => void;
 }
 
-const SlidingHighlightContext = React.createContext<SlidingHighlightContextValue>({
+const SlidingHighlightContext = createContext<SlidingHighlightContextValue>({
   setActiveElement: () => {},
 });
 
@@ -26,12 +26,12 @@ interface SlidingHighlightConfig {
 }
 
 const useSlidingHighlight = (config: SlidingHighlightConfig = {}) => {
-  const [highlightPosition, setHighlightPosition] = React.useState<SlidingHighlightPosition | null>(
+  const [highlightPosition, setHighlightPosition] = useState<SlidingHighlightPosition | null>(
     null,
   );
-  const [highlightVariant, setHighlightVariant] = React.useState("default");
+  const [highlightVariant, setHighlightVariant] = useState("default");
 
-  const setActiveElement = React.useCallback(
+  const setActiveElement = useCallback(
     (element: HTMLElement | null, variant = "default") => {
       if (!element) {
         setHighlightPosition(null);
@@ -61,9 +61,9 @@ const useSlidingHighlight = (config: SlidingHighlightConfig = {}) => {
     [config.lineHeight],
   );
 
-  const contextValue = React.useMemo(() => ({ setActiveElement }), [setActiveElement]);
+  const contextValue = useMemo(() => ({ setActiveElement }), [setActiveElement]);
 
-  const clearHighlight = React.useCallback(() => {
+  const clearHighlight = useCallback(() => {
     setHighlightPosition(null);
   }, []);
 
@@ -95,14 +95,14 @@ const useSlidingHighlight = (config: SlidingHighlightConfig = {}) => {
 };
 
 const useSlidingHighlightItem = (variant = "default") => {
-  const itemRef = React.useRef<HTMLElement>(null);
-  const { setActiveElement } = React.useContext(SlidingHighlightContext);
+  const itemRef = useRef<HTMLElement>(null);
+  const { setActiveElement } = useContext(SlidingHighlightContext);
 
-  const handlePointerEnter = React.useCallback(() => {
+  const handlePointerEnter = useCallback(() => {
     setActiveElement(itemRef.current, variant);
   }, [setActiveElement, variant]);
 
-  const handleFocus = React.useCallback(() => {
+  const handleFocus = useCallback(() => {
     setActiveElement(itemRef.current, variant);
   }, [setActiveElement, variant]);
 

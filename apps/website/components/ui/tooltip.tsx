@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type { ComponentProps } from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ const TooltipContent = ({
   sideOffset = 8,
   children,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Popup> & {
+}: ComponentProps<typeof TooltipPrimitive.Popup> & {
   sideOffset?: number;
 }) => (
   <TooltipPrimitive.Portal>

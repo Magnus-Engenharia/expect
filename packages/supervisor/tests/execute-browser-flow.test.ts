@@ -1,5 +1,5 @@
-import { existsSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 import type {
@@ -304,7 +304,7 @@ describe("executeBrowserFlow", () => {
 
     const screenshotPath = screenshotToolResultEvent.result.replace("Screenshot saved to ", "");
 
-    expect(existsSync(screenshotPath)).toBe(true);
+    expect(fs.existsSync(screenshotPath)).toBe(true);
     expect(events.find((event) => event.type === "run-completed")).toMatchObject({
       type: "run-completed",
       report: {
@@ -314,7 +314,7 @@ describe("executeBrowserFlow", () => {
       },
     });
 
-    rmSync(dirname(screenshotPath), { recursive: true, force: true });
+    fs.rmSync(path.dirname(screenshotPath), { recursive: true, force: true });
   });
 
   it("serializes object tool results instead of object Object", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { Text } from "ink";
 import { lerpColor } from "../../utils/lerp-color";
 import { SHIMMER_TICK_MS, SHIMMER_GRADIENT_WIDTH } from "../../constants";
@@ -13,15 +13,23 @@ interface TextShimmerProps {
 export const TextShimmer = ({ text, baseColor, highlightColor, speed = 1 }: TextShimmerProps) => {
   const [position, setPosition] = useState(-SHIMMER_GRADIENT_WIDTH);
 
-  useEffect(() => {
-    const upperBound = text.length + SHIMMER_GRADIENT_WIDTH;
-    const interval = setInterval(() => {
-      setPosition((previous) =>
-        previous >= upperBound ? -SHIMMER_GRADIENT_WIDTH : previous + speed,
-      );
-    }, SHIMMER_TICK_MS);
-    return () => clearInterval(interval);
-  }, [text.length, speed]);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  const textLengthRef = useRef(text.length);
+  textLengthRef.current = text.length;
+
+  const startedRef = useRef(false);
+  if (!startedRef.current) {
+    startedRef.current = true;
+    setTimeout(() => {
+      setInterval(() => {
+        const upperBound = textLengthRef.current + SHIMMER_GRADIENT_WIDTH;
+        setPosition((previous) =>
+          previous >= upperBound ? -SHIMMER_GRADIENT_WIDTH : previous + speedRef.current,
+        );
+      }, SHIMMER_TICK_MS);
+    }, 0);
+  }
 
   return (
     <Text>

@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import path from "node:path";
 // @ts-expect-error node:sqlite lacks type declarations
-import { DatabaseSync } from "node:sqlite";
+import * as sqlite from "node:sqlite";
 import { assert, describe, it } from "vite-plus/test";
 import { Effect, Layer, Option } from "effect";
 import { NodeServices } from "@effect/platform-node";
@@ -37,7 +37,7 @@ describe("BROWSER_CONFIGS", () => {
 });
 
 const seedFirefoxCookiesDb = (dbPath: string) => {
-  const database = new DatabaseSync(dbPath);
+  const database = new sqlite.DatabaseSync(dbPath);
   database.exec(
     `CREATE TABLE moz_cookies (
       id INTEGER PRIMARY KEY,
@@ -147,7 +147,7 @@ const buildBinaryCookiesFile = (
 describe("Cookies.extract (Firefox)", () => {
   it("extracts cookies from a Firefox profile database", () =>
     Effect.gen(function* () {
-      const profileDir = mkdtempSync(path.join(tmpdir(), "firefox-profile-test-"));
+      const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "firefox-profile-test-"));
 
       try {
         seedFirefoxCookiesDb(path.join(profileDir, "cookies.sqlite"));
@@ -180,16 +180,16 @@ describe("Cookies.extract (Firefox)", () => {
         assert.isTrue(preference!.httpOnly);
         assert.strictEqual(preference!.sameSite, "Strict");
       } finally {
-        rmSync(profileDir, { recursive: true, force: true });
+        fs.rmSync(profileDir, { recursive: true, force: true });
       }
     }).pipe(Effect.provide(CookiesTestRuntime), Effect.runPromise));
 
   it("returns empty array for profile with no cookies", () =>
     Effect.gen(function* () {
-      const profileDir = mkdtempSync(path.join(tmpdir(), "firefox-empty-test-"));
+      const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "firefox-empty-test-"));
 
       try {
-        const database = new DatabaseSync(path.join(profileDir, "cookies.sqlite"));
+        const database = new sqlite.DatabaseSync(path.join(profileDir, "cookies.sqlite"));
         database.exec(
           `CREATE TABLE moz_cookies (
             id INTEGER PRIMARY KEY, name TEXT, value TEXT, host TEXT,
@@ -208,7 +208,7 @@ describe("Cookies.extract (Firefox)", () => {
         assert.isArray(result);
         assert.strictEqual(result.length, 0);
       } finally {
-        rmSync(profileDir, { recursive: true, force: true });
+        fs.rmSync(profileDir, { recursive: true, force: true });
       }
     }).pipe(Effect.provide(CookiesTestRuntime), Effect.runPromise));
 });
@@ -216,7 +216,7 @@ describe("Cookies.extract (Firefox)", () => {
 describe("Cookies.extract (Safari)", () => {
   it("extracts cookies from a Safari binary cookies file", () =>
     Effect.gen(function* () {
-      const profileDir = mkdtempSync(path.join(tmpdir(), "safari-profile-test-"));
+      const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "safari-profile-test-"));
 
       try {
         const macEpochExpiry = 700_000_000;
@@ -231,7 +231,7 @@ describe("Cookies.extract (Safari)", () => {
           },
         ]);
         const cookieFilePath = path.join(profileDir, "Cookies.binarycookies");
-        writeFileSync(cookieFilePath, binaryData);
+        fs.writeFileSync(cookieFilePath, binaryData);
 
         const cookies = yield* Cookies;
         const safariBrowser = new SafariBrowser({
@@ -250,7 +250,7 @@ describe("Cookies.extract (Safari)", () => {
         assert.isTrue(cookie.httpOnly);
         assert.strictEqual(cookie.expires, macEpochExpiry + MAC_EPOCH_DELTA_SECONDS);
       } finally {
-        rmSync(profileDir, { recursive: true, force: true });
+        fs.rmSync(profileDir, { recursive: true, force: true });
       }
     }).pipe(Effect.provide(CookiesTestRuntime), Effect.runPromise));
 });

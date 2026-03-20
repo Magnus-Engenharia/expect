@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 import { chromium } from "playwright";
 import type { Browser, BrowserContext, Page } from "playwright";
-import { createServer, type Server } from "node:http";
+import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Cookie } from "@browser-tester/cookies";
 import { injectCookies } from "./helpers/inject-cookies";
@@ -19,7 +19,7 @@ const PREFS_MAX_AGE_SECONDS = 31536000;
 const startApp = async () => {
   const requests: RecordedRequest[] = [];
 
-  const server = createServer((request, response) => {
+  const server = http.createServer((request, response) => {
     const path = request.url ?? "/";
     const method = request.method ?? "GET";
     const cookieHeader = request.headers.cookie ?? "";
@@ -117,7 +117,7 @@ const extractCookiesFromContext = async (context: BrowserContext) => {
 };
 
 describe("cookie injection", () => {
-  let server: Server;
+  let server: http.Server;
   let port: number;
   let requests: RecordedRequest[];
 

@@ -1,5 +1,5 @@
-import { dirname } from "node:path";
-import { mkdirSync } from "node:fs";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Browser as PlaywrightBrowser, BrowserContext, Page } from "playwright";
 import type { Cookie } from "@browser-tester/cookies";
 import { Config, Deferred, Effect, Layer, Option, ServiceMap } from "effect";
@@ -134,7 +134,7 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
         ? yield* Deferred.await(cookieCacheDeferred)
         : undefined;
 
-      const videoDir = Option.map(videoOutputPath, (path) => dirname(path));
+      const videoDir = Option.map(videoOutputPath, (outputPath) => path.dirname(outputPath));
       const pageResult = yield* browserService.createPage(url, {
         headed: options.headed,
         cookies:
@@ -215,7 +215,9 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
       const resolvedOutputPath = outputPath ?? activeSession.videoOutputPath;
       let savedVideoPath = activeSession.savedVideoPath;
       if (resolvedOutputPath && !savedVideoPath) {
-        yield* Effect.sync(() => mkdirSync(dirname(resolvedOutputPath), { recursive: true }));
+        yield* Effect.sync(() =>
+          fs.mkdirSync(path.dirname(resolvedOutputPath), { recursive: true }),
+        );
         savedVideoPath = yield* browserService
           .saveVideo(activeSession.page, resolvedOutputPath)
           .pipe(Effect.catchTag("BrowserLaunchError", () => Effect.succeed(undefined)));

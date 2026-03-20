@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { DEMO_CHAR_INTERVAL_MS, DEMO_LINE_PAUSE_MS, DEMO_PROMPT_PAUSE_MS } from "@/constants";
 
@@ -216,7 +216,7 @@ export const TerminalDemo = () => {
     [animateOutput, scrollToBottom],
   );
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (isAnimating) return;
     const command = inputValue;
@@ -224,34 +224,34 @@ export const TerminalDemo = () => {
     runCommand(command);
   };
 
-  useEffect(() => {
-    let charIndex = 0;
-    const fullCommand = AUTO_DEMO_COMMAND;
+  const demoStartedRef = useRef(false);
+  if (!demoStartedRef.current) {
+    demoStartedRef.current = true;
+    setTimeout(() => {
+      setHistory([{ text: "$ ", style: "prompt" }]);
 
-    setHistory([{ text: "$ ", style: "prompt" }]);
+      let charIndex = 0;
+      const fullCommand = AUTO_DEMO_COMMAND;
 
-    const typeChar = () => {
-      if (charIndex < fullCommand.length) {
-        charIndex += 1;
-        setHistory([{ text: `$ ${fullCommand.slice(0, charIndex)}`, style: "prompt" }]);
-        timeoutRef.current = setTimeout(typeChar, DEMO_CHAR_INTERVAL_MS);
-      } else {
-        const output = COMMANDS[fullCommand];
-        if (output) {
-          animateOutput(output.lines, () => {
-            setShowInput(true);
-            setTimeout(() => inputRef.current?.focus(), 100);
-          });
+      const typeChar = () => {
+        if (charIndex < fullCommand.length) {
+          charIndex += 1;
+          setHistory([{ text: `$ ${fullCommand.slice(0, charIndex)}`, style: "prompt" }]);
+          timeoutRef.current = setTimeout(typeChar, DEMO_CHAR_INTERVAL_MS);
+        } else {
+          const output = COMMANDS[fullCommand];
+          if (output) {
+            animateOutput(output.lines, () => {
+              setShowInput(true);
+              setTimeout(() => inputRef.current?.focus(), 100);
+            });
+          }
         }
-      }
-    };
+      };
 
-    timeoutRef.current = setTimeout(typeChar, DEMO_PROMPT_PAUSE_MS);
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [animateOutput]);
+      timeoutRef.current = setTimeout(typeChar, DEMO_PROMPT_PAUSE_MS);
+    }, 0);
+  }
 
   const handleContainerClick = () => {
     if (showInput && !isAnimating) {

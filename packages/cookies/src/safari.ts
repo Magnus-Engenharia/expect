@@ -1,5 +1,5 @@
 import path from "node:path";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { Effect, Layer, Option, ServiceMap } from "effect";
 import * as FileSystem from "effect/FileSystem";
 import { SafariBrowser } from "./types";
@@ -29,7 +29,7 @@ export class SafariSource extends ServiceMap.Service<SafariSource>()("@cookies/S
 
         let cookieFilePath = Option.none<string>();
         for (const relativePath of config.cookieRelativePaths) {
-          const candidate = path.join(homedir(), relativePath, "Cookies.binarycookies");
+          const candidate = path.join(os.homedir(), relativePath, "Cookies.binarycookies");
           if (yield* fileSystem.exists(candidate)) {
             cookieFilePath = Option.some(candidate);
             break;

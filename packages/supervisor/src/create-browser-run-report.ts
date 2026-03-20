@@ -1,10 +1,10 @@
-import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, dirname, extname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { promisify } from "node:util";
+import * as child_process from "node:child_process";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as url from "node:url";
+import * as util from "node:util";
 import {
   HIGHLIGHT_OVERLAY_FONT_SIZE_PX,
   HIGHLIGHT_OVERLAY_HEIGHT_PX,
@@ -52,7 +52,7 @@ interface ArtifactPreparationResult {
   warnings: string[];
 }
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = util.promisify(child_process.execFile);
 
 const commandExists = async (command: string): Promise<boolean> => {
   try {
@@ -267,7 +267,7 @@ const createHighlightVideo = async (
   events: BrowserRunEvent[],
   onProgress?: (message: string) => Promise<void> | void,
 ) => {
-  if (!rawVideoPath || !existsSync(rawVideoPath)) {
+  if (!rawVideoPath || !fs.existsSync(rawVideoPath)) {
     return { highlightVideoPath: undefined, warning: undefined };
   }
 
@@ -286,14 +286,14 @@ const createHighlightVideo = async (
   }
 
   const canDrawText = await ffmpegFilterAvailable("drawtext");
-  const temporaryDirectoryPath = mkdtempSync(join(tmpdir(), "browser-tester-highlight-"));
-  const highlightVideoPath = join(dirname(resolve(rawVideoPath)), HIGHLIGHT_VIDEO_FILE_NAME);
+  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "browser-tester-highlight-"));
+  const highlightVideoPath = path.join(path.dirname(path.resolve(rawVideoPath)), HIGHLIGHT_VIDEO_FILE_NAME);
 
   try {
     const segmentPaths: string[] = [];
 
     for (const [index, window] of windows.entries()) {
-      const segmentPath = join(temporaryDirectoryPath, `segment-${index}.webm`);
+      const segmentPath = path.join(temporaryDirectoryPath, `segment-${index}.webm`);
       const ffmpegArguments = [
         "-y",
         "-ss",
@@ -313,8 +313,8 @@ const createHighlightVideo = async (
       segmentPaths.push(segmentPath);
     }
 
-    const concatFilePath = join(temporaryDirectoryPath, "segments.txt");
-    writeFileSync(
+    const concatFilePath = path.join(temporaryDirectoryPath, "segments.txt");
+    fs.writeFileSync(
       concatFilePath,
       segmentPaths
         .map((segmentPath) => `file '${segmentPath.replaceAll("'", "'\\''")}'`)
@@ -344,7 +344,7 @@ const createHighlightVideo = async (
       warning: "Highlight reel generation failed.",
     };
   } finally {
-    rmSync(temporaryDirectoryPath, { recursive: true, force: true });
+    fs.rmSync(temporaryDirectoryPath, { recursive: true, force: true });
   }
 };
 
@@ -353,14 +353,14 @@ const copyArtifact = (
   filePath: string,
   preferredPrefix: string,
 ): string | undefined => {
-  if (!existsSync(filePath)) return undefined;
+  if (!fs.existsSync(filePath)) return undefined;
 
-  const targetPath = join(
+  const targetPath = path.join(
     assetDirectoryPath,
-    `${preferredPrefix}-${randomUUID().slice(0, 8)}${extname(filePath)}`,
+    `${preferredPrefix}-${crypto.randomUUID().slice(0, 8)}${path.extname(filePath)}`,
   );
-  copyFileSync(filePath, targetPath);
-  return `${SHARE_ASSET_DIRECTORY_NAME}/${basename(targetPath)}`;
+  fs.copyFileSync(filePath, targetPath);
+  return `${SHARE_ASSET_DIRECTORY_NAME}/${path.basename(targetPath)}`;
 };
 
 const createShareBundle = (options: {
@@ -369,15 +369,15 @@ const createShareBundle = (options: {
 }): Pick<BrowserRunArtifacts, "shareBundlePath" | "shareSummaryPath" | "shareUrl"> => {
   const shareOutputDirectoryPath = process.env.BROWSER_TESTER_SHARE_OUTPUT_DIR;
   const shareBaseUrl = process.env.BROWSER_TESTER_SHARE_BASE_URL;
-  const bundleId = randomUUID().slice(0, 8);
+  const bundleId = crypto.randomUUID().slice(0, 8);
   const shareBundlePath =
     shareOutputDirectoryPath && shareBaseUrl
-      ? join(resolve(shareOutputDirectoryPath), bundleId)
-      : mkdtempSync(join(tmpdir(), SHARE_DIRECTORY_PREFIX));
+      ? path.join(path.resolve(shareOutputDirectoryPath), bundleId)
+      : fs.mkdtempSync(path.join(os.tmpdir(), SHARE_DIRECTORY_PREFIX));
 
-  mkdirSync(shareBundlePath, { recursive: true });
-  const assetDirectoryPath = join(shareBundlePath, SHARE_ASSET_DIRECTORY_NAME);
-  mkdirSync(assetDirectoryPath, { recursive: true });
+  fs.mkdirSync(shareBundlePath, { recursive: true });
+  const assetDirectoryPath = path.join(shareBundlePath, SHARE_ASSET_DIRECTORY_NAME);
+  fs.mkdirSync(assetDirectoryPath, { recursive: true });
 
   const sharedVideoPath = options.artifacts.highlightVideoPath ?? options.artifacts.rawVideoPath;
   const sharedScreenshotPaths = options.artifacts.screenshotPaths;
@@ -391,8 +391,8 @@ const createShareBundle = (options: {
     )
     .filter((relativePath): relativePath is string => Boolean(relativePath));
 
-  const shareSummaryPath = join(shareBundlePath, SHARE_SUMMARY_FILE_NAME);
-  const shareReportPath = join(shareBundlePath, SHARE_REPORT_FILE_NAME);
+  const shareSummaryPath = path.join(shareBundlePath, SHARE_SUMMARY_FILE_NAME);
+  const shareReportPath = path.join(shareBundlePath, SHARE_REPORT_FILE_NAME);
 
   const summaryLines = [
     `# ${options.report.title}`,
@@ -445,8 +445,8 @@ const createShareBundle = (options: {
     );
   }
 
-  writeFileSync(shareSummaryPath, summaryLines.join("\n"), "utf-8");
-  writeFileSync(
+  fs.writeFileSync(shareSummaryPath, summaryLines.join("\n"), "utf-8");
+  fs.writeFileSync(
     shareReportPath,
     [
       "<!doctype html>",
@@ -470,7 +470,7 @@ const createShareBundle = (options: {
     shareUrl:
       shareOutputDirectoryPath && shareBaseUrl
         ? `${shareBaseUrl.replace(/\/$/, "")}/${bundleId}/${SHARE_REPORT_FILE_NAME}`
-        : pathToFileURL(shareReportPath).href,
+        : url.pathToFileURL(shareReportPath).href,
   };
 };
 
@@ -482,9 +482,9 @@ const prepareArtifacts = async (
 ): Promise<ArtifactPreparationResult> => {
   const warnings: string[] = [];
   const existingScreenshotPaths = screenshotPaths.filter((screenshotPath) =>
-    existsSync(screenshotPath),
+    fs.existsSync(screenshotPath),
   );
-  const existingRawVideoPath = rawVideoPath && existsSync(rawVideoPath) ? rawVideoPath : undefined;
+  const existingRawVideoPath = rawVideoPath && fs.existsSync(rawVideoPath) ? rawVideoPath : undefined;
   const highlightVideoResult = await createHighlightVideo(existingRawVideoPath, events, onProgress);
   if (highlightVideoResult.warning) warnings.push(highlightVideoResult.warning);
 

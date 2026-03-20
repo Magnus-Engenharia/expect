@@ -1,4 +1,4 @@
-import { extname } from "node:path";
+import * as path from "node:path";
 import type { ChangedFile } from "../types";
 
 const COMPONENT_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -24,7 +24,7 @@ export const categorizeChangedFiles = (files: ChangedFile[]): ChangedFileSummary
   let markupCount = 0;
 
   for (const file of files) {
-    const extension = extname(file.path).toLowerCase();
+    const extension = path.extname(file.path).toLowerCase();
     if (COMPONENT_EXTENSIONS.has(extension)) {
       componentCount++;
     } else if (STYLE_EXTENSIONS.has(extension)) {

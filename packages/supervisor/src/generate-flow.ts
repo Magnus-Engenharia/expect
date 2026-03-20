@@ -7,7 +7,7 @@ import type { AgentProvider, FlowStep, BrowserRunReport, TestTarget } from "./ty
 
 export interface GeneratedFlow {
   title: string;
-  steps: FlowStep[];
+  steps: readonly FlowStep[];
 }
 
 export interface GenerateFlowOptions {

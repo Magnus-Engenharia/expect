@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import { Text, useInput } from "ink";
 import pc from "picocolors";
 
@@ -81,7 +81,13 @@ export const Input = ({
 
   const { cursorOffset, cursorWidth } = state;
 
-  useEffect(() => {
+  const previousInputDepsRef = useRef({ originalValue, focus, showCursor });
+  if (
+    previousInputDepsRef.current.originalValue !== originalValue ||
+    previousInputDepsRef.current.focus !== focus ||
+    previousInputDepsRef.current.showCursor !== showCursor
+  ) {
+    previousInputDepsRef.current = { originalValue, focus, showCursor };
     setState((previousState) => {
       if (!focus || !showCursor) return previousState;
 
@@ -92,7 +98,7 @@ export const Input = ({
 
       return previousState;
     });
-  }, [originalValue, focus, showCursor]);
+  }
 
   const cursorActualWidth = highlightPastedText ? cursorWidth : 0;
   const value = mask ? mask.repeat(originalValue.length) : originalValue;

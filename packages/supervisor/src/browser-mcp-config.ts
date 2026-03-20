@@ -1,4 +1,4 @@
-import { fileURLToPath } from "node:url";
+import * as url from "node:url";
 import {
   BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME,
   BROWSER_TESTER_VIDEO_OUTPUT_ENV_NAME,
@@ -7,7 +7,7 @@ import { DEFAULT_BROWSER_MCP_SERVER_NAME } from "./constants";
 import type { AgentProviderSettings, McpServerConfig } from "@browser-tester/agent";
 
 export const getBrowserMcpEntrypoint = (): string =>
-  fileURLToPath(import.meta.resolve("@browser-tester/browser/cli"));
+  url.fileURLToPath(import.meta.resolve("@browser-tester/browser/cli"));
 
 export const buildBrowserMcpServerEnv = (options: {
   videoOutputPath?: string;

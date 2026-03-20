@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 
 // ─── Types ───────────────────────────────────────────────
 type ItemStack = { id: string; count: number } | null;
@@ -390,28 +390,30 @@ function Slot({
 
 // ─── Main Component ─────────────────────────────────────
 export default function CraftingTable() {
-  const [itemIcons, setItemIcons] = useState<Record<string, string>>({});
-  const [ready, setReady] = useState(false);
+  const [blockIcons, setBlockIcons] = useState<Record<string, string>>({});
+  const loadingRef = useRef(false);
 
-  useEffect(() => {
-    const load = async () => {
-      const icons: Record<string, string> = {};
-      for (const [blockId, paths] of Object.entries(BLOCK_TEXTURE_PATHS)) {
+  if (!loadingRef.current) {
+    loadingRef.current = true;
+    Promise.all(
+      Object.entries(BLOCK_TEXTURE_PATHS).map(async ([blockId, paths]) => {
         const [top, side, front] = await Promise.all([
           loadImage(paths.top),
           loadImage(paths.side),
           loadImage(paths.front),
         ]);
-        icons[blockId] = renderIsometricBlock({ top, side, front });
-      }
-      for (const [itemId, path] of Object.entries(FLAT_ITEM_PATHS)) {
-        icons[itemId] = path;
-      }
-      setItemIcons(icons);
-      setReady(true);
-    };
-    load();
-  }, []);
+        return [blockId, renderIsometricBlock({ top, side, front })] as const;
+      }),
+    ).then((entries) => {
+      setBlockIcons(Object.fromEntries(entries));
+    });
+  }
+
+  const itemIcons = useMemo(
+    () => ({ ...FLAT_ITEM_PATHS, ...blockIcons }),
+    [blockIcons],
+  );
+  const ready = Object.keys(blockIcons).length === Object.keys(BLOCK_TEXTURE_PATHS).length;
 
   // Inventory: 36 slots (0-26 = main, 27-35 = hotbar)
   const [inventory, setInventory] = useState<ItemStack[]>(() => {
@@ -426,15 +428,6 @@ export default function CraftingTable() {
   const craftingOutput = useMemo(() => matchRecipe(craftingGrid), [craftingGrid]);
   const [heldItem, setHeldItem] = useState<ItemStack>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  // Mouse tracking
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
 
   // ─── Click Handlers ──────────────────────────────────
   const handleSlotClick = useCallback(
@@ -549,7 +542,8 @@ export default function CraftingTable() {
         imageRendering: "pixelated",
         cursor: heldItem ? "none" : "default",
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onMouseMove={(event) => setMousePos({ x: event.clientX, y: event.clientY })}
+      onContextMenu={(event) => event.preventDefault()}
     >
       {/* Dark overlay */}
       <div

@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { Schema } from "effect";
 import { SCREENSHOT_DIRECTORY_PREFIX, SCREENSHOT_OUTPUT_DIRECTORY_PATH } from "../constants";
 
@@ -64,13 +64,13 @@ export const saveBrowserImageResult = (options: {
 
   const outputDirectoryPath =
     options.outputDirectoryPath ??
-    mkdtempSync(join(SCREENSHOT_OUTPUT_DIRECTORY_PATH, SCREENSHOT_DIRECTORY_PREFIX));
-  const outputPath = join(
+    fs.mkdtempSync(path.join(SCREENSHOT_OUTPUT_DIRECTORY_PATH, SCREENSHOT_DIRECTORY_PREFIX));
+  const outputPath = path.join(
     outputDirectoryPath,
-    `${options.browserAction}-${randomUUID()}.${imageFileExtension}`,
+    `${options.browserAction}-${crypto.randomUUID()}.${imageFileExtension}`,
   );
 
-  writeFileSync(outputPath, Buffer.from(browserImageContent.data, "base64"));
+  fs.writeFileSync(outputPath, Buffer.from(browserImageContent.data, "base64"));
 
   return {
     outputDirectoryPath,

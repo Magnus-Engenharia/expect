@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { Box, type DOMElement } from "ink";
 import { useMouse } from "../../hooks/mouse-context";
 import { LAYOUT_ORIGIN_OFFSET } from "../../constants";
@@ -26,33 +26,35 @@ const getAbsolutePosition = (node: DOMElement): { left: number; top: number } =>
 };
 
 export const Clickable = ({ onClick, children, fullWidth = true }: ClickableProps) => {
-  const ref = useRef<DOMElement>(null);
   const { subscribeClick } = useMouse();
   const onClickRef = useRef(onClick);
   onClickRef.current = onClick;
 
-  useEffect(() => {
-    return subscribeClick((position, action) => {
-      if (action !== "press") return;
-      const element = ref.current;
-      if (!element?.yogaNode) return;
+  const refCallback = useCallback(
+    (element: DOMElement | null) => {
+      if (!element) return;
+      return subscribeClick((position, action) => {
+        if (action !== "press") return;
+        if (!element.yogaNode) return;
 
-      const elementPosition = getAbsolutePosition(element);
-      const layout = element.yogaNode.getComputedLayout();
+        const elementPosition = getAbsolutePosition(element);
+        const layout = element.yogaNode.getComputedLayout();
 
-      const isOutsideHorizontally =
-        position.x < elementPosition.left || position.x >= elementPosition.left + layout.width;
-      const isOutsideVertically =
-        position.y < elementPosition.top || position.y >= elementPosition.top + layout.height;
+        const isOutsideHorizontally =
+          position.x < elementPosition.left || position.x >= elementPosition.left + layout.width;
+        const isOutsideVertically =
+          position.y < elementPosition.top || position.y >= elementPosition.top + layout.height;
 
-      if (!isOutsideHorizontally && !isOutsideVertically) {
-        onClickRef.current?.();
-      }
-    });
-  }, [subscribeClick]);
+        if (!isOutsideHorizontally && !isOutsideVertically) {
+          onClickRef.current?.();
+        }
+      });
+    },
+    [subscribeClick],
+  );
 
   return (
-    <Box ref={ref} width={fullWidth ? "100%" : undefined}>
+    <Box ref={refCallback} width={fullWidth ? "100%" : undefined}>
       {children}
     </Box>
   );

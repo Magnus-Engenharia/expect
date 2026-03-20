@@ -2,7 +2,7 @@
 // Reads the SQLite cookie database directly and decrypts values using
 // platform-specific key retrieval (macOS Keychain, Linux secret-tool, Windows DPAPI).
 import path from "node:path";
-import { homedir, platform } from "node:os";
+import * as os from "node:os";
 import { Effect, Layer, Schema, ServiceMap } from "effect";
 import * as FileSystem from "effect/FileSystem";
 import { ChildProcess } from "effect/unstable/process";
@@ -141,7 +141,7 @@ export class ChromiumKeyProvider extends ServiceMap.Service<
         stripHashPrefix: boolean,
       ) {
         const config = chromiumConfig(browserKey);
-        const localStatePath = path.join(homedir(), config.localStatePath);
+        const localStatePath = path.join(os.homedir(), config.localStatePath);
 
         const localStateContent = yield* fileSystem.readFileString(localStatePath).pipe(
           Effect.catchTag("PlatformError", () =>
@@ -331,7 +331,7 @@ export class ChromiumSqliteFallback extends ServiceMap.Service<ChromiumSqliteFal
     Layer.provide(
       Layer.unwrap(
         Effect.sync(() => {
-          const currentPlatform = platform();
+          const currentPlatform = os.platform();
           if (currentPlatform === "darwin") return ChromiumKeyProvider.layerDarwin;
           if (currentPlatform === "win32") return ChromiumKeyProvider.layerWin32;
           return ChromiumKeyProvider.layerLinux;

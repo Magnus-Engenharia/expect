@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { createRequire } from "node:module";
+import * as nodeModule from "node:module";
 import path from "node:path";
 import type {
   LanguageModelV3,
@@ -55,7 +55,7 @@ const assertNoDebugLogErrors = (debugLogPath: string) => {
 };
 
 const resolveClaudeExecutablePath = (): string | undefined => {
-  const require = createRequire(typeof __filename !== "undefined" ? __filename : import.meta.url);
+  const require = nodeModule.createRequire(typeof __filename !== "undefined" ? __filename : import.meta.url);
 
   try {
     const sdkEntryPath = require.resolve("@anthropic-ai/claude-agent-sdk");

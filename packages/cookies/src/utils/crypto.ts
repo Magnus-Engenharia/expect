@@ -1,4 +1,4 @@
-import { createDecipheriv, pbkdf2Sync } from "node:crypto";
+import * as crypto from "node:crypto";
 
 const PBKDF2_SALT = "saltysalt";
 const PBKDF2_KEY_LENGTH_BYTES = 16;
@@ -12,7 +12,7 @@ const GCM_MIN_PAYLOAD_BYTES = 28;
 const COOKIE_PREFIX_PATTERN = /^v\d\d$/;
 
 export const deriveKey = (password: string, iterations: number): Buffer =>
-  pbkdf2Sync(password, PBKDF2_SALT, iterations, PBKDF2_KEY_LENGTH_BYTES, "sha1");
+  crypto.pbkdf2Sync(password, PBKDF2_SALT, iterations, PBKDF2_KEY_LENGTH_BYTES, "sha1");
 
 export const decryptAes128Cbc = (
   encryptedValue: Uint8Array,
@@ -62,7 +62,7 @@ export const decryptAes256Gcm = (
   );
 
   try {
-    const decipher = createDecipheriv("aes-256-gcm", masterKey, nonce);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", masterKey, nonce);
     decipher.setAuthTag(authTag);
     const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return decodeCookieBytes(plaintext, stripHashPrefix);
@@ -74,7 +74,7 @@ export const decryptAes256Gcm = (
 const tryAes128Cbc = (ciphertext: Buffer, key: Buffer): Buffer | undefined => {
   try {
     const initVector = Buffer.alloc(PBKDF2_KEY_LENGTH_BYTES, PBKDF2_IV_FILL);
-    const decipher = createDecipheriv("aes-128-cbc", key, initVector);
+    const decipher = crypto.createDecipheriv("aes-128-cbc", key, initVector);
     decipher.setAutoPadding(false);
     const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return removePkcs7Padding(plaintext);

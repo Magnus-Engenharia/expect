@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Key } from "ink";
 
 interface ScrollableListOptions {
@@ -21,9 +21,11 @@ export const useScrollableList = ({
 }: ScrollableListOptions): ScrollableListResult => {
   const [highlightedIndex, setHighlightedIndex] = useState(initialIndex ?? 0);
 
-  useEffect(() => {
+  const previousItemCountRef = useRef(itemCount);
+  if (previousItemCountRef.current !== itemCount) {
+    previousItemCountRef.current = itemCount;
     setHighlightedIndex((previous) => Math.min(previous, Math.max(0, itemCount - 1)));
-  }, [itemCount]);
+  }
 
   const scrollOffset = useMemo(() => {
     if (itemCount <= visibleCount) return 0;

@@ -12,7 +12,7 @@ vi.mock("node:os", () => ({
   arch: vi.fn(),
 }));
 
-import { availableParallelism, cpus, freemem, loadavg, platform, totalmem, arch } from "node:os";
+import * as os from "node:os";
 import { estimateBrowserCapacity, getSystemStats } from "../src/estimate-browser-capacity";
 
 const BYTES_PER_MB = 1024 * 1024;
@@ -23,22 +23,22 @@ const mockSystem = ({
   totalMb = 16384,
   freeMb = 8192,
   load = 2.0,
-  os = "darwin" as NodeJS.Platform,
+  operatingSystem = "darwin" as NodeJS.Platform,
   architecture = "arm64",
 } = {}) => {
-  vi.mocked(availableParallelism).mockReturnValue(cores);
-  vi.mocked(cpus).mockReturnValue(
+  vi.mocked(os.availableParallelism).mockReturnValue(cores);
+  vi.mocked(os.cpus).mockReturnValue(
     Array.from({ length: cores }, () => ({
       model,
       speed: 2400,
       times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 },
     })),
   );
-  vi.mocked(totalmem).mockReturnValue(totalMb * BYTES_PER_MB);
-  vi.mocked(freemem).mockReturnValue(freeMb * BYTES_PER_MB);
-  vi.mocked(loadavg).mockReturnValue([load, load, load]);
-  vi.mocked(platform).mockReturnValue(os);
-  vi.mocked(arch).mockReturnValue(architecture);
+  vi.mocked(os.totalmem).mockReturnValue(totalMb * BYTES_PER_MB);
+  vi.mocked(os.freemem).mockReturnValue(freeMb * BYTES_PER_MB);
+  vi.mocked(os.loadavg).mockReturnValue([load, load, load]);
+  vi.mocked(os.platform).mockReturnValue(operatingSystem);
+  vi.mocked(os.arch).mockReturnValue(architecture);
 };
 
 afterEach(() => {
@@ -79,7 +79,7 @@ describe("getSystemStats", () => {
 
   it("uses availableParallelism as primary core count source", () => {
     mockSystem({ cores: 4 });
-    vi.mocked(cpus).mockReturnValue(
+    vi.mocked(os.cpus).mockReturnValue(
       Array.from({ length: 8 }, () => ({
         model: "Intel",
         speed: 3000,
@@ -94,7 +94,7 @@ describe("getSystemStats", () => {
 
   it("falls back to cpus().length when availableParallelism throws", () => {
     mockSystem({ cores: 8 });
-    vi.mocked(availableParallelism).mockImplementation(() => {
+    vi.mocked(os.availableParallelism).mockImplementation(() => {
       throw new Error("not supported");
     });
 
@@ -105,10 +105,10 @@ describe("getSystemStats", () => {
 
   it("falls back to navigator.hardwareConcurrency when os APIs fail", () => {
     mockSystem({ load: 0 });
-    vi.mocked(availableParallelism).mockImplementation(() => {
+    vi.mocked(os.availableParallelism).mockImplementation(() => {
       throw new Error("not supported");
     });
-    vi.mocked(cpus).mockReturnValue([]);
+    vi.mocked(os.cpus).mockReturnValue([]);
     vi.stubGlobal("navigator", { hardwareConcurrency: 6 });
 
     const stats = getSystemStats();
@@ -119,10 +119,10 @@ describe("getSystemStats", () => {
 
   it("falls back to 1 core when all sources unavailable", () => {
     mockSystem({ load: 0 });
-    vi.mocked(availableParallelism).mockImplementation(() => {
+    vi.mocked(os.availableParallelism).mockImplementation(() => {
       throw new Error("not supported");
     });
-    vi.mocked(cpus).mockReturnValue([]);
+    vi.mocked(os.cpus).mockReturnValue([]);
     vi.stubGlobal("navigator", undefined);
 
     const stats = getSystemStats();
@@ -156,7 +156,7 @@ describe("getSystemStats", () => {
   });
 
   it("reports platform and arch", () => {
-    mockSystem({ os: "linux", architecture: "x64" });
+    mockSystem({ operatingSystem: "linux", architecture: "x64" });
     const stats = getSystemStats();
 
     expect(stats.platform).toBe("linux");
@@ -230,10 +230,10 @@ describe("estimateBrowserCapacity", () => {
 
   it("works with navigator fallback for capacity", () => {
     mockSystem({ freeMb: 32768, load: 0 });
-    vi.mocked(availableParallelism).mockImplementation(() => {
+    vi.mocked(os.availableParallelism).mockImplementation(() => {
       throw new Error("not supported");
     });
-    vi.mocked(cpus).mockReturnValue([]);
+    vi.mocked(os.cpus).mockReturnValue([]);
     vi.stubGlobal("navigator", { hardwareConcurrency: 12 });
 
     const { system, maxBrowsers } = estimateBrowserCapacity();

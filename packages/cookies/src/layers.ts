@@ -1,4 +1,4 @@
-import { platform } from "node:os";
+import * as os from "node:os";
 import { Effect, Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { Browsers } from "./browser-detector";
@@ -57,7 +57,7 @@ const layerLiveWin32 = Layer.mergeAll(
 
 export const layerLive = Layer.unwrap(
   Effect.sync(() => {
-    const currentPlatform = platform();
+    const currentPlatform = os.platform();
     if (currentPlatform === "darwin") return layerLiveDarwin;
     if (currentPlatform === "win32") return layerLiveWin32;
     return layerLiveLinux;

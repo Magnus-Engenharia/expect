@@ -1,5 +1,5 @@
 import { context } from "esbuild";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import * as fs from "node:fs";
 
 const watchMode = process.argv.includes("--watch");
 
@@ -35,15 +35,15 @@ const emitPlugin = {
       const runtimeCode =
         `${result.outputFiles[0].text}\n` +
         "globalThis.__browserTesterRuntime = __browserTesterRuntime;\n";
-      mkdirSync("src/generated", { recursive: true });
-      writeFileSync(
+      fs.mkdirSync("src/generated", { recursive: true });
+      fs.writeFileSync(
         "src/generated/runtime-script.ts",
         `export const RUNTIME_SCRIPT = ${JSON.stringify(runtimeCode)};\n`,
       );
 
-      const source = readFileSync(RUNTIME_ENTRY, "utf-8");
+      const source = fs.readFileSync(RUNTIME_ENTRY, "utf-8");
       const exportNames = extractExportedFunctionNames(source);
-      writeFileSync("src/generated/runtime-types.ts", generateRuntimeTypes(exportNames));
+      fs.writeFileSync("src/generated/runtime-types.ts", generateRuntimeTypes(exportNames));
     });
   },
 };

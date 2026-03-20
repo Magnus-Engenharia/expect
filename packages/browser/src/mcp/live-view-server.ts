@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import * as http from "node:http";
 import type { CDPSession, Page } from "playwright";
 import {
   LIVE_VIEW_MJPEG_BOUNDARY,
@@ -25,7 +25,7 @@ interface ScreencastFrameParams {
   metadata: unknown;
 }
 
-type MjpegClient = ServerResponse<IncomingMessage>;
+type MjpegClient = http.ServerResponse<http.IncomingMessage>;
 
 const VIEWER_HTML = `<!doctype html>
 <html lang="en">
@@ -144,7 +144,7 @@ export const startLiveViewServer = async ({
 
   const pollInterval = setInterval(syncScreencast, LIVE_VIEW_PAGE_POLL_INTERVAL_MS);
 
-  const handleStreamRequest = (request: IncomingMessage, response: MjpegClient): void => {
+  const handleStreamRequest = (request: http.IncomingMessage, response: MjpegClient): void => {
     response.writeHead(200, {
       "Content-Type": `multipart/x-mixed-replace; boundary=${LIVE_VIEW_MJPEG_BOUNDARY}`,
       Connection: "keep-alive",
@@ -162,7 +162,7 @@ export const startLiveViewServer = async ({
     });
   };
 
-  const routeRequest = (request: IncomingMessage, response: MjpegClient): void => {
+  const routeRequest = (request: http.IncomingMessage, response: MjpegClient): void => {
     const pathname = new URL(request.url ?? "/", parsedUrl).pathname;
 
     if (pathname === "/") {
@@ -193,7 +193,7 @@ export const startLiveViewServer = async ({
     respondText(response, 404, "Not found");
   };
 
-  const server = createServer(routeRequest);
+  const server = http.createServer(routeRequest);
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);

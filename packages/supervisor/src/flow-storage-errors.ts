@@ -2,7 +2,7 @@ import { Schema } from "effect";
 
 export class FlowNotFoundError extends Schema.ErrorClass<FlowNotFoundError>("FlowNotFoundError")({
   _tag: Schema.tag("FlowNotFoundError"),
-  lookupType: Schema.Literal("slug", "filePath"),
+  lookupType: Schema.Union([Schema.Literal("slug"), Schema.Literal("filePath")]),
   lookupValue: Schema.String,
 }) {
   message = `Saved flow not found for ${this.lookupType}: ${this.lookupValue}`;
