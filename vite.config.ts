@@ -7,7 +7,9 @@ export default defineConfig({
   lint: {
     ignorePatterns: ["archive"],
     plugins: ["typescript", "react", "import"],
+    jsPlugins: ["./lint-rules/node-namespace-imports.js"],
     rules: {
+      "node-imports/namespace-imports": "error",
       "require-yield": "off",
       "no-restricted-imports": [
         "error",

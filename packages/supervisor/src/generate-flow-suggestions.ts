@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { CLAUDE_PLANNER_MODEL, CODEX_PLANNER_MODEL, DEFAULT_AGENT_PROVIDER } from "./constants";
+import { DEFAULT_AGENT_PROVIDER } from "./constants";
 import { ensureSafeCurrentWorkingDirectory } from "@browser-tester/utils";
 import { createAgentModel } from "./create-agent-model";
 import { extractJsonObject } from "./json";
@@ -64,12 +64,6 @@ export const generateFlowSuggestions = async (
       cwd: ensureSafeCurrentWorkingDirectory(),
       effort: "low",
       maxTurns: 1,
-      ...(provider === "claude"
-        ? { model: CLAUDE_PLANNER_MODEL }
-        : provider === "codex"
-          ? { model: CODEX_PLANNER_MODEL }
-          : {}),
-      permissionMode: "plan" as const,
       tools: [],
     });
 

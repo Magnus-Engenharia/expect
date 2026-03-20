@@ -11,7 +11,7 @@ const BASE_TIMESTAMP = 1_000_000;
 const runStarted = (offsetMs = 0): BrowserRunEvent => ({
   type: "run-started",
   timestamp: BASE_TIMESTAMP + offsetMs,
-  planTitle: "Test plan",
+  title: "Test run",
 });
 
 const stepStarted = (offsetMs: number, stepId: string, title: string): BrowserRunEvent => ({

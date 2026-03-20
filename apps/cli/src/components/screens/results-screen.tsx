@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import * as path from "node:path";
+import * as url from "node:url";
 import { Box, Text, useInput } from "ink";
 import Link from "ink-link";
 import { postPullRequestComment, type BrowserRunReport } from "@browser-tester/supervisor";
@@ -17,6 +17,9 @@ import { Clickable } from "../ui/clickable";
 
 const isRemoteUrl = (value: string | undefined): boolean =>
   typeof value === "string" && (value.startsWith("https://") || value.startsWith("http://"));
+
+const isFileUrl = (value: string | undefined): boolean =>
+  typeof value === "string" && value.startsWith("file://");
 
 const buildResultsClipboardText = (report: BrowserRunReport): string => {
   const screenshotPaths = report.artifacts.screenshotPaths;
@@ -63,6 +66,10 @@ export const ResultsScreen = () => {
   const COLORS = useColors();
   const latestRunReport = useFlowSessionStore((state) => state.latestRunReport);
   const resolvedTarget = useFlowSessionStore((state) => state.resolvedTarget);
+  const flowSaveStatus = useFlowSessionStore((state) => state.flowSaveStatus);
+  const savedFlowPath = useFlowSessionStore((state) => state.savedFlowPath);
+  const flowSaveError = useFlowSessionStore((state) => state.flowSaveError);
+  const saveCurrentFlow = useFlowSessionStore((state) => state.saveCurrentFlow);
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [clipboardStatusMessage, setClipboardStatusMessage] = useState<string | null>(null);
   const [clipboardError, setClipboardError] = useState<string | null>(null);
@@ -118,7 +125,15 @@ export const ResultsScreen = () => {
   };
 
   const openLocalFile = (filePath: string) => {
-    openUrl(pathToFileURL(resolve(filePath)).href);
+    openUrl(isFileUrl(filePath) ? filePath : url.pathToFileURL(path.resolve(filePath)).href);
+  };
+
+  const handleSaveFlow = () => {
+    if (flowSaveStatus === "generating") {
+      return;
+    }
+
+    void saveCurrentFlow();
   };
 
   useInput((input) => {
@@ -134,6 +149,11 @@ export const ResultsScreen = () => {
       return;
     }
 
+    if (normalizedInput === "s") {
+      handleSaveFlow();
+      return;
+    }
+
     if (normalizedInput === "v" && latestRunReport) {
       const videoPath = latestRunReport.artifacts.rawVideoPath;
       if (videoPath) openLocalFile(videoPath);
@@ -146,11 +166,11 @@ export const ResultsScreen = () => {
     }
 
     if (normalizedInput === "o" && latestRunReport?.artifacts.shareUrl) {
-      const url = latestRunReport.artifacts.shareUrl;
-      if (isRemoteUrl(url)) {
-        openUrl(url);
+      const shareUrl = latestRunReport.artifacts.shareUrl;
+      if (isRemoteUrl(shareUrl) || isFileUrl(shareUrl)) {
+        openUrl(shareUrl);
       } else {
-        openLocalFile(url);
+        openLocalFile(shareUrl);
       }
     }
   });
@@ -174,7 +194,7 @@ export const ResultsScreen = () => {
         marginTop={1}
       >
         <Text color={latestRunReport.status === "passed" ? COLORS.GREEN : COLORS.RED} bold>
-          {latestRunReport.status === "passed" ? "Plan completed" : "Issues found"}
+          {latestRunReport.status === "passed" ? "Test completed" : "Issues found"}
         </Text>
         <Text color={COLORS.TEXT}>{latestRunReport.summary}</Text>
         {latestRunReport.pullRequest ? (
@@ -225,31 +245,6 @@ export const ResultsScreen = () => {
         ))}
       </Box>
 
-      {latestRunReport.confirmedRiskAreas.length > 0 ||
-      latestRunReport.clearedRiskAreas.length > 0 ||
-      latestRunReport.unresolvedRiskAreas.length > 0 ? (
-        <Box flexDirection="column" marginTop={1} paddingX={1}>
-          <Text color={COLORS.DIM} bold>
-            RISK AREAS
-          </Text>
-          {latestRunReport.confirmedRiskAreas.map((riskArea) => (
-            <Text key={`confirmed-${riskArea}`} color={COLORS.RED}>
-              • Confirmed risk: <Text color={COLORS.TEXT}>{riskArea}</Text>
-            </Text>
-          ))}
-          {latestRunReport.clearedRiskAreas.map((riskArea) => (
-            <Text key={`cleared-${riskArea}`} color={COLORS.GREEN}>
-              • Cleared: <Text color={COLORS.TEXT}>{riskArea}</Text>
-            </Text>
-          ))}
-          {latestRunReport.unresolvedRiskAreas.map((riskArea) => (
-            <Text key={`unresolved-${riskArea}`} color={COLORS.YELLOW}>
-              • Needs follow-up: <Text color={COLORS.TEXT}>{riskArea}</Text>
-            </Text>
-          ))}
-        </Box>
-      ) : null}
-
       <Box flexDirection="column" marginTop={1} paddingX={1}>
         <Text color={COLORS.DIM} bold>
           ARTIFACTS
@@ -294,6 +289,22 @@ export const ResultsScreen = () => {
       ) : null}
 
       <Box flexDirection="column" marginTop={1} paddingX={1}>
+        <Clickable onClick={handleSaveFlow}>
+          <Text color={COLORS.DIM}>
+            Press <Text color={COLORS.PRIMARY}>s</Text> to save this run as a reusable flow.
+          </Text>
+        </Clickable>
+        {flowSaveStatus === "generating" ? (
+          <Text color={COLORS.DIM}>Generating saved flow...</Text>
+        ) : null}
+        {flowSaveStatus === "saved" && savedFlowPath ? (
+          <Text color={COLORS.GREEN}>
+            Saved flow: <FileLink path={savedFlowPath} />
+          </Text>
+        ) : null}
+      </Box>
+
+      <Box flexDirection="column" marginTop={1} paddingX={1}>
         <Clickable onClick={handleCopyToClipboard}>
           <Text color={COLORS.DIM}>
             Press <Text color={COLORS.PRIMARY}>y</Text> to copy share details to the clipboard.
@@ -317,6 +328,7 @@ export const ResultsScreen = () => {
       <Box paddingX={1} flexDirection="column">
         <ErrorMessage message={clipboardError} />
         <ErrorMessage message={commentError} />
+        <ErrorMessage message={flowSaveStatus === "error" ? flowSaveError : null} />
       </Box>
 
       {screenshotPaths.map((screenshotPath) => (

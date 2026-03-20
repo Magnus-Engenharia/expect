@@ -1,24 +1,22 @@
 import { Effect, Stream } from "effect";
 import {
   executeBrowserFlow,
-  generateBrowserPlan,
   getBrowserEnvironment,
   getCommitSummary,
   getGitState,
   getRecommendedScope,
-  loadSavedFlowBySlug,
+  loadFlowBySlug,
   resolveBrowserTarget,
   saveTestedFingerprint,
   type BrowserRunEvent,
   type BrowserRunReport,
-  type CommitSummary,
-  type GenerateBrowserPlanResult,
+  type SavedFlowFileData,
   type TestAction,
 } from "@browser-tester/supervisor";
 import figures from "figures";
 import { VERSION } from "../constants";
-import { CliRuntime } from "../runtime";
 import type { TestRunConfig } from "./test-run-config";
+import { persistRunLearnings } from "./persist-run-learnings";
 
 const ACTION_LABELS: Record<TestAction, string> = {
   "test-unstaged": "unstaged changes",
@@ -35,10 +33,23 @@ const DEFAULT_INSTRUCTIONS: Record<TestAction, string> = {
     "Test the selected commit's changes in the browser and verify they work correctly.",
 };
 
+const getActionForSavedFlow = (savedFlow: SavedFlowFileData): TestAction => {
+  switch (savedFlow.savedTargetScope) {
+    case "unstaged":
+      return "test-unstaged";
+    case "branch":
+      return "test-branch";
+    case "commit":
+      return "select-commit";
+    default:
+      return "test-changes";
+  }
+};
+
 const formatRunEvent = (event: BrowserRunEvent): string | null => {
   switch (event.type) {
     case "run-started":
-      return `Starting ${event.planTitle}`;
+      return `Starting ${event.title}`;
     case "step-started":
       return `${figures.arrowRight} ${event.stepId} ${event.title}`;
     case "step-completed":
@@ -56,47 +67,6 @@ const formatRunEvent = (event: BrowserRunEvent): string | null => {
     default:
       return null;
   }
-};
-
-const resolvePlan = async (
-  config: TestRunConfig,
-  selectedCommit?: CommitSummary,
-): Promise<GenerateBrowserPlanResult> => {
-  const { action, environmentOverrides } = config;
-
-  if (config.flowSlug) {
-    const savedFlow = await CliRuntime.runPromise(
-      loadSavedFlowBySlug(config.flowSlug).pipe(
-        Effect.catchTag("FlowNotFoundError", () => Effect.succeed(null)),
-      ),
-    );
-    if (!savedFlow) {
-      console.error(`Saved flow "${config.flowSlug}" not found.`);
-      process.exit(1);
-    }
-    const target = resolveBrowserTarget({ action, commit: selectedCommit });
-    const environment = {
-      ...getBrowserEnvironment(environmentOverrides),
-      ...savedFlow.environment,
-    };
-    console.error(`Using saved flow: ${savedFlow.title} (${savedFlow.plan.steps.length} steps)\n`);
-    return { target, plan: savedFlow.plan, environment };
-  }
-
-  const userInstruction = config.message ?? DEFAULT_INSTRUCTIONS[action];
-  console.error("Planning browser flow...");
-  const result = await Effect.runPromise(
-    generateBrowserPlan({
-      action,
-      commit: selectedCommit,
-      userInstruction,
-      environmentOverrides,
-      provider: config.planningProvider,
-      model: config.planningModel,
-    }),
-  );
-  console.error(`Plan: ${result.plan.title} (${result.plan.steps.length} steps)\n`);
-  return result;
 };
 
 export const runTest = async (config: TestRunConfig): Promise<void> => {
@@ -120,20 +90,34 @@ export const runTest = async (config: TestRunConfig): Promise<void> => {
   }
 
   try {
-    const { target, plan, environment } = await resolvePlan(config, resolvedCommit);
+    const savedFlow = config.flowSlug
+      ? await loadFlowBySlug(config.flowSlug, process.cwd())
+      : undefined;
+    const flowAction = savedFlow ? getActionForSavedFlow(savedFlow) : action;
+    const flowCommit = savedFlow?.selectedCommit ?? resolvedCommit;
+    const userInstruction =
+      config.message ?? savedFlow?.flow.userInstruction ?? DEFAULT_INSTRUCTIONS[flowAction];
+    const target = resolveBrowserTarget({ action: flowAction, commit: flowCommit });
+    const environment = getBrowserEnvironment({
+      ...(savedFlow?.environment ?? {}),
+      ...(config.environmentOverrides ?? {}),
+    });
     const latestRunReportState: { current: BrowserRunReport | null } = { current: null };
+    const runEvents: BrowserRunEvent[] = [];
 
     await Effect.runPromise(
       Stream.runForEach(
         executeBrowserFlow({
           target,
-          plan,
+          userInstruction,
           environment,
+          savedFlow: savedFlow?.flow,
           provider: config.executionProvider,
           ...(config.executionModel ? { providerSettings: { model: config.executionModel } } : {}),
         }),
         (event) =>
           Effect.sync(() => {
+            runEvents.push(event);
             if (event.type === "run-started" && event.liveViewUrl) {
               process.stdout.write(`Live view: ${event.liveViewUrl}\n`);
             }
@@ -149,6 +133,14 @@ export const runTest = async (config: TestRunConfig): Promise<void> => {
     );
 
     const latestRunReport = latestRunReportState.current;
+
+    if (latestRunReport) {
+      await persistRunLearnings({
+        cwd: target.cwd,
+        events: runEvents,
+        report: latestRunReport,
+      });
+    }
 
     if (latestRunReport?.status === "passed") {
       saveTestedFingerprint();

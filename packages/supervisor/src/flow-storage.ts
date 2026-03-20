@@ -1,387 +1,190 @@
-import { dirname, join } from "node:path";
-import { Effect, Layer, ServiceMap } from "effect";
-import * as FileSystem from "effect/FileSystem";
-import type { PlatformError } from "effect/PlatformError";
-import { NodeServices } from "@effect/platform-node";
-import type { BrowserEnvironmentHints, BrowserFlowPlan, TestTarget } from "./types";
+import * as fsPromises from "node:fs/promises";
+import * as path from "node:path";
 import {
   FLOW_DESCRIPTION_CHAR_LIMIT,
   FLOW_DIRECTORY_INDEX_FILE_NAME,
   SAVED_FLOW_FORMAT_VERSION,
 } from "./constants";
-import { getSavedFlowDirectoryPath } from "./utils/get-saved-flow-directory-path";
-import {
-  formatSavedFlowFrontmatter,
-  parseSavedFlowFile,
-  type SavedFlowFileData,
-} from "./saved-flow-file";
-import { slugify } from "./utils/slugify";
 import { FlowNotFoundError, FlowParseError, FlowStorageError } from "./flow-storage-errors";
+import { formatSavedFlowFile, parseSavedFlowFile } from "./saved-flow-file";
+import type {
+  BrowserEnvironmentHints,
+  SavedFlow,
+  SavedFlowFileData,
+  SavedFlowSummary,
+  TestTarget,
+} from "./types";
+import { getSavedFlowDirectoryPath } from "./utils/get-saved-flow-directory-path";
+import { slugify } from "./utils/slugify";
 
-export interface SaveFlowOptions {
+interface SaveFlowOptions {
+  cwd?: string;
+  title: string;
+  description: string;
+  flow: SavedFlow;
+  environment?: BrowserEnvironmentHints;
   target: TestTarget;
-  plan: BrowserFlowPlan;
-  environment: BrowserEnvironmentHints;
 }
 
-export interface SaveFlowResult {
-  flowPath: string;
-  directoryPath: string;
-  slug: string;
-}
+const MARKDOWN_FILE_PATTERN = /\.md$/;
 
-export interface SavedFlowSummary {
-  title: string;
-  description: string;
-  slug: string;
-  filePath: string;
-  modifiedAtMs: number;
-  savedTargetScope: TestTarget["scope"] | null;
-  savedTargetDisplayName: string | null;
-}
+const isNodeError = (error: unknown): error is NodeJS.ErrnoException =>
+  error instanceof Error && "code" in error;
 
-export interface LoadedSavedFlow extends SavedFlowSummary {
-  plan: BrowserFlowPlan;
-  environment: BrowserEnvironmentHints;
-}
+const truncateDescription = (description: string): string =>
+  description.length <= FLOW_DESCRIPTION_CHAR_LIMIT
+    ? description
+    : `${description.slice(0, FLOW_DESCRIPTION_CHAR_LIMIT - 3).trimEnd()}...`;
 
-interface SavedFlowDirectoryEntry {
-  title: string;
-  description: string;
-  slug: string;
-}
-
-const normalizeWhitespace = (value: string): string => value.trim().replace(/\s+/g, " ");
-
-const truncateDescription = (value: string, limit: number): string => {
-  const cleaned = normalizeWhitespace(value);
-  if (cleaned.length <= limit) return cleaned;
-  return cleaned.slice(0, limit - 1) + "…";
-};
-
-const createFlowDescription = (plan: BrowserFlowPlan): string =>
-  truncateDescription(
-    plan.targetSummary || plan.rationale || plan.userInstruction,
-    FLOW_DESCRIPTION_CHAR_LIMIT,
-  );
-
-const formatOptionalList = (values: string[]): string =>
-  values.length > 0 ? values.map((value) => `- ${value}`).join("\n") : "- None";
-
-const formatFlowFileContent = (
-  options: SaveFlowOptions,
-  slug: string,
-  description: string,
-): string => {
-  const { target, plan, environment } = options;
-
-  const stepBlocks = plan.steps
-    .map((step, index) =>
-      [
-        `### ${index + 1}. ${step.title}`,
-        "",
-        `Instruction: ${step.instruction}`,
-        `Expected outcome: ${step.expectedOutcome}`,
-        `Route hint: ${step.routeHint ?? "None"}`,
-        `Changed file evidence: ${
-          step.changedFileEvidence && step.changedFileEvidence.length > 0
-            ? step.changedFileEvidence.join(", ")
-            : "None"
-        }`,
-      ].join("\n"),
-    )
-    .join("\n\n");
-
-  return [
-    formatSavedFlowFrontmatter({
-      format_version: SAVED_FLOW_FORMAT_VERSION,
-      title: plan.title,
-      description,
-      slug,
-      saved_target_scope: target.scope,
-      saved_target_display_name: target.displayName,
-      plan,
-      environment,
-    }),
-    "",
-    `# ${plan.title}`,
-    "",
-    description,
-    "",
-    "## User Instruction",
-    "",
-    plan.userInstruction,
-    "",
-    "## Target",
-    "",
-    `- Scope: ${target.scope}`,
-    `- Display name: ${target.displayName}`,
-    `- Current branch: ${target.branch.current}`,
-    `- Main branch: ${target.branch.main ?? "unknown"}`,
-    "",
-    "## Cookie Sync",
-    "",
-    `- Required: ${plan.cookieSync.required ? "Yes" : "No"}`,
-    `- Reason: ${plan.cookieSync.reason}`,
-    `- Enabled for this saved flow: ${environment.cookies === true ? "Yes" : "No"}`,
-    "",
-    "## Target URLs",
-    "",
-    formatOptionalList(plan.targetUrls),
-    "",
-    "## Risk Areas",
-    "",
-    formatOptionalList(plan.riskAreas),
-    "",
-    "## Assumptions",
-    "",
-    formatOptionalList(plan.assumptions),
-    "",
-    "## Steps",
-    "",
-    stepBlocks,
-    "",
-  ].join("\n");
-};
-
-const getSavedFlowSummary = (
-  savedFlowFileData: SavedFlowFileData,
+const createFlowSummary = async (
   filePath: string,
-  modifiedAtMs: number,
-): SavedFlowSummary => ({
-  title: savedFlowFileData.title,
-  description: savedFlowFileData.description,
-  slug: savedFlowFileData.slug,
-  filePath,
-  modifiedAtMs,
-  savedTargetScope: savedFlowFileData.saved_target_scope,
-  savedTargetDisplayName: savedFlowFileData.saved_target_display_name,
-});
+  fileData: SavedFlowFileData,
+): Promise<SavedFlowSummary> => {
+  const fileStats = await fsPromises.stat(filePath);
 
-const getSavedFlowDirectoryEntry = (
-  savedFlowFileData: SavedFlowFileData,
-): SavedFlowDirectoryEntry => ({
-  title: savedFlowFileData.title,
-  description: savedFlowFileData.description,
-  slug: savedFlowFileData.slug,
-});
+  return {
+    title: fileData.title,
+    description: fileData.description,
+    slug: fileData.slug,
+    filePath,
+    modifiedAtMs: fileStats.mtimeMs,
+    savedTargetScope: fileData.savedTargetScope,
+    savedTargetDisplayName: fileData.savedTargetDisplayName,
+  };
+};
 
-const formatSavedFlowDirectoryContent = (entries: SavedFlowDirectoryEntry[]): string =>
-  [
+const writeFlowDirectoryIndex = async (cwd: string): Promise<void> => {
+  const flowDirectoryPath = getSavedFlowDirectoryPath(cwd);
+  const savedFlows = await listFlows(cwd);
+  const lines = [
     "# Saved Flows",
     "",
-    ...(entries.length > 0
-      ? entries.map((entry) => `- [${entry.title}](./${entry.slug}.md) - ${entry.description}`)
-      : ["No saved flows yet."]),
+    ...(savedFlows.length > 0
+      ? savedFlows.map(
+          (savedFlow) =>
+            `- [${savedFlow.title}](./${path.basename(savedFlow.filePath)}) - ${savedFlow.description}`,
+        )
+      : ["- No saved flows yet."]),
     "",
-  ].join("\n");
+  ];
 
-const filterFlowFileNames = (fileNames: string[]): string[] =>
-  fileNames
-    .filter((fileName) => fileName.endsWith(".md") && fileName !== FLOW_DIRECTORY_INDEX_FILE_NAME)
-    .sort((leftValue, rightValue) => leftValue.localeCompare(rightValue));
-
-const getModifiedAtMs = (modifiedAt: unknown): number => {
-  if (modifiedAt === undefined || modifiedAt === null) return 0;
-  if (typeof modifiedAt === "number") return modifiedAt;
-  if (typeof modifiedAt === "bigint") return Number(modifiedAt);
-  if (modifiedAt instanceof Date) return modifiedAt.getTime();
-  return 0;
+  await fsPromises.mkdir(flowDirectoryPath, { recursive: true });
+  await fsPromises.writeFile(
+    path.join(flowDirectoryPath, FLOW_DIRECTORY_INDEX_FILE_NAME),
+    lines.join("\n"),
+    "utf-8",
+  );
 };
-const EMPTY_FLOW_FILE_NAMES: string[] = [];
 
-export class FlowStorage extends ServiceMap.Service<FlowStorage>()("@supervisor/FlowStorage", {
-  make: Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
+export const saveFlow = async (options: SaveFlowOptions): Promise<string> => {
+  const cwd = options.cwd ?? options.target.cwd;
+  const flowDirectoryPath = getSavedFlowDirectoryPath(cwd);
+  const slug = slugify(options.title);
+  const filePath = path.join(flowDirectoryPath, `${slug}.md`);
+  const flowFileData: SavedFlowFileData = {
+    formatVersion: SAVED_FLOW_FORMAT_VERSION,
+    title: options.title,
+    description: truncateDescription(options.description),
+    slug,
+    savedTargetScope: options.target.scope,
+    savedTargetDisplayName: options.target.displayName,
+    selectedCommit: options.target.selectedCommit,
+    flow: options.flow,
+    environment: options.environment ?? {},
+  };
 
-    const withStorageError = <A, E, R>(
-      effect: Effect.Effect<A, E | PlatformError, R>,
-      operation: string,
-      filePath: string,
-    ) =>
-      effect.pipe(
-        Effect.catchTag("PlatformError", (cause) =>
-          new FlowStorageError({ operation, filePath, cause }).asEffect(),
-        ),
-      );
-
-    const readFlowFile = Effect.fn("FlowStorage.readFlowFile")(function* (filePath: string) {
-      const fileContent = yield* fileSystem.readFileString(filePath).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () =>
-          new FlowNotFoundError({ lookupType: "filePath", lookupValue: filePath }).asEffect(),
-        ),
-        (effect) => withStorageError(effect, "read saved flow file", filePath),
-      );
-
-      const fileInfo = yield* fileSystem.stat(filePath).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () =>
-          new FlowNotFoundError({ lookupType: "filePath", lookupValue: filePath }).asEffect(),
-        ),
-        (effect) => withStorageError(effect, "stat saved flow file", filePath),
-      );
-
-      const savedFlowFileData = parseSavedFlowFile(fileContent);
-      if (!savedFlowFileData) {
-        return yield* new FlowParseError({ filePath }).asEffect();
-      }
-
-      return {
-        savedFlowFileData,
-        modifiedAtMs: getModifiedAtMs(fileInfo.mtime),
-      };
+  try {
+    await fsPromises.mkdir(flowDirectoryPath, { recursive: true });
+    await fsPromises.writeFile(filePath, formatSavedFlowFile(flowFileData), "utf-8");
+    await writeFlowDirectoryIndex(cwd);
+    return filePath;
+  } catch (error) {
+    throw new FlowStorageError({
+      operation: "save",
+      filePath,
+      cause: error instanceof Error ? error.message : String(error),
     });
+  }
+};
 
-    const readFlowFileNames = Effect.fn("FlowStorage.readFlowFileNames")(function* (
-      flowDirectoryPath: string,
-    ) {
-      return yield* fileSystem.readDirectory(flowDirectoryPath).pipe(
-        Effect.map(filterFlowFileNames),
-        Effect.catchReason("PlatformError", "NotFound", () =>
-          Effect.succeed(EMPTY_FLOW_FILE_NAMES),
-        ),
-        (effect) => withStorageError(effect, "read saved flow directory", flowDirectoryPath),
-      );
+export const loadFlow = async (filePath: string): Promise<SavedFlowFileData> => {
+  let content: string;
+
+  try {
+    content = await fsPromises.readFile(filePath, "utf-8");
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      throw new FlowNotFoundError({ lookupType: "filePath", lookupValue: filePath });
+    }
+
+    throw new FlowStorageError({
+      operation: "load",
+      filePath,
+      cause: error instanceof Error ? error.message : String(error),
     });
+  }
 
-    const syncDirectory = Effect.fn("FlowStorage.syncDirectory")(function* (
-      flowDirectoryPath: string,
-    ) {
-      const directoryFilePath = join(flowDirectoryPath, FLOW_DIRECTORY_INDEX_FILE_NAME);
-      const flowFileNames = yield* readFlowFileNames(flowDirectoryPath);
-      const directoryEntries = yield* Effect.forEach(
-        flowFileNames,
-        (fileName) =>
-          readFlowFile(join(flowDirectoryPath, fileName)).pipe(
-            Effect.map(({ savedFlowFileData }) => getSavedFlowDirectoryEntry(savedFlowFileData)),
-            Effect.catchTags({
-              FlowNotFoundError: () => Effect.succeed(undefined),
-              FlowParseError: () => Effect.succeed(undefined),
-              FlowStorageError: () => Effect.succeed(undefined),
-            }),
-          ),
-        { concurrency: "unbounded" },
-      );
+  const parsedFlow = parseSavedFlowFile(content);
+  if (!parsedFlow) {
+    throw new FlowParseError({ filePath });
+  }
 
-      const filteredEntries = directoryEntries
-        .filter((entry): entry is SavedFlowDirectoryEntry => entry !== undefined)
-        .sort((leftValue, rightValue) => leftValue.title.localeCompare(rightValue.title));
+  return parsedFlow;
+};
 
-      yield* fileSystem
-        .writeFileString(directoryFilePath, formatSavedFlowDirectoryContent(filteredEntries))
-        .pipe((effect) =>
-          withStorageError(effect, "write saved flow directory", directoryFilePath),
-        );
+export const loadFlowBySlug = async (
+  slug: string,
+  cwd: string = process.cwd(),
+): Promise<SavedFlowFileData> => {
+  const filePath = path.join(getSavedFlowDirectoryPath(cwd), `${slug}.md`);
+  return loadFlow(filePath);
+};
 
-      return directoryFilePath;
+export const listFlows = async (cwd: string = process.cwd()): Promise<SavedFlowSummary[]> => {
+  const flowDirectoryPath = getSavedFlowDirectoryPath(cwd);
+  let directoryEntries: string[];
+
+  try {
+    directoryEntries = await fsPromises.readdir(flowDirectoryPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return [];
+    }
+
+    throw new FlowStorageError({
+      operation: "list",
+      filePath: flowDirectoryPath,
+      cause: error instanceof Error ? error.message : String(error),
     });
+  }
 
-    const save = Effect.fn("FlowStorage.save")(function* (options: SaveFlowOptions) {
-      const slug = slugify(options.plan.title);
-      const description = createFlowDescription(options.plan);
-      const flowDirectoryPath = getSavedFlowDirectoryPath(options.target.cwd);
-      const flowFilePath = join(flowDirectoryPath, `${slug}.md`);
+  const markdownEntries = directoryEntries.filter(
+    (entry) => MARKDOWN_FILE_PATTERN.test(entry) && entry !== FLOW_DIRECTORY_INDEX_FILE_NAME,
+  );
+  const savedFlows = await Promise.all(
+    markdownEntries.map(async (entry) => {
+      const filePath = path.join(flowDirectoryPath, entry);
+      const parsedFlow = await loadFlow(filePath);
+      return createFlowSummary(filePath, parsedFlow);
+    }),
+  );
 
-      yield* fileSystem
-        .makeDirectory(flowDirectoryPath, { recursive: true })
-        .pipe((effect) =>
-          withStorageError(effect, "create saved flow directory", flowDirectoryPath),
-        );
-      yield* fileSystem
-        .writeFileString(flowFilePath, formatFlowFileContent(options, slug, description))
-        .pipe((effect) => withStorageError(effect, "write saved flow file", flowFilePath));
-      yield* syncDirectory(flowDirectoryPath);
+  return savedFlows.sort((leftFlow, rightFlow) => rightFlow.modifiedAtMs - leftFlow.modifiedAtMs);
+};
 
-      return {
-        flowPath: flowFilePath,
-        directoryPath: join(flowDirectoryPath, FLOW_DIRECTORY_INDEX_FILE_NAME),
-        slug,
-      };
+export const removeFlow = async (filePath: string, cwd: string = process.cwd()): Promise<void> => {
+  try {
+    await fsPromises.rm(filePath);
+    await writeFlowDirectoryIndex(cwd);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      throw new FlowNotFoundError({ lookupType: "filePath", lookupValue: filePath });
+    }
+
+    throw new FlowStorageError({
+      operation: "remove",
+      filePath,
+      cause: error instanceof Error ? error.message : String(error),
     });
-
-    const load = Effect.fn("FlowStorage.load")(function* (filePath: string) {
-      const { savedFlowFileData, modifiedAtMs } = yield* readFlowFile(filePath);
-
-      return {
-        ...getSavedFlowSummary(savedFlowFileData, filePath, modifiedAtMs),
-        environment: savedFlowFileData.environment,
-        plan: savedFlowFileData.plan,
-      };
-    });
-
-    const list = Effect.fn("FlowStorage.list")(function* (cwd: string = process.cwd()) {
-      const flowDirectoryPath = getSavedFlowDirectoryPath(cwd);
-      const flowFileNames = yield* readFlowFileNames(flowDirectoryPath);
-
-      const savedFlows = yield* Effect.forEach(
-        flowFileNames,
-        (fileName) =>
-          readFlowFile(join(flowDirectoryPath, fileName)).pipe(
-            Effect.map(({ savedFlowFileData, modifiedAtMs }) =>
-              getSavedFlowSummary(
-                savedFlowFileData,
-                join(flowDirectoryPath, fileName),
-                modifiedAtMs,
-              ),
-            ),
-            Effect.catchTags({
-              FlowNotFoundError: () => Effect.succeed(undefined),
-              FlowParseError: () => Effect.succeed(undefined),
-              FlowStorageError: () => Effect.succeed(undefined),
-            }),
-          ),
-        { concurrency: "unbounded" },
-      );
-
-      return savedFlows
-        .filter((savedFlow): savedFlow is SavedFlowSummary => savedFlow !== undefined)
-        .sort(
-          (leftValue, rightValue) =>
-            rightValue.modifiedAtMs - leftValue.modifiedAtMs ||
-            leftValue.title.localeCompare(rightValue.title),
-        );
-    });
-
-    const loadBySlug = Effect.fn("FlowStorage.loadBySlug")(function* (
-      slug: string,
-      cwd: string = process.cwd(),
-    ) {
-      const savedFlows = yield* list(cwd);
-      const matchingFlow = savedFlows.find((flow) => flow.slug === slug);
-
-      if (!matchingFlow) {
-        return yield* new FlowNotFoundError({ lookupType: "slug", lookupValue: slug }).asEffect();
-      }
-
-      return yield* load(matchingFlow.filePath);
-    });
-
-    const remove = Effect.fn("FlowStorage.remove")(function* (filePath: string) {
-      yield* fileSystem.remove(filePath).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () =>
-          new FlowNotFoundError({ lookupType: "filePath", lookupValue: filePath }).asEffect(),
-        ),
-        (effect) => withStorageError(effect, "remove saved flow file", filePath),
-      );
-      yield* syncDirectory(dirname(filePath));
-    });
-
-    return { save, load, loadBySlug, list, remove } as const;
-  }),
-}) {
-  static layer = Layer.effect(this, this.make).pipe(Layer.provide(NodeServices.layer));
-}
-
-export const saveFlow = (options: SaveFlowOptions) =>
-  FlowStorage.use((flowStorage) => flowStorage.save(options));
-
-export const loadSavedFlow = (filePath: string) =>
-  FlowStorage.use((flowStorage) => flowStorage.load(filePath));
-
-export const loadSavedFlowBySlug = (slug: string, cwd?: string) =>
-  FlowStorage.use((flowStorage) => flowStorage.loadBySlug(slug, cwd));
-
-export const listSavedFlows = (cwd?: string) =>
-  FlowStorage.use((flowStorage) => flowStorage.list(cwd));
-
-export const removeSavedFlow = (filePath: string) =>
-  FlowStorage.use((flowStorage) => flowStorage.remove(filePath));
+  }
+};

@@ -4,10 +4,8 @@ import stringWidth from "string-width";
 import { useColors, useThemeContext } from "../theme-context";
 import { HintBar, HINT_SEPARATOR, type HintSegment } from "./hint-bar";
 import { useNavigationStore, type Screen } from "../../stores/use-navigation";
-import { usePreferencesStore } from "../../stores/use-preferences";
 import { useFlowSessionStore } from "../../stores/use-flow-session";
 import { useGitState } from "../../hooks/use-git-state";
-import { useSavedFlows } from "../../hooks/use-saved-flows";
 import { Clickable } from "./clickable";
 import { TextShimmer } from "./text-shimmer";
 
@@ -17,34 +15,16 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
   const goBack = useFlowSessionStore((state) => state.goBack);
   const updateEnvironment = useFlowSessionStore((state) => state.updateEnvironment);
   const browserEnvironment = useFlowSessionStore((state) => state.browserEnvironment);
-  const requestPlanApproval = useFlowSessionStore((state) => state.requestPlanApproval);
-  const approvePlan = useFlowSessionStore((state) => state.approvePlan);
-  const generatedPlan = useFlowSessionStore((state) => state.generatedPlan);
-  const skipPlanning = usePreferencesStore((state) => state.skipPlanning);
-  const { data: savedFlowSummaries = [] } = useSavedFlows();
+  const startTesting = useFlowSessionStore((state) => state.startTesting);
   const latestRunReport = useFlowSessionStore((state) => state.latestRunReport);
   const liveViewUrl = useFlowSessionStore((state) => state.liveViewUrl);
-  const planningProvider = usePreferencesStore((state) => state.planningProvider);
-  const planningModel = usePreferencesStore((state) => state.planningModel);
-  const resolvedPlanningProvider = useFlowSessionStore((state) => state.resolvedPlanningProvider);
   switch (screen) {
-    case "main": {
-      const hints: HintSegment[] = [
-        {
-          key: "shift+tab",
-          label: `skip planning ${skipPlanning ? "on" : "off"}`,
-          color: skipPlanning ? COLORS.GREEN : undefined,
-        },
+    case "main":
+      return [
+        { key: "ctrl+p", label: "pick pr", onClick: () => navigateTo("select-pr") },
+        { key: "ctrl+r", label: "saved flows", onClick: () => navigateTo("saved-flow-picker") },
+        { key: "ctrl+t", label: "theme", onClick: () => navigateTo("theme") },
       ];
-      if (savedFlowSummaries.length > 0) {
-        hints.push({
-          key: "ctrl+r",
-          label: "reuse flow",
-          onClick: () => navigateTo("saved-flow-picker"),
-        });
-      }
-      return hints;
-    }
     case "select-pr":
       return [
         { key: "↑↓", label: "nav" },
@@ -56,55 +36,9 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
     case "saved-flow-picker":
       return [
         { key: "↑↓", label: "nav" },
-        { key: "esc", label: "back", cta: true, onClick: goBack },
+        { key: "esc", label: "back", onClick: goBack },
+        { key: "d", label: "remove" },
         { key: "enter", label: "select", color: COLORS.PRIMARY, cta: true },
-      ];
-    case "planning": {
-      const planningHints: HintSegment[] = [];
-      const provider = resolvedPlanningProvider ?? planningProvider;
-      const providerName =
-        provider === "claude"
-          ? "Claude"
-          : provider === "codex"
-            ? "Codex"
-            : provider === "cursor"
-              ? "Cursor"
-              : null;
-      if (providerName) {
-        planningHints.push({
-          key: providerName + (planningModel ? ` · ${planningModel}` : ""),
-          label: "agent",
-        });
-      }
-      return [...planningHints, { key: "esc", label: "cancel", cta: true, onClick: goBack }];
-    }
-    case "review-plan":
-      return [
-        { key: "↑↓", label: "nav" },
-        { key: "tab", label: "fold" },
-        { key: "s", label: "save plan" },
-        ...(generatedPlan?.cookieSync.required
-          ? [
-              {
-                key: "c",
-                label: browserEnvironment?.cookies === true ? "cookies on" : "sync cookies",
-                onClick: () =>
-                  updateEnvironment({
-                    ...(browserEnvironment ?? {}),
-                    cookies: !(browserEnvironment?.cookies === true),
-                  }),
-              },
-            ]
-          : []),
-        { key: "esc", label: "leave" },
-        { key: "e", label: "edit", cta: true },
-        {
-          key: "a/enter",
-          label: "approve",
-          color: COLORS.PRIMARY,
-          cta: true,
-          onClick: requestPlanApproval,
-        },
       ];
     case "cookie-sync-confirm":
       return [
@@ -119,7 +53,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
               ...(browserEnvironment ?? {}),
               cookies: true,
             });
-            approvePlan();
+            startTesting();
           },
         },
         {
@@ -127,7 +61,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
           label: "run anyway",
           color: COLORS.PRIMARY,
           cta: true,
-          onClick: approvePlan,
+          onClick: startTesting,
         },
       ];
     case "testing": {
@@ -154,6 +88,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
       }
       return [
         ...resultsHints,
+        { key: "s", label: "save flow" },
         { key: "y", label: "copy", color: COLORS.PRIMARY, cta: true },
         ...(latestRunReport?.pullRequest ? [{ key: "p", label: "post to PR", cta: true }] : []),
         { key: "esc", label: "main menu", cta: true, onClick: goBack },

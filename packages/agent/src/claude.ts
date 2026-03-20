@@ -75,7 +75,6 @@ const runGenerate = Effect.fn("ClaudeAgent.generate")(function* (
   const abortController = createLinkedAbortController(options.abortSignal);
   const content: LanguageModelV3Content[] = [];
   let sessionId: string | undefined;
-  let finalResultText = "";
 
   yield* Effect.tryPromise({
     try: async () => {
@@ -90,26 +89,11 @@ const runGenerate = Effect.fn("ClaudeAgent.generate")(function* (
           content.push(...convertAssistantBlocks(event.message.content));
         if (event.type === "user" && Array.isArray(event.message.content))
           content.push(...convertToolResultBlocks(event.message.content));
-        if (event.type === "result" && "result" in event && typeof event.result === "string") {
-          finalResultText = event.result;
-        }
       }
       assertNoDebugLogErrors(queryOptions.debugFile);
     },
     catch: (cause) => new ClaudeQueryError({ cause: String(cause) }),
   });
-
-  if (settings.permissionMode === "plan") {
-    const allAssistantText = content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("\n");
-
-    const combinedText = [allAssistantText, finalResultText].filter(Boolean).join("\n");
-
-    content.length = 0;
-    content.push({ type: "text", text: combinedText });
-  }
 
   return {
     content,

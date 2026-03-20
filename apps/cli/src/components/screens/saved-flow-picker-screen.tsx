@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import figures from "figures";
+import { loadFlow, removeFlow } from "@browser-tester/supervisor";
 import { SAVED_FLOW_PICKER_VISIBLE_COUNT } from "../../constants";
-import { useColors } from "../theme-context";
-import { RuledBox } from "../ui/ruled-box";
-import { useFlowSessionStore } from "../../stores/use-flow-session";
-import { EMPTY_SAVED_FLOWS, useSavedFlows } from "../../hooks/use-saved-flows";
+import { useSavedFlows, EMPTY_SAVED_FLOWS } from "../../hooks/use-saved-flows";
+import { useScrollableList } from "../../hooks/use-scrollable-list";
 import { queryClient } from "../../query-client";
+import { useFlowSessionStore } from "../../stores/use-flow-session";
 import { formatTimeAgo } from "../../utils/format-time-ago";
-import { CliRuntime } from "../../runtime";
-import { loadSavedFlow, removeSavedFlow } from "@browser-tester/supervisor";
-import { ScreenHeading } from "../ui/screen-heading";
-import { ErrorMessage } from "../ui/error-message";
+import { useColors } from "../theme-context";
 import { Clickable } from "../ui/clickable";
+import { ErrorMessage } from "../ui/error-message";
+import { RuledBox } from "../ui/ruled-box";
+import { ScreenHeading } from "../ui/screen-heading";
+import { Spinner } from "../ui/spinner";
 
 const ACTION_LABELS: Record<string, string> = {
   "test-unstaged": "Test current changes",
@@ -24,67 +25,62 @@ const ACTION_LABELS: Record<string, string> = {
 export const SavedFlowPickerScreen = () => {
   const COLORS = useColors();
   const testAction = useFlowSessionStore((state) => state.testAction);
-  const { data: savedFlowSummaries = EMPTY_SAVED_FLOWS } = useSavedFlows();
   const applySavedFlow = useFlowSessionStore((state) => state.applySavedFlow);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const { data: savedFlowSummaries = EMPTY_SAVED_FLOWS, isLoading } = useSavedFlows();
   const [loadingFilePath, setLoadingFilePath] = useState<string | null>(null);
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null);
   const [deleteConfirmationVisible, setDeleteConfirmationVisible] = useState(false);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { highlightedIndex, setHighlightedIndex, scrollOffset, handleNavigation } =
+    useScrollableList({
+      itemCount: savedFlowSummaries.length,
+      visibleCount: SAVED_FLOW_PICKER_VISIBLE_COUNT,
+    });
 
-  useEffect(() => {
-    setSelectedIndex((previous) =>
-      savedFlowSummaries.length === 0 ? 0 : Math.min(previous, savedFlowSummaries.length - 1),
-    );
-  }, [savedFlowSummaries.length]);
-
-  const selectedFlow = savedFlowSummaries[selectedIndex] ?? null;
-  const actionInProgress = Boolean(loadingFilePath || deletingFilePath);
-
-  const scrollOffset = useMemo(() => {
-    if (savedFlowSummaries.length <= SAVED_FLOW_PICKER_VISIBLE_COUNT) return 0;
-    const half = Math.floor(SAVED_FLOW_PICKER_VISIBLE_COUNT / 2);
-    const maxOffset = savedFlowSummaries.length - SAVED_FLOW_PICKER_VISIBLE_COUNT;
-    return Math.min(maxOffset, Math.max(0, selectedIndex - half));
-  }, [savedFlowSummaries.length, selectedIndex]);
-
+  const selectedFlow = savedFlowSummaries[highlightedIndex] ?? null;
   const visibleSavedFlows = savedFlowSummaries.slice(
     scrollOffset,
     scrollOffset + SAVED_FLOW_PICKER_VISIBLE_COUNT,
   );
+  const actionInProgress = Boolean(loadingFilePath || deletingFilePath);
 
-  const selectFlow = (index: number) => {
-    if (actionInProgress || deleteConfirmationVisible) return;
-    const flow = savedFlowSummaries[index];
-    if (!flow) return;
+  const handleLoadSelectedFlow = (index: number) => {
+    if (actionInProgress || deleteConfirmationVisible) {
+      return;
+    }
 
-    setSelectedIndex(index);
-    setLoadingError(null);
-    setLoadingFilePath(flow.filePath);
+    const savedFlowSummary = savedFlowSummaries[index];
+    if (!savedFlowSummary) {
+      return;
+    }
 
-    void CliRuntime.runPromise(loadSavedFlow(flow.filePath))
-      .then((loaded) => applySavedFlow(loaded))
-      .catch((caughtError) => {
-        setLoadingError(
-          caughtError instanceof Error ? caughtError.message : "Failed to load flow.",
-        );
+    setHighlightedIndex(index);
+    setErrorMessage(null);
+    setLoadingFilePath(savedFlowSummary.filePath);
+    void loadFlow(savedFlowSummary.filePath)
+      .then((loadedFlow) => {
+        applySavedFlow(loadedFlow);
+      })
+      .catch((error) => {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load saved flow.");
+      })
+      .finally(() => {
         setLoadingFilePath(null);
       });
   };
 
-  const deleteSelectedFlow = () => {
-    if (!selectedFlow || actionInProgress) return;
+  const handleDeleteSelectedFlow = () => {
+    if (!selectedFlow || actionInProgress) {
+      return;
+    }
 
     setDeleteConfirmationVisible(false);
-    setLoadingError(null);
+    setErrorMessage(null);
     setDeletingFilePath(selectedFlow.filePath);
-
-    void CliRuntime.runPromise(removeSavedFlow(selectedFlow.filePath))
+    void removeFlow(selectedFlow.filePath)
       .then(() => queryClient.invalidateQueries({ queryKey: ["saved-flows"] }))
-      .catch((caughtError) => {
-        setLoadingError(
-          caughtError instanceof Error ? caughtError.message : "Failed to remove saved flow.",
-        );
+      .catch((error) => {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to remove saved flow.");
       })
       .finally(() => {
         setDeletingFilePath(null);
@@ -95,84 +91,104 @@ export const SavedFlowPickerScreen = () => {
     const normalizedInput = input.toLowerCase();
 
     if (deleteConfirmationVisible) {
-      if (key.return) deleteSelectedFlow();
-      if (normalizedInput === "n") setDeleteConfirmationVisible(false);
+      if (key.return) {
+        handleDeleteSelectedFlow();
+      }
+
+      if (normalizedInput === "n") {
+        setDeleteConfirmationVisible(false);
+      }
+
       return;
     }
 
-    if (actionInProgress) return;
-    if (savedFlowSummaries.length === 0) return;
-
-    if (key.downArrow || normalizedInput === "j" || (key.ctrl && normalizedInput === "n")) {
-      setSelectedIndex((previous) => Math.min(savedFlowSummaries.length - 1, previous + 1));
+    if (actionInProgress || savedFlowSummaries.length === 0) {
+      return;
     }
 
-    if (key.upArrow || normalizedInput === "k" || (key.ctrl && normalizedInput === "p")) {
-      setSelectedIndex((previous) => Math.max(0, previous - 1));
+    if (handleNavigation(input, key)) {
+      return;
     }
 
-    if (key.return) selectFlow(selectedIndex);
+    if (key.return) {
+      handleLoadSelectedFlow(highlightedIndex);
+    }
+
     if (normalizedInput === "d") {
-      setLoadingError(null);
+      setErrorMessage(null);
       setDeleteConfirmationVisible(true);
     }
   });
 
-  if (!testAction) return null;
-
   return (
     <Box flexDirection="column" width="100%" paddingY={1}>
       <Box paddingX={1}>
-        <ScreenHeading title="Reuse saved flow" subtitle={ACTION_LABELS[testAction]} />
+        <ScreenHeading
+          title="Reuse saved flow"
+          subtitle={testAction ? ACTION_LABELS[testAction] : "Load a previously saved flow"}
+        />
       </Box>
 
-      <Box
-        flexDirection="column"
-        marginTop={1}
-        height={SAVED_FLOW_PICKER_VISIBLE_COUNT}
-        overflow="hidden"
-        paddingX={1}
-      >
-        {visibleSavedFlows.map((savedFlow, index) => {
-          const actualIndex = index + scrollOffset;
-          const isSelected = actualIndex === selectedIndex;
-          const isLoading = loadingFilePath === savedFlow.filePath;
-          const isDeleting = deletingFilePath === savedFlow.filePath;
-          const actionSuffix = isLoading ? " (loading...)" : isDeleting ? " (removing...)" : "";
+      {isLoading ? (
+        <Box marginTop={1} paddingX={1}>
+          <Spinner message="Loading saved flows..." />
+        </Box>
+      ) : (
+        <Box
+          flexDirection="column"
+          marginTop={1}
+          height={SAVED_FLOW_PICKER_VISIBLE_COUNT}
+          overflow="hidden"
+          paddingX={1}
+        >
+          {visibleSavedFlows.map((savedFlow, index) => {
+            const actualIndex = index + scrollOffset;
+            const isSelected = actualIndex === highlightedIndex;
+            const isLoadingFlow = loadingFilePath === savedFlow.filePath;
+            const isDeletingFlow = deletingFilePath === savedFlow.filePath;
+            const actionSuffix = isLoadingFlow
+              ? " (loading...)"
+              : isDeletingFlow
+                ? " (removing...)"
+                : "";
 
-          return (
-            <Clickable key={savedFlow.filePath} onClick={() => selectFlow(actualIndex)}>
-              <Box flexDirection="column" marginBottom={1}>
-                <Text>
-                  <Text color={isSelected ? COLORS.PRIMARY : COLORS.DIM}>
-                    {isSelected ? `${figures.pointer} ` : "  "}
-                  </Text>
-                  {isSelected ? (
-                    <Text color={COLORS.PRIMARY} bold>
-                      {savedFlow.title}
+            return (
+              <Clickable
+                key={savedFlow.filePath}
+                onClick={() => handleLoadSelectedFlow(actualIndex)}
+              >
+                <Box flexDirection="column" marginBottom={1}>
+                  <Text>
+                    <Text color={isSelected ? COLORS.PRIMARY : COLORS.DIM}>
+                      {isSelected ? `${figures.pointer} ` : "  "}
                     </Text>
-                  ) : (
-                    <Text color={COLORS.TEXT}>{savedFlow.title}</Text>
-                  )}
-                  <Text color={COLORS.DIM}>{" · updated "}</Text>
-                  <Text color={COLORS.DIM}>{formatTimeAgo(savedFlow.modifiedAtMs)}</Text>
-                  {actionSuffix ? <Text color={COLORS.DIM}>{actionSuffix}</Text> : null}
-                </Text>
-                <Text color={COLORS.DIM}>
-                  {"  "}
-                  {savedFlow.description}
-                  {savedFlow.savedTargetDisplayName
-                    ? ` · saved for ${savedFlow.savedTargetDisplayName}`
-                    : ""}
-                </Text>
-              </Box>
-            </Clickable>
-          );
-        })}
-        {savedFlowSummaries.length === 0 ? (
-          <Text color={COLORS.DIM}>No compatible saved flows available yet.</Text>
-        ) : null}
-      </Box>
+                    {isSelected ? (
+                      <Text color={COLORS.PRIMARY} bold>
+                        {savedFlow.title}
+                      </Text>
+                    ) : (
+                      <Text color={COLORS.TEXT}>{savedFlow.title}</Text>
+                    )}
+                    <Text color={COLORS.DIM}>{" · updated "}</Text>
+                    <Text color={COLORS.DIM}>{formatTimeAgo(savedFlow.modifiedAtMs)}</Text>
+                    {actionSuffix ? <Text color={COLORS.DIM}>{actionSuffix}</Text> : null}
+                  </Text>
+                  <Text color={COLORS.DIM}>
+                    {"  "}
+                    {savedFlow.description}
+                    {savedFlow.savedTargetDisplayName
+                      ? ` · saved for ${savedFlow.savedTargetDisplayName}`
+                      : ""}
+                  </Text>
+                </Box>
+              </Clickable>
+            );
+          })}
+          {savedFlowSummaries.length === 0 ? (
+            <Text color={COLORS.DIM}>No saved flows available yet.</Text>
+          ) : null}
+        </Box>
+      )}
 
       {deleteConfirmationVisible && selectedFlow ? (
         <RuledBox color={COLORS.YELLOW} marginTop={1}>
@@ -195,7 +211,7 @@ export const SavedFlowPickerScreen = () => {
       ) : null}
 
       <Box paddingX={1}>
-        <ErrorMessage message={loadingError} />
+        <ErrorMessage message={errorMessage} />
       </Box>
     </Box>
   );

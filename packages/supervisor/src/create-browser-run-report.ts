@@ -24,7 +24,6 @@ import {
 import type { BrowserRunEvent } from "./events";
 import { getPullRequestForBranch } from "./github-comment";
 import type {
-  BrowserFlowPlan,
   BrowserRunArtifacts,
   BrowserRunFinding,
   BrowserRunReport,
@@ -34,7 +33,7 @@ import type {
 
 interface CreateBrowserRunReportOptions {
   target: TestTarget;
-  plan: BrowserFlowPlan;
+  userInstruction: string;
   events: BrowserRunEvent[];
   completionEvent: Extract<BrowserRunEvent, { type: "run-completed" }>;
   rawVideoPath?: string;
@@ -75,33 +74,40 @@ const ffmpegFilterAvailable = async (filterName: string): Promise<boolean> => {
   }
 };
 
-const normalizeText = (value: string): string => value.trim().toLowerCase();
-
-const matchesRiskArea = (riskArea: string, texts: string[]): boolean => {
-  const normalizedRiskArea = normalizeText(riskArea);
-  return texts.some((text) => normalizeText(text).includes(normalizedRiskArea));
-};
-
 const getStepResults = (
-  plan: BrowserFlowPlan,
   events: BrowserRunEvent[],
   completionEvent: Extract<BrowserRunEvent, { type: "run-completed" }>,
 ): BrowserRunStepResult[] => {
   const stepResultById = new Map<string, BrowserRunStepResult>();
+  const stepOrder: string[] = [];
 
-  for (const step of plan.steps) {
-    stepResultById.set(step.id, {
-      stepId: step.id,
-      title: step.title,
-      status: "not-run",
+  const ensureStepResult = (stepId: string, title: string): BrowserRunStepResult => {
+    const existingStepResult = stepResultById.get(stepId);
+    if (existingStepResult) {
+      if (existingStepResult.title !== title) {
+        stepResultById.set(stepId, { ...existingStepResult, title });
+      }
+      return stepResultById.get(stepId)!;
+    }
+
+    const stepResult = {
+      stepId,
+      title,
+      status: "not-run" as const,
       summary: "Step was not completed.",
-    });
-  }
+    };
+    stepResultById.set(stepId, stepResult);
+    stepOrder.push(stepId);
+    return stepResult;
+  };
 
   for (const event of events) {
+    if (event.type === "step-started") {
+      ensureStepResult(event.stepId, event.title);
+    }
+
     if (event.type === "step-completed") {
-      const existingStepResult = stepResultById.get(event.stepId);
-      if (!existingStepResult) continue;
+      const existingStepResult = ensureStepResult(event.stepId, event.stepId);
       stepResultById.set(event.stepId, {
         ...existingStepResult,
         status: "passed",
@@ -110,8 +116,7 @@ const getStepResults = (
     }
 
     if (event.type === "assertion-failed") {
-      const existingStepResult = stepResultById.get(event.stepId);
-      if (!existingStepResult) continue;
+      const existingStepResult = ensureStepResult(event.stepId, event.stepId);
       stepResultById.set(event.stepId, {
         ...existingStepResult,
         status: "failed",
@@ -120,7 +125,17 @@ const getStepResults = (
     }
   }
 
-  // HACK: direct runs don't emit per-step events, so infer step status from the overall run result
+  if (stepOrder.length === 0) {
+    return [
+      {
+        stepId: "step-01",
+        title: "Run requested browser test",
+        status: completionEvent.status,
+        summary: completionEvent.summary,
+      },
+    ];
+  }
+
   for (const stepResult of stepResultById.values()) {
     if (stepResult.status === "not-run") {
       stepResult.status = completionEvent.status === "passed" ? "passed" : "failed";
@@ -128,29 +143,35 @@ const getStepResults = (
     }
   }
 
-  return plan.steps
-    .map((step) => stepResultById.get(step.id))
+  return stepOrder
+    .map((stepId) => stepResultById.get(stepId))
     .filter((stepResult): stepResult is BrowserRunStepResult => Boolean(stepResult));
 };
 
 const getFindings = (
   events: BrowserRunEvent[],
-  plan: BrowserFlowPlan,
   completionEvent: Extract<BrowserRunEvent, { type: "run-completed" }>,
 ): BrowserRunFinding[] => {
   const findings: BrowserRunFinding[] = [];
+  const stepTitleById = new Map<string, string>();
+
+  for (const event of events) {
+    if (event.type === "step-started") {
+      stepTitleById.set(event.stepId, event.title);
+    }
+  }
 
   for (const event of events) {
     if (event.type !== "assertion-failed") continue;
 
-    const planStep = plan.steps.find((step) => step.id === event.stepId);
+    const stepTitle = stepTitleById.get(event.stepId);
     findings.push({
       id: `${event.stepId}-${findings.length + 1}`,
       severity: "error",
-      title: planStep ? `${planStep.title} failed` : `${event.stepId} failed`,
+      title: stepTitle ? `${stepTitle} failed` : `${event.stepId} failed`,
       detail: event.message,
       stepId: event.stepId,
-      stepTitle: planStep?.title,
+      stepTitle,
     });
   }
 
@@ -164,44 +185,6 @@ const getFindings = (
   }
 
   return findings;
-};
-
-const getRiskAreaSummary = (
-  plan: BrowserFlowPlan,
-  stepResults: BrowserRunStepResult[],
-  findings: BrowserRunFinding[],
-): Pick<BrowserRunReport, "confirmedRiskAreas" | "clearedRiskAreas" | "unresolvedRiskAreas"> => {
-  const confirmedRiskAreas: string[] = [];
-  const clearedRiskAreas: string[] = [];
-  const unresolvedRiskAreas: string[] = [];
-
-  const failedTexts = stepResults
-    .filter((stepResult) => stepResult.status === "failed")
-    .flatMap((stepResult) => [stepResult.title, stepResult.summary]);
-  const findingTexts = findings.flatMap((finding) => [finding.title, finding.detail]);
-  const passedTexts = stepResults
-    .filter((stepResult) => stepResult.status === "passed")
-    .flatMap((stepResult) => [stepResult.title, stepResult.summary]);
-
-  for (const riskArea of plan.riskAreas) {
-    if (matchesRiskArea(riskArea, [...failedTexts, ...findingTexts])) {
-      confirmedRiskAreas.push(riskArea);
-      continue;
-    }
-
-    if (matchesRiskArea(riskArea, passedTexts)) {
-      clearedRiskAreas.push(riskArea);
-      continue;
-    }
-
-    unresolvedRiskAreas.push(riskArea);
-  }
-
-  return {
-    confirmedRiskAreas,
-    clearedRiskAreas,
-    unresolvedRiskAreas,
-  };
 };
 
 const isInterestingToolName = (toolName: string): boolean => {
@@ -519,9 +502,8 @@ export const createBrowserRunReport = async (
   options: CreateBrowserRunReportOptions,
 ): Promise<BrowserRunReport> => {
   await options.onProgress?.("Analyzing results");
-  const stepResults = getStepResults(options.plan, options.events, options.completionEvent);
-  const findings = getFindings(options.events, options.plan, options.completionEvent);
-  const riskAreaSummary = getRiskAreaSummary(options.plan, stepResults, findings);
+  const stepResults = getStepResults(options.events, options.completionEvent);
+  const findings = getFindings(options.events, options.completionEvent);
   await options.onProgress?.("Looking up pull request");
   const [artifactPreparation, pullRequest] = await Promise.all([
     prepareArtifacts(
@@ -534,14 +516,13 @@ export const createBrowserRunReport = async (
   ]);
 
   const partialReport = {
-    title: options.plan.title,
+    title: options.userInstruction,
     status: options.completionEvent.status,
     summary: options.completionEvent.summary,
     findings,
     stepResults,
     warnings: artifactPreparation.warnings,
     pullRequest,
-    ...riskAreaSummary,
   };
 
   await options.onProgress?.("Building report");

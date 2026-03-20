@@ -24,6 +24,7 @@ import { FileLink } from "../ui/file-link";
 import { ErrorMessage } from "../ui/error-message";
 import { deriveTestingState, saveTestedFingerprint } from "@browser-tester/supervisor";
 import { openUrl } from "../../utils/open-url";
+import { persistRunLearnings } from "../../utils/persist-run-learnings";
 
 const TOOL_CALL_DISPLAY_MODE_COMPACT = "compact";
 const TOOL_CALL_DISPLAY_MODE_DETAILED = "detailed";
@@ -44,8 +45,9 @@ const getNextToolCallDisplayMode = (toolCallDisplayMode: string): string => {
 
 export const TestingScreen = () => {
   const target = useFlowSessionStore((state) => state.resolvedTarget);
-  const plan = useFlowSessionStore((state) => state.generatedPlan);
+  const userInstruction = useFlowSessionStore((state) => state.flowInstruction);
   const environment = useFlowSessionStore((state) => state.browserEnvironment);
+  const pendingSavedFlow = useFlowSessionStore((state) => state.pendingSavedFlow);
   const executionProvider = usePreferencesStore((state) => state.executionProvider);
   const executionModel = usePreferencesStore((state) => state.executionModel);
   const completeTestingRun = useFlowSessionStore((state) => state.completeTestingRun);
@@ -65,10 +67,11 @@ export const TestingScreen = () => {
   const [exitRequested, setExitRequested] = useState(false);
   const [pendingLiveViewUrl, setPendingLiveViewUrl] = useState<string | null>(null);
   const runFiberRef = useRef<Fiber.Fiber<unknown, unknown> | null>(null);
+  const emittedEventsRef = useRef<BrowserRunEvent[]>([]);
 
   const derivedState = useMemo(
-    () => (plan ? deriveTestingState(plan, events, toolCallDisplayMode) : null),
-    [plan, events, toolCallDisplayMode],
+    () => deriveTestingState(events, toolCallDisplayMode),
+    [events, toolCallDisplayMode],
   );
 
   const elapsedTimeLabel = useMemo(() => formatElapsedTime(elapsedTimeMs), [elapsedTimeMs]);
@@ -115,7 +118,7 @@ export const TestingScreen = () => {
   }, [pendingLiveViewUrl, setLiveViewUrl]);
 
   useEffect(() => {
-    if (!target || !plan || !environment) return;
+    if (!target || !userInstruction || !environment) return;
 
     const startedAt = Date.now();
     setEvents([]);
@@ -127,28 +130,37 @@ export const TestingScreen = () => {
     setElapsedTimeMs(0);
     setShowCancelConfirmation(false);
     setExitRequested(false);
+    emittedEventsRef.current = [];
     useFlowSessionStore.setState({ resolvedExecutionProvider: executionProvider ?? null });
     runFiberRef.current = Effect.runFork(
       Stream.runForEach(
         executeBrowserFlow({
           target,
-          plan,
+          userInstruction,
           environment,
+          savedFlow: pendingSavedFlow ?? undefined,
           provider: executionProvider,
           ...(executionModel ? { providerSettings: { model: executionModel } } : {}),
         }),
         (event) =>
           Effect.sync(() => {
+            const nextEvents = [...emittedEventsRef.current, event];
+            emittedEventsRef.current = nextEvents;
             if (event.type === "run-started" && event.liveViewUrl) {
               setPendingLiveViewUrl(event.liveViewUrl);
             }
             if (event.type === "run-completed") {
               setVideoPath(event.report?.artifacts.rawVideoPath ?? event.videoPath ?? null);
               if (event.report) {
+                void persistRunLearnings({
+                  cwd: target.cwd,
+                  events: nextEvents,
+                  report: event.report,
+                });
                 if (event.report.status === "passed") {
                   saveTestedFingerprint();
                 }
-                completeTestingRun(event.report);
+                completeTestingRun(event.report, nextEvents);
               }
             }
             if (event.type === "tool-result") {
@@ -186,9 +198,10 @@ export const TestingScreen = () => {
     environment,
     executionModel,
     executionProvider,
-    plan,
+    pendingSavedFlow,
     setLiveViewUrl,
     target,
+    userInstruction,
   ]);
 
   useInput((input, key) => {
@@ -236,7 +249,7 @@ export const TestingScreen = () => {
     }
   });
 
-  if (!target || !plan || !environment || !derivedState) return null;
+  if (!target || !userInstruction || !environment) return null;
 
   const { steps, currentToolCallText, completedCount, totalCount, runStatusLabel } = derivedState;
   const filledWidth =
@@ -255,8 +268,8 @@ export const TestingScreen = () => {
       <Box flexDirection="column" width="100%" paddingY={1}>
         <Box paddingX={1}>
           <ScreenHeading
-            title="Executing browser plan"
-            subtitle={`${plan.title} │ ${target.displayName}`}
+            title="Executing browser test"
+            subtitle={`${userInstruction} │ ${target.displayName}`}
           />
         </Box>
 
