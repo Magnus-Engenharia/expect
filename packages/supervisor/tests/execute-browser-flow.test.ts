@@ -8,7 +8,7 @@ import type {
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { buildExecutionModelSettings, executeBrowserFlow } from "../src/execute-browser-flow";
-import type { BrowserFlowPlan, TestTarget } from "../src/types";
+import type { TestTarget } from "../src/types";
 
 const createStreamModel = (
   parts: LanguageModelV3StreamPart[],
@@ -111,30 +111,6 @@ const testTarget: TestTarget = {
   changedFiles: [{ status: "M", path: "src/onboarding.tsx" }],
   recentCommits: [],
   diffPreview: "src/onboarding.tsx | 9 ++++++++-",
-};
-
-const testPlan: BrowserFlowPlan = {
-  title: "Onboarding import regression plan",
-  rationale: "Verify onboarding import still works after the changes.",
-  targetSummary: "Cover onboarding and import entry points.",
-  userInstruction: "Go through onboarding and click Import Projects.",
-  assumptions: [],
-  riskAreas: ["Onboarding", "Project import"],
-  targetUrls: ["/onboarding"],
-  cookieSync: {
-    required: false,
-    reason: "This test can run without an existing signed-in session.",
-  },
-  steps: [
-    {
-      id: "step-01",
-      title: "Open onboarding",
-      instruction: "Navigate to onboarding.",
-      expectedOutcome: "The onboarding page loads.",
-      routeHint: "/onboarding",
-      changedFileEvidence: ["src/onboarding.tsx"],
-    },
-  ],
 };
 
 describe("executeBrowserFlow", () => {

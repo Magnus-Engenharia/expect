@@ -45,9 +45,11 @@ const getStepResults = (
     const existingStepResult = stepResultById.get(stepId);
     if (existingStepResult) {
       if (existingStepResult.title !== title) {
-        stepResultById.set(stepId, { ...existingStepResult, title });
+        const updatedStepResult = { ...existingStepResult, title };
+        stepResultById.set(stepId, updatedStepResult);
+        return updatedStepResult;
       }
-      return stepResultById.get(stepId)!;
+      return existingStepResult;
     }
 
     const stepResult = {

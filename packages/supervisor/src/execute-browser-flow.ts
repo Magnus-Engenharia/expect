@@ -38,7 +38,7 @@ export const buildExecutionModelSettings = (
   options: Pick<
     ExecuteBrowserFlowOptions,
     "provider" | "providerSettings" | "target" | "browserMcpServerName" | "liveViewUrl"
-  >,
+  > & { replayOutputPath?: string },
 ): AgentProviderSettings => {
   const provider = options.provider ?? DEFAULT_AGENT_PROVIDER;
   const browserMcpServerName = options.browserMcpServerName ?? DEFAULT_BROWSER_MCP_SERVER_NAME;
@@ -648,7 +648,6 @@ const buildExecutionStream = Effect.fn("executeBrowserFlow")(function* (
   const prompt = buildExecutionPrompt({
     ...options,
     browserMcpServerName,
-    replayOutputPath,
     learnings,
   });
   const abortController = new AbortController();
