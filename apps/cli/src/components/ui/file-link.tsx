@@ -11,9 +11,7 @@ interface FileLinkProps {
 const isFileUrl = (value: string): boolean => value.startsWith("file://");
 
 export const FileLink = ({ path: filePath, label }: FileLinkProps) => {
-  const absolutePath = isFileUrl(filePath)
-    ? url.fileURLToPath(filePath)
-    : path.resolve(filePath);
+  const absolutePath = isFileUrl(filePath) ? url.fileURLToPath(filePath) : path.resolve(filePath);
   const fileUrl = isFileUrl(filePath) ? filePath : url.pathToFileURL(absolutePath).href;
 
   return (
