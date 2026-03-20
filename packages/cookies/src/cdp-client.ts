@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import {
   Effect,
@@ -56,6 +57,25 @@ export class CdpClient extends ServiceMap.Service<CdpClient>()("@cookies/CdpClie
     const fs = yield* FileSystem.FileSystem;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const httpClient = yield* HttpClient;
+
+    const tempBasePath = os.tmpdir();
+    const tempEntries = yield* fs
+      .readDirectory(tempBasePath)
+      .pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as readonly string[])));
+    const staleCdpDirectories = tempEntries.filter((entry) => entry.startsWith("cookies-cdp-"));
+    if (staleCdpDirectories.length > 0) {
+      yield* Effect.logInfo("Cleaning up stale CDP temp directories", {
+        count: staleCdpDirectories.length,
+      });
+      yield* Effect.forEach(
+        staleCdpDirectories,
+        (entry) =>
+          fs
+            .remove(path.join(tempBasePath, entry), { recursive: true })
+            .pipe(Effect.catchTag("PlatformError", () => Effect.void)),
+        { concurrency: "unbounded" },
+      );
+    }
 
     const getAllCookies = Effect.fn("CdpClient.getAllCookies")(function* () {
       const socket = yield* Socket;
