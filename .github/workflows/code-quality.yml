@@ -17,8 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Build
-            command: pnpm build
           - name: Lint
             command: pnpm lint
           - name: Format
@@ -36,8 +34,12 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           GITHUB_ACTIONS: "1"
+      # need to build before running typecheck to ensure all files are built
+      - name: Build 
+        run: pnpm build
       - name: ${{ matrix.name }}
         run: ${{ matrix.command }}
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
