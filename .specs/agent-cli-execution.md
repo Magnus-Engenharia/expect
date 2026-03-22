@@ -2,6 +2,8 @@
 
 How Cursor background agents (and other AI coding agents) discover and run testie end-to-end.
 
+**Status: Implemented** — See the implementation section at the bottom for what was built.
+
 ---
 
 ## Problem
@@ -374,3 +376,44 @@ When you have made UI changes and want to verify they work in a real browser:
 6. **API key management**: Cursor background agents get secrets via environment variables. Should AGENTS.md document which secrets to configure in the Cursor Dashboard?
 
 7. **Concurrency**: If an agent runs testie multiple times (e.g., test unstaged, fix, test again), should there be a lock to prevent concurrent browser sessions?
+
+---
+
+## What Was Implemented
+
+All phases were implemented in a single pass:
+
+### CLI Changes (`apps/cli/`)
+
+1. **`--json` flag** — Added to all headless commands. When set, structured JSON report is written to stdout after test execution. Human-readable output still goes to stderr.
+
+2. **`--base-url` flag** — Added as a global option. Passed through to `TestPlanDraft.baseUrl` so the planner and executor know where the app is running.
+
+3. **`testie setup` command** (`apps/cli/src/utils/run-setup.ts`) — Checks:
+   - Playwright Chromium installed (via `--dry-run`)
+   - API key present (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`)
+   - Inside a git repository
+   - Dev server detected (probes ports 3000, 3001, 4173, 5173, 8080, 8000 or reads `BROWSER_TESTER_BASE_URL`)
+   - `--install` flag auto-installs Chromium if missing
+   - Outputs JSON in headless mode, human-friendly report in interactive mode
+
+4. **`testie agent` command** — Single entry point for AI agents:
+   - Runs setup checks first
+   - If setup fails, outputs JSON error and exits 1
+   - If setup passes, auto-detects base URL from setup, then runs headless with `--json` forced on
+   - `--install` flag for fully unattended runs
+   - `--scope` flag to select `unstaged`, `branch`, or `changes`
+
+### Documentation
+
+5. **AGENTS.md / CLAUDE.md** — Added `## Browser Testing with Testie` section covering prerequisites, setup, invocation, scoped testing, output format, and agent tips.
+
+6. **`.cursor/rules/testie.mdc`** — Cursor agent auto-discovery rule. Triggers on UI-related file globs. Provides quick-start instructions for browser testing.
+
+7. **`packages/testie-skill/SKILL.md`** — Updated to v1.1.0 with `testie setup`, `testie agent`, `--json`, `--base-url` docs, JSON output format examples, and setup check output format.
+
+### Bug fixes in `runHeadless`
+
+- `isHeadless` was hardcoded to `false` in the draft — fixed to `true`
+- `baseUrl` was hardcoded to `Option.none()` — now reads from CLI flag
+- Added `process.exitCode = 1` on failure instead of relying on caller
