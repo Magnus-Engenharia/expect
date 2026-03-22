@@ -8,6 +8,7 @@ import { ThemeProvider } from "./components/theme-context.js";
 import { loadThemeName } from "./utils/load-theme.js";
 import { ChangesFor, Git, TestPlanDraft, DraftId } from "@browser-tester/supervisor";
 import { runHeadless } from "./utils/run-test.js";
+import { runSetup, printSetupReport } from "./utils/run-setup.js";
 import type { AgentBackend } from "@browser-tester/agent";
 import { useNavigationStore, Screen } from "./stores/use-navigation.js";
 import { usePreferencesStore } from "./stores/use-preferences.js";
@@ -25,6 +26,8 @@ interface CommanderOpts {
   flow?: string;
   yes?: boolean;
   agent?: AgentBackend;
+  json?: boolean;
+  baseUrl?: string;
 }
 
 const program = new Command()
@@ -35,6 +38,8 @@ const program = new Command()
   .option("-f, --flow <slug>", "reuse a saved flow by its slug")
   .option("-y, --yes", "skip plan review and run immediately")
   .option("-a, --agent <provider>", "agent provider to use (claude or codex)")
+  .option("--json", "output structured JSON to stdout (headless mode)")
+  .option("--base-url <url>", "browser base URL (e.g. http://localhost:3000)")
   .addHelpText(
     "after",
     `
@@ -137,6 +142,8 @@ const runHeadlessForAction = async (
     changesFor,
     instruction: opts.message ?? DEFAULT_INSTRUCTION,
     agent: opts.agent,
+    json: opts.json,
+    baseUrl: opts.baseUrl,
   });
 };
 
@@ -166,6 +173,47 @@ program
     const opts = program.opts<CommanderOpts>();
     if (isHeadless()) return runHeadlessForAction("branch", opts);
     await runInteractiveForAction("branch", opts);
+  });
+
+program
+  .command("setup")
+  .description("check and install prerequisites for browser testing")
+  .option("--install", "auto-install missing prerequisites (e.g. Chromium)")
+  .action(async (setupOpts: { install?: boolean }) => {
+    const result = await runSetup(setupOpts.install ?? false);
+    if (isHeadless()) {
+      console.log(JSON.stringify(result, undefined, 2));
+    } else {
+      printSetupReport(result);
+    }
+    process.exitCode = result.ready ? 0 : 1;
+  });
+
+program
+  .command("agent")
+  .description("single-command entry point for AI agents: setup + test + JSON output")
+  .option("--install", "auto-install missing prerequisites before testing")
+  .option("--scope <scope>", "test scope: unstaged, branch, or changes", "changes")
+  .action(async (agentOpts: { install?: boolean; scope?: string }) => {
+    const opts = program.opts<CommanderOpts>();
+    const scope = (agentOpts.scope ?? "changes") as "unstaged" | "branch" | "changes";
+
+    const setupResult = await runSetup(agentOpts.install ?? false);
+    if (!setupResult.ready) {
+      console.log(JSON.stringify({ status: "setup-failed", checks: setupResult.checks }, undefined, 2));
+      process.exitCode = 1;
+      return;
+    }
+
+    const effectiveBaseUrl = opts.baseUrl ?? setupResult.suggestedBaseUrl;
+    const { changesFor } = await resolveChangesFor(scope);
+    return runHeadless({
+      changesFor,
+      instruction: opts.message ?? DEFAULT_INSTRUCTION,
+      agent: opts.agent,
+      json: true,
+      baseUrl: effectiveBaseUrl,
+    });
   });
 
 program.action(async () => {

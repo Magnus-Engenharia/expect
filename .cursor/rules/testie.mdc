@@ -1,0 +1,95 @@
+---
+description: Run AI-powered browser tests with testie to verify UI and frontend changes work in a real browser
+globs: ["**/*.tsx", "**/*.jsx", "**/*.css", "**/*.html", "**/*.vue", "**/*.svelte"]
+alwaysApply: false
+---
+
+# Browser Testing with Testie
+
+Testie is an AI-powered browser testing CLI. It scans your code changes, generates a test plan, and executes it against a live browser.
+
+## When to use
+
+Use testie after making UI, frontend, or full-stack changes to verify they work in a real browser. Especially useful for:
+
+- Form interactions (submit, validation, error states)
+- Navigation flows (routing, redirects, deep links)
+- Visual changes (layout, styling, responsive behavior)
+- Component behavior (modals, dropdowns, tooltips)
+
+## Prerequisites
+
+Run once per environment:
+
+```bash
+npx playwright install chromium
+```
+
+Or use the built-in setup:
+
+```bash
+testie setup --install
+```
+
+Ensure your AI provider API key is set (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`).
+
+## Quick start
+
+1. Start your dev server (e.g. `pnpm dev`)
+2. Run testie:
+
+```bash
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie -m "Test the signup flow" -y --json
+```
+
+## Agent single-command
+
+`testie agent` combines setup checks, dev server auto-detection, test execution, and JSON output:
+
+```bash
+testie agent -m "Verify the new button works" --install
+```
+
+If `BROWSER_TESTER_BASE_URL` is not set, it probes common ports (3000, 5173, 8080, etc.) to find a running dev server.
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `-m, --message <text>` | What to test (natural language) |
+| `-y, --yes` | Skip plan review (always use for agents) |
+| `--json` | Output structured JSON to stdout |
+| `--base-url <url>` | Dev server URL |
+| `--scope <scope>` | `unstaged`, `branch`, or `changes` (for `testie agent`) |
+| `--install` | Auto-install missing browser (for `setup` and `agent`) |
+
+## Output
+
+With `--json` or `testie agent`, structured JSON is written to stdout:
+
+```json
+{
+  "status": "passed",
+  "title": "Test signup flow",
+  "steps": [
+    { "id": "step-1", "title": "Navigate to signup", "status": "passed", "summary": "Page loaded" }
+  ],
+  "summary": "All steps passed",
+  "durationMs": 12340
+}
+```
+
+Exit code `0` = all steps passed. Exit code `1` = failure.
+
+## Examples
+
+```bash
+# Test unstaged changes
+testie unstaged -m "Check the form validation" -y --json
+
+# Test full branch diff
+testie branch -m "Verify all PR changes" -y --json
+
+# Agent mode with auto-setup
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie agent -m "Test the login flow" --install
+```

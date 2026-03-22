@@ -19,10 +19,13 @@ interface HeadlessRunOptions {
   changesFor: ChangesFor;
   instruction: string;
   agent?: AgentBackend;
+  json?: boolean;
+  baseUrl?: string;
 }
 
 export const runHeadless = async (options: HeadlessRunOptions): Promise<void> => {
   const cwd = process.cwd();
+  const startTime = Date.now();
 
   console.error(`testie v${VERSION}`);
   console.error(`Testing ${changesForDisplayName(options.changesFor)}\n`);
@@ -44,8 +47,8 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
           diffPreview,
           fileStats: [...fileStats],
           instruction: options.instruction,
-          baseUrl: Option.none(),
-          isHeadless: false,
+          baseUrl: options.baseUrl ? Option.some(options.baseUrl) : Option.none(),
+          isHeadless: true,
           requiresCookies: false,
         });
       }).pipe(Effect.provide(Git.withRepoRoot(cwd))),
@@ -94,8 +97,34 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
         const report = yield* Reporter.use((reporter) => reporter.report(finalExecuted)).pipe(
           Effect.provide(Reporter.layer),
         );
+
+        if (options.json) {
+          const jsonReport = {
+            status: report.status,
+            title: testPlan.title,
+            steps: report.steps.map((step) => {
+              const statuses = report.stepStatuses;
+              const entry = statuses.get(step.id);
+              return {
+                id: step.id,
+                title: step.title,
+                status: entry?.status ?? "not-run",
+                summary: entry?.summary ?? "",
+              };
+            }),
+            summary: report.summary,
+            screenshotPaths: [...report.screenshotPaths],
+            durationMs: Date.now() - startTime,
+          };
+          console.log(JSON.stringify(jsonReport, undefined, 2));
+        }
+
         console.error(`\nResult: ${report.status.toUpperCase()}`);
         console.error(report.summary);
+
+        if (report.status === "failed") {
+          process.exitCode = 1;
+        }
       }).pipe(
         Effect.provide(Executor.layer),
         Effect.provide(Agent.layerFor(options.agent ?? "claude")),
@@ -103,6 +132,7 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
           Effect.sync(() => {
             if (!cause.reasons.every(Cause.isInterruptReason)) {
               console.error(`Error: ${Cause.pretty(cause)}`);
+              process.exitCode = 1;
             }
           }),
         ),

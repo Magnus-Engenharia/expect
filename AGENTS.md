@@ -499,6 +499,85 @@ All tooling is run through pnpm scripts defined in the root `package.json`.
 - `pnpm check` — run format, lint, and type checks
 - `pnpm test` — run tests
 
+## Browser Testing with Testie
+
+Use testie to run AI-powered browser tests against your code changes. Testie plans a test based on your diff, executes it in a real browser, and reports results.
+
+### Prerequisites
+
+```bash
+npx playwright install chromium
+```
+
+Ensure `ANTHROPIC_API_KEY` is set (for Claude) or `OPENAI_API_KEY` (for Codex).
+
+### Check readiness
+
+```bash
+testie setup
+```
+
+Outputs which prerequisites are met and which are missing. In headless/CI environments, outputs JSON to stdout.
+
+Auto-install missing prerequisites:
+
+```bash
+testie setup --install
+```
+
+### Run browser tests
+
+Always set `BROWSER_TESTER_BASE_URL` to your dev server URL. Always pass `-y` to skip interactive plan review. Use `--json` for machine-readable output.
+
+```bash
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie -m "Test the signup flow" -y --json
+```
+
+### Single-command agent entry point
+
+`testie agent` combines setup checks + test execution + JSON output in one call:
+
+```bash
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie agent -m "Test all changes" --install
+```
+
+It auto-detects a running dev server if `BROWSER_TESTER_BASE_URL` is not set. If setup checks fail, it outputs a JSON error and exits with code 1 without running tests.
+
+### Scoped testing
+
+```bash
+testie unstaged -m "Verify the new button works" -y --json
+testie branch -m "Test all changes from this PR" -y --json
+testie agent --scope branch -m "Test all changes"
+```
+
+### Interpreting results
+
+- Exit code `0`: all steps passed
+- Exit code `1`: one or more steps failed or an error occurred
+- With `--json`, structured JSON is written to stdout:
+
+```json
+{
+  "status": "passed",
+  "title": "Test signup flow",
+  "steps": [
+    { "id": "step-1", "title": "Navigate to signup", "status": "passed", "summary": "Page loaded" }
+  ],
+  "summary": "All steps passed",
+  "screenshotPaths": [],
+  "durationMs": 12340
+}
+```
+
+### Tips for agents
+
+- Always start the dev server before running testie.
+- Always pass `-y` to skip interactive plan review.
+- Use `--json` (or `testie agent`) for machine-readable output.
+- Use `-m` with a clear, specific instruction about what to test.
+- Set `BROWSER_TESTER_BASE_URL` or let `testie agent` auto-detect the dev server port.
+
 ## Review Checklist for Agents
 
 - [ ] Run `pnpm install` after pulling remote changes and before getting started.

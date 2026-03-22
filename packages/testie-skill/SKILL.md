@@ -4,7 +4,7 @@ description: Use the testie CLI to run AI-powered browser tests against code cha
 license: MIT
 metadata:
   author: millionco
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Testie CLI (Headless Mode)
@@ -75,6 +75,39 @@ Tests the changes introduced by a specific commit. The hash can be a full SHA or
 testie commit abc1234
 ```
 
+### Check prerequisites
+
+```bash
+testie setup
+```
+
+Checks that all prerequisites are met: Chromium browser, API key, git repo, and dev server. Outputs JSON in headless mode.
+
+Auto-install missing prerequisites:
+
+```bash
+testie setup --install
+```
+
+### Agent entry point (recommended for AI agents)
+
+```bash
+testie agent -m "Test the signup flow"
+```
+
+Single command that combines setup checks + test execution + JSON output. This is the recommended way to run testie from an AI agent.
+
+```bash
+testie agent -m "Verify all changes" --install --scope branch
+```
+
+Flags specific to `testie agent`:
+
+| Flag | Description |
+| --- | --- |
+| `--install` | Auto-install missing prerequisites before testing |
+| `--scope <scope>` | Test scope: `unstaged`, `branch`, or `changes` (default: `changes`) |
+
 ## Options
 
 | Flag                          | Description                                        |
@@ -82,6 +115,7 @@ testie commit abc1234
 | `-m, --message <instruction>` | Natural language instruction for the browser agent |
 | `-f, --flow <slug>`           | Reuse a previously saved flow by its slug          |
 | `-y, --yes`                   | Skip plan review and auto-run after planning       |
+| `--json`                      | Output structured JSON to stdout                   |
 | `--base-url <url>`            | Override the browser base URL                      |
 | `--headed`                    | Run browser in headed (visible) mode               |
 | `--cookies`                   | Enable cookie sync from your browser               |
@@ -95,6 +129,8 @@ testie commit abc1234
 | `BROWSER_TESTER_BASE_URL` | Default base URL for the browser (e.g., `http://localhost:3000`) |
 | `BROWSER_TESTER_HEADED`   | `true`/`1` to run headed by default                              |
 | `BROWSER_TESTER_COOKIES`  | `true`/`1` to enable cookie sync by default                      |
+| `ANTHROPIC_API_KEY`       | API key for Claude (used for planning and execution)             |
+| `OPENAI_API_KEY`          | API key for Codex (alternative to Claude)                        |
 
 CLI flags override environment variables when both are set.
 
@@ -134,15 +170,25 @@ testie branch -m "Verify the new settings page renders correctly" -y
 testie commit abc1234 --headed -m "Check the modal animation" -y
 ```
 
-### Agent-oriented one-liner
+### Agent one-liner with JSON output
 
 ```bash
-BROWSER_TESTER_BASE_URL=http://localhost:3000 testie -m "Test the signup flow end-to-end" -y
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie -m "Test the signup flow end-to-end" -y --json
 ```
+
+### Agent single-command (recommended)
+
+```bash
+BROWSER_TESTER_BASE_URL=http://localhost:3000 testie agent -m "Test the signup flow" --install
+```
+
+This checks prerequisites, auto-installs Chromium if missing, runs the test, and outputs JSON.
 
 ## Output Format
 
-In headless mode, testie streams structured output to stdout:
+### Human-readable (default)
+
+In headless mode without `--json`, testie streams structured output to stderr:
 
 ```
 Starting <plan title>
@@ -160,22 +206,60 @@ Failed assertions appear as:
 Run failed: <summary>
 ```
 
-Browser interaction logs appear indented:
+### JSON output (`--json` or `testie agent`)
 
+With `--json`, structured JSON is written to stdout:
+
+```json
+{
+  "status": "passed",
+  "title": "Test signup flow",
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Navigate to signup page",
+      "status": "passed",
+      "summary": "Page loaded successfully"
+    },
+    {
+      "id": "step-2",
+      "title": "Fill in form and submit",
+      "status": "failed",
+      "summary": "Submit button not found"
+    }
+  ],
+  "summary": "1 of 2 steps passed",
+  "screenshotPaths": [],
+  "durationMs": 12340
+}
 ```
-    browser:click Clicked "Submit" button
-    browser:fill Typed "user@example.com" into email field
+
+### Setup check output (`testie setup`)
+
+```json
+{
+  "ready": true,
+  "checks": [
+    { "name": "browser", "ok": true, "detail": "Chromium is installed" },
+    { "name": "apiKey", "ok": true, "detail": "Found: ANTHROPIC_API_KEY" },
+    { "name": "git", "ok": true, "detail": "Inside a git repository" },
+    { "name": "devServer", "ok": true, "detail": "Dev server detected on port 3000" }
+  ],
+  "suggestedBaseUrl": "http://localhost:3000"
+}
 ```
 
 ## Exit Codes
 
-- `0` — all tests passed
-- `1` — test failure or error
+- `0` — all tests passed (or setup checks passed)
+- `1` — test failure, setup failure, or error
 
 ## Tips
 
 - Always pass `-y` when running from an agent to skip the interactive plan review step.
 - Always set `BROWSER_TESTER_BASE_URL` or `--base-url` so testie knows where your app is running.
 - Use `-m` to give testie a clear, specific instruction about what to test.
+- Use `--json` or `testie agent` for machine-readable output that agents can parse.
+- Use `testie setup` to check readiness before running tests.
 - Combine subcommands with options: `testie branch -m "..." -y --base-url http://localhost:3000`.
 - If a flow is reusable across runs, save it in the TUI and invoke it with `-f <slug>` for consistency.
