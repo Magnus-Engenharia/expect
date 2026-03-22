@@ -17,6 +17,7 @@ import {
   ERROR_CODE_INVALID_PARAMS,
   ERROR_CODE_METHOD_NOT_FOUND,
   PROTOCOL_VERSION,
+  TOOL_CALL_ID_SHORT_LENGTH,
 } from "./constants.js";
 import {
   type ContentBlock,
@@ -211,7 +212,7 @@ export class AcpServer extends ServiceMap.Service<
                   }
 
                   if (lastEvent._tag === "ToolCall") {
-                    const toolCallId = `tc_${crypto.randomUUID().slice(0, 8)}`;
+                    const toolCallId = `tc_${crypto.randomUUID().slice(0, TOOL_CALL_ID_SHORT_LENGTH)}`;
                     yield* Ref.set(lastToolCallId, toolCallId);
                     yield* sendUpdate(request.sessionId, {
                       sessionUpdate: "tool_call",
@@ -224,7 +225,8 @@ export class AcpServer extends ServiceMap.Service<
 
                   if (lastEvent._tag === "ToolResult") {
                     const trackedId = yield* Ref.get(lastToolCallId);
-                    const toolCallId = trackedId ?? `tc_${crypto.randomUUID().slice(0, 8)}`;
+                    const toolCallId =
+                      trackedId ?? `tc_${crypto.randomUUID().slice(0, TOOL_CALL_ID_SHORT_LENGTH)}`;
                     yield* Ref.set(lastToolCallId, undefined);
                     yield* sendUpdate(request.sessionId, {
                       sessionUpdate: "tool_call_update",

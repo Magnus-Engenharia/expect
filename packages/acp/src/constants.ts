@@ -13,3 +13,5 @@ export const ERROR_CODE_INVALID_PARAMS = -32602;
 export const ERROR_CODE_INTERNAL = -32603;
 export const ERROR_CODE_AUTH_REQUIRED = -32000;
 export const ERROR_CODE_NOT_FOUND = -32001;
+
+export const TOOL_CALL_ID_SHORT_LENGTH = 8;

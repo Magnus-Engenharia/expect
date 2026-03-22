@@ -1,6 +1,6 @@
-import { Effect, FileSystem, Layer, Stream } from "effect";
+import { Effect, FileSystem, Layer, Schema, Stream } from "effect";
 import { Agent, AgentStreamError } from "@browser-tester/shared/agent";
-import type { ExecutionEvent } from "@browser-tester/shared/models";
+import { ExecutionEvent } from "@browser-tester/shared/models";
 import { ClaudeProvider } from "./providers/claude.js";
 import { CodexProvider } from "./providers/codex.js";
 import { AcpProvider } from "./providers/acp.js";
@@ -84,7 +84,9 @@ export const layerTest = (fixturePath: string) =>
           fileSystem.stream(fixturePath).pipe(
             Stream.decodeText(),
             Stream.splitLines,
-            Stream.map((line) => JSON.parse(line) as ExecutionEvent),
+            Stream.mapEffect((line) =>
+              Schema.decodeEffect(Schema.fromJsonString(ExecutionEvent))(line),
+            ),
             Stream.orDie,
           ),
       });

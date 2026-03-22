@@ -178,19 +178,21 @@ export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (config: A
     }
 
     if (parseResult.method === "session/update" && parseResult.params) {
-      const decoded = Schema.decodeUnknownSync(SessionUpdatePayload)(parseResult.params);
-      const event: SessionUpdateEvent = {
-        sessionId: decoded.sessionId,
-        sessionUpdate: decoded.update.sessionUpdate,
-        text: decoded.update.content?.text,
-        toolCallId: decoded.update.toolCallId,
-        title: decoded.update.title,
-        kind: decoded.update.kind,
-        status: decoded.update.status,
-        rawInput: decoded.update.rawInput,
-        rawOutput: decoded.update.rawOutput,
-      };
-      Effect.runFork(Queue.offer(updateQueue, event));
+      const decoded = Schema.decodeUnknownOption(SessionUpdatePayload)(parseResult.params);
+      if (Option.isSome(decoded)) {
+        const event: SessionUpdateEvent = {
+          sessionId: decoded.value.sessionId,
+          sessionUpdate: decoded.value.update.sessionUpdate,
+          text: decoded.value.update.content?.text,
+          toolCallId: decoded.value.update.toolCallId,
+          title: decoded.value.update.title,
+          kind: decoded.value.update.kind,
+          status: decoded.value.update.status,
+          rawInput: decoded.value.update.rawInput,
+          rawOutput: decoded.value.update.rawOutput,
+        };
+        Effect.runFork(Queue.offer(updateQueue, event));
+      }
     }
   };
 
