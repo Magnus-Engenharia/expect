@@ -134,10 +134,10 @@ export class StdioTransport extends ServiceMap.Service<StdioTransport>()("@acp/S
           resume(Effect.fail(new TransportClosedError({})));
         };
 
+        process.stdin.setEncoding("utf-8");
         process.stdin.on("data", onData);
         process.stdin.on("end", onEnd);
         process.stdin.resume();
-        process.stdin.setEncoding("utf-8");
       });
     });
 

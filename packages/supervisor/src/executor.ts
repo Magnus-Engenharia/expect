@@ -30,13 +30,10 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
       });
 
       return agent.stream(streamOptions).pipe(
-        Stream.mapAccum(
-          () => initial,
-          (executed, part) => {
-            const next = executed.addEvent(part);
-            return [next, [next]] as const;
-          },
-        ),
+        Stream.mapAccum(initial, (executed, part) => {
+          const next = executed.addEvent(part);
+          return [next, [next]] as const;
+        }),
         Stream.mapError((reason) => new ExecutionError({ reason })),
       );
     }, Stream.unwrap);

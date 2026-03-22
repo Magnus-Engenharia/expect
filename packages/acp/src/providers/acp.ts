@@ -107,7 +107,11 @@ export class AcpProvider extends ServiceMap.Service<
                     })
                     .pipe(
                       Effect.tap(() => Effect.sync(() => connection.process.stdin?.end())),
-                      Effect.catchTag("AcpClientError", () => Effect.void),
+                      Effect.catchTag("AcpClientError", (clientError) =>
+                        Effect.logWarning("ACP prompt request failed", {
+                          error: clientError.message,
+                        }),
+                      ),
                     ),
                 );
 

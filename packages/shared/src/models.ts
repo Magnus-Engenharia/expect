@@ -21,6 +21,7 @@ export const AgentProvider = Schema.Literals([
   "cursor-acp",
   "opencode",
   "kiro-cli",
+  "copilot",
 ] as const);
 export type AgentProvider = typeof AgentProvider.Type;
 
@@ -34,6 +35,7 @@ export const AGENT_PROVIDER_DISPLAY_NAMES: Record<AgentProvider, string> = {
   "cursor-acp": "Cursor (ACP)",
   opencode: "OpenCode",
   "kiro-cli": "Kiro CLI",
+  copilot: "GitHub Copilot",
 };
 const TOOL_CALL_DISPLAY_TEXT_CHAR_LIMIT = 80;
 const PLANNER_CHANGED_FILE_LIMIT = 12;

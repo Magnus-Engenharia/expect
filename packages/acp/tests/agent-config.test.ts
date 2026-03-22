@@ -36,6 +36,14 @@ describe("ACP Agent Config", () => {
       expect(config.command).toBe("kiro");
     });
 
+    it("contains copilot", () => {
+      const config = KNOWN_ACP_AGENTS["copilot"];
+      expect(config).toBeDefined();
+      expect(config.command).toBe("gh");
+      expect(config.args).toEqual(["copilot", "--acp"]);
+      expect(config.displayName).toBe("GitHub Copilot");
+    });
+
     it("all configs have required fields", () => {
       for (const [_key, config] of Object.entries(KNOWN_ACP_AGENTS)) {
         expect(config.command.length).toBeGreaterThan(0);

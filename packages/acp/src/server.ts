@@ -1,5 +1,5 @@
 import * as crypto from "node:crypto";
-import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
+import { Effect, Fiber, Layer, Option, Ref, Schema, ServiceMap, Stream } from "effect";
 import { Executor, Git, Planner, Reporter } from "@browser-tester/supervisor";
 import { type AgentBackend, layerFor as agentLayerFor } from "./agent.js";
 import {
@@ -53,7 +53,7 @@ interface AcpSession {
   readonly sessionId: SessionId;
   readonly cwd: string;
   readonly currentMode: string;
-  readonly pendingCancel: Option.Option<AbortController>;
+  readonly runningFiber: Option.Option<Fiber.Fiber<unknown, unknown>>;
 }
 
 const stepStatusToAcpStatus = (status: StepStatus): PlanEntryStatus =>
@@ -128,11 +128,8 @@ export class AcpServer extends ServiceMap.Service<
             return;
           }
 
-          sessions.set(request.sessionId, {
-            ...session,
-            pendingCancel: Option.some(new AbortController()),
-          });
           const promptText = extractPromptText(request.prompt);
+          const lastToolCallId = yield* Ref.make<string | undefined>(undefined);
 
           const runTurn = Effect.gen(function* () {
             yield* sendUpdate(request.sessionId, {
@@ -215,22 +212,20 @@ export class AcpServer extends ServiceMap.Service<
 
                   if (lastEvent._tag === "ToolCall") {
                     const toolCallId = `tc_${crypto.randomUUID().slice(0, 8)}`;
+                    yield* Ref.set(lastToolCallId, toolCallId);
                     yield* sendUpdate(request.sessionId, {
                       sessionUpdate: "tool_call",
                       toolCallId,
                       title: lastEvent.displayText,
                       kind: "execute",
-                      status: "pending",
-                    });
-                    yield* sendUpdate(request.sessionId, {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId,
                       status: "in_progress",
                     });
                   }
 
                   if (lastEvent._tag === "ToolResult") {
-                    const toolCallId = `tc_${crypto.randomUUID().slice(0, 8)}`;
+                    const trackedId = yield* Ref.get(lastToolCallId);
+                    const toolCallId = trackedId ?? `tc_${crypto.randomUUID().slice(0, 8)}`;
+                    yield* Ref.set(lastToolCallId, undefined);
                     yield* sendUpdate(request.sessionId, {
                       sessionUpdate: "tool_call_update",
                       toolCallId,
@@ -280,7 +275,7 @@ export class AcpServer extends ServiceMap.Service<
             Effect.catchTag("FindRepoRootError", () => Effect.succeed("end_turn" as const)),
           );
 
-          const stopReason = yield* runTurn.pipe(
+          const turnWithErrorHandling = runTurn.pipe(
             Effect.catchTag("@supervisor/PlanningError", (planningError) =>
               Effect.gen(function* () {
                 yield* sendUpdate(request.sessionId, {
@@ -307,7 +302,12 @@ export class AcpServer extends ServiceMap.Service<
             ),
           );
 
-          sessions.set(request.sessionId, { ...session, pendingCancel: Option.none() });
+          const fiber = yield* Effect.forkChild(turnWithErrorHandling);
+          sessions.set(request.sessionId, { ...session, runningFiber: Option.some(fiber) });
+
+          const stopReason = yield* Fiber.join(fiber);
+
+          sessions.set(request.sessionId, { ...session, runningFiber: Option.none() });
           yield* transport.sendResponse(requestId, { stopReason });
         });
 
@@ -343,7 +343,7 @@ export class AcpServer extends ServiceMap.Service<
                 sessionId: SessionId.makeUnsafe(sessionId),
                 cwd,
                 currentMode: "test",
-                pendingCancel: Option.none(),
+                runningFiber: Option.none(),
               });
               yield* transport.sendResponse(id, {
                 sessionId,
@@ -367,15 +367,17 @@ export class AcpServer extends ServiceMap.Service<
                   Effect.succeed({ sessionId: "", modeId: "test" }),
                 ),
               );
-              const session = sessions.get(parsed.sessionId);
-              if (session) {
-                sessions.set(parsed.sessionId, { ...session, currentMode: parsed.modeId });
+              const modeSession = sessions.get(parsed.sessionId);
+              if (modeSession) {
+                sessions.set(parsed.sessionId, { ...modeSession, currentMode: parsed.modeId });
+                yield* sendUpdate(parsed.sessionId, {
+                  sessionUpdate: "current_mode_update",
+                  modeId: parsed.modeId,
+                });
+                yield* transport.sendResponse(id, {});
+              } else {
+                yield* transport.sendError(id, ERROR_CODE_INVALID_PARAMS, "Session not found");
               }
-              yield* sendUpdate(parsed.sessionId, {
-                sessionUpdate: "current_mode_update",
-                modeId: parsed.modeId,
-              });
-              yield* transport.sendResponse(id, {});
             } else {
               yield* transport.sendError(
                 id,
@@ -389,8 +391,8 @@ export class AcpServer extends ServiceMap.Service<
                 Effect.catchTag("SchemaError", () => Effect.succeed({ sessionId: "" })),
               );
               const cancelSession = sessions.get(parsed.sessionId);
-              if (cancelSession && Option.isSome(cancelSession.pendingCancel)) {
-                cancelSession.pendingCancel.value.abort();
+              if (cancelSession && Option.isSome(cancelSession.runningFiber)) {
+                yield* Effect.forkChild(Fiber.interrupt(cancelSession.runningFiber.value));
               }
             }
           }

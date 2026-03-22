@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { Deferred, Effect, Queue, Ref, Schema, Stream } from "effect";
+import { Deferred, Effect, Option, Queue, Ref, Schema, Stream } from "effect";
 import { AcpClientError } from "./errors.js";
 
 const JSON_RPC_VERSION = "2.0" as const;
@@ -90,16 +90,20 @@ export const KNOWN_ACP_AGENTS: Record<string, AcpAgentConfig> = {
     args: ["--acp"],
     displayName: "Kiro CLI",
   }),
+  copilot: new AcpAgentConfig({
+    command: "gh",
+    args: ["copilot", "--acp"],
+    displayName: "GitHub Copilot",
+  }),
 };
 
 const parseIncomingLine = (line: string): typeof IncomingJsonRpc.Type | undefined => {
   const trimmed = line.trim();
   if (trimmed.length === 0) return undefined;
-  try {
-    return Schema.decodeUnknownSync(Schema.fromJsonString(IncomingJsonRpc))(trimmed);
-  } catch {
-    return undefined;
-  }
+  return Option.getOrElse(
+    Schema.decodeUnknownOption(Schema.fromJsonString(IncomingJsonRpc))(trimmed),
+    () => undefined,
+  );
 };
 
 export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (config: AcpAgentConfig) {
@@ -149,10 +153,14 @@ export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (config: A
     }
 
     if (parseResult.method === "session/request_permission" && parseResult.id !== undefined) {
-      const permissionParams = parseResult.params as
-        | { options?: Array<{ optionId: string; kind: string }> }
-        | undefined;
-      const allowOption = permissionParams?.options?.find(
+      const PermissionParams = Schema.Struct({
+        options: Schema.optional(
+          Schema.Array(Schema.Struct({ optionId: Schema.String, kind: Schema.String })),
+        ),
+      });
+      const decoded = Schema.decodeUnknownOption(PermissionParams)(parseResult.params);
+      const options = Option.isSome(decoded) ? decoded.value.options : undefined;
+      const allowOption = options?.find(
         (option) => option.kind === "allow_once" || option.kind === "allow_always",
       );
       const responsePayload = {
