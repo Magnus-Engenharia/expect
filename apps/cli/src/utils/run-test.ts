@@ -10,7 +10,7 @@ import {
   Reporter,
   TestPlanDraft,
 } from "@browser-tester/supervisor";
-import { Agent, type AgentBackend } from "@browser-tester/agent";
+import { type AgentBackend, layerFor } from "@browser-tester/acp";
 import figures from "figures";
 import { VERSION } from "../constants.js";
 import { CliRuntime } from "../runtime.js";
@@ -54,7 +54,7 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
     const testPlan = await CliRuntime.runPromise(
       Planner.use((planner) => planner.plan(draft)).pipe(
         Effect.provide(Planner.layer),
-        Effect.provide(Agent.layerFor(options.agent ?? "claude")),
+        Effect.provide(layerFor(options.agent ?? "claude")),
       ),
     );
     console.error(`Plan: ${testPlan.title} (${testPlan.steps.length} steps)\n`);
@@ -98,7 +98,7 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
         console.error(report.summary);
       }).pipe(
         Effect.provide(Executor.layer),
-        Effect.provide(Agent.layerFor(options.agent ?? "claude")),
+        Effect.provide(layerFor(options.agent ?? "claude")),
         Effect.catchCause((cause) =>
           Effect.sync(() => {
             if (!cause.reasons.every(Cause.isInterruptReason)) {

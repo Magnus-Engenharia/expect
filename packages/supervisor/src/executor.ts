@@ -1,4 +1,4 @@
-import { Agent, AgentStreamOptions, ClaudeQueryError, CodexRunError } from "@browser-tester/agent";
+import { Agent, AgentStreamOptions, AgentStreamError } from "@browser-tester/shared/agent";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
 import { ExecutedTestPlan, RunStarted, type TestPlan } from "@browser-tester/shared/models";
 import { NodeServices } from "@effect/platform-node";
@@ -6,7 +6,7 @@ import { NodeServices } from "@effect/platform-node";
 export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervisor/ExecutionError")(
   {
     _tag: Schema.tag("@supervisor/ExecutionError"),
-    reason: Schema.Union([ClaudeQueryError, CodexRunError]),
+    reason: AgentStreamError,
   },
 ) {
   message = `Execution failed: ${this.reason.message}`;
@@ -14,8 +14,9 @@ export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervis
 
 export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Executor", {
   make: Effect.gen(function* () {
+    const agent = yield* Agent;
+
     const executePlan = Effect.fn("Executor.executePlan")(function* (plan: TestPlan) {
-      const agent = yield* Agent;
       const initial = new ExecutedTestPlan({
         ...plan,
         events: [new RunStarted({ plan })],

@@ -1,11 +1,11 @@
 import { Codex } from "@openai/codex-sdk";
 import type { UserInput } from "@openai/codex-sdk";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
-import { CodexRunError } from "./errors.js";
-import { CurrentModel } from "./current-model.js";
-import { CodexThreadEvent } from "./schemas/codex-stream.js";
-import { AgentStreamOptions } from "./types.js";
+import { CodexRunError } from "../errors.js";
+import { CurrentModel } from "../current-model.js";
+import { CodexThreadEvent } from "../provider-schemas/codex-stream.js";
+import { AgentStreamOptions } from "@browser-tester/shared/agent";
+import type { ExecutionEvent } from "@browser-tester/shared/models";
 
 const prepareCodexThread = (options: AgentStreamOptions, model: string) => {
   const codex = new Codex();
@@ -30,9 +30,7 @@ const buildInput = (options: AgentStreamOptions): UserInput[] =>
 export class CodexProvider extends ServiceMap.Service<
   CodexProvider,
   {
-    readonly stream: (
-      options: AgentStreamOptions,
-    ) => Stream.Stream<LanguageModelV3StreamPart, CodexRunError>;
+    readonly stream: (options: AgentStreamOptions) => Stream.Stream<ExecutionEvent, CodexRunError>;
   }
 >()("@browser-tester/CodexProvider") {
   static layer = Layer.effect(CodexProvider)(
@@ -60,7 +58,7 @@ export class CodexProvider extends ServiceMap.Service<
                 Effect.catchTag("SchemaError", Effect.die),
               ),
             ),
-            Stream.map((event) => event.streamParts),
+            Stream.map((event) => event.executionEvents),
             Stream.filter(Option.isSome),
             Stream.flatMap((option) => Stream.fromIterable(option.value)),
           );

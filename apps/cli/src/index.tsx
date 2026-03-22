@@ -8,7 +8,7 @@ import { ThemeProvider } from "./components/theme-context.js";
 import { loadThemeName } from "./utils/load-theme.js";
 import { ChangesFor, Git, TestPlanDraft, DraftId } from "@browser-tester/supervisor";
 import { runHeadless } from "./utils/run-test.js";
-import type { AgentBackend } from "@browser-tester/agent";
+import { runAcp } from "./utils/run-acp.js";
 import { useNavigationStore, Screen } from "./stores/use-navigation.js";
 import { usePreferencesStore } from "./stores/use-preferences.js";
 import { usePlanStore, Plan } from "./stores/use-plan-store.js";
@@ -24,7 +24,7 @@ interface CommanderOpts {
   message?: string;
   flow?: string;
   yes?: boolean;
-  agent?: AgentBackend;
+  agent?: string;
 }
 
 const program = new Command()
@@ -34,7 +34,10 @@ const program = new Command()
   .option("-m, --message <instruction>", "natural language instruction for what to test")
   .option("-f, --flow <slug>", "reuse a saved flow by its slug")
   .option("-y, --yes", "skip plan review and run immediately")
-  .option("-a, --agent <provider>", "agent provider to use (claude or codex)")
+  .option(
+    "-a, --agent <provider>",
+    "agent provider (claude, codex, gemini-cli, claude-code, codex-cli, opencode, kiro-cli)",
+  )
   .addHelpText(
     "after",
     `
@@ -166,6 +169,15 @@ program
     const opts = program.opts<CommanderOpts>();
     if (isHeadless()) return runHeadlessForAction("branch", opts);
     await runInteractiveForAction("branch", opts);
+  });
+
+program
+  .command("acp")
+  .description("run as an ACP agent over stdio (for IDE integration)")
+  .option("--codex", "use Codex backend instead of Claude")
+  .action(async (acpOpts: { codex?: boolean }) => {
+    const agent: AgentBackend = acpOpts.codex ? "codex" : "claude";
+    await runAcp(agent);
   });
 
 program.action(async () => {

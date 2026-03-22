@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Array, Effect, FileSystem, Option, String } from "effect";
-import { NodeServices } from "@effect/platform-node";
+import { Option } from "effect";
 import {
   ExecutedTestPlan,
   TestPlan,
@@ -8,15 +7,12 @@ import {
   StepId,
   PlanId,
   ChangesFor,
+  AgentText,
+  AgentThinking,
+  ToolCall,
+  ToolResult,
+  type ExecutionEvent,
 } from "@browser-tester/shared/models";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const FIXTURE_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../fixtures/execute-1.jsonl",
-);
 
 const makeTestPlan = (): TestPlan =>
   new TestPlan({
@@ -44,41 +40,32 @@ const makeTestPlan = (): TestPlan =>
     requiresCookies: false,
   } as any);
 
-const loadFixtureParts = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  return yield* fs
-    .readFileString(FIXTURE_PATH)
-    .pipe(
-      Effect.map(String.split("\n")),
-      Effect.map(Array.filter((line) => line.trim().length > 0)),
-      Effect.map(Array.map((line) => JSON.parse(line) as LanguageModelV3StreamPart)),
-    );
-}).pipe(Effect.provide(NodeServices.layer));
+const sampleEvents: ExecutionEvent[] = [
+  new AgentThinking({ text: "Let me analyze the code..." }),
+  new AgentText({
+    text: "I'll start by checking the CLI.\nSTEP_START|step-01|CLI Application Startup",
+  }),
+  new ToolCall({ toolName: "browser__open", input: { url: "http://localhost:3000" } }),
+  new ToolResult({ toolName: "browser__open", result: "Browser opened", isError: false }),
+  new ToolCall({ toolName: "browser__screenshot", input: { mode: "snapshot" } }),
+  new ToolResult({
+    toolName: "browser__screenshot",
+    result: "/tmp/screenshot.png",
+    isError: false,
+  }),
+  new AgentText({
+    text: "The CLI started successfully.\nSTEP_DONE|step-01|CLI started and rendered correctly",
+  }),
+  new AgentText({ text: "RUN_COMPLETED|passed|All steps passed" }),
+];
 
 describe("reducer", () => {
-  it.only("reduces LanguageModelV3StreamParts into ExecutedTestPlan", async () => {
-    const parts = await Effect.runPromise(loadFixtureParts);
-    console.log("creating initial ExecutedTestPlan...");
+  it("reduces ExecutionEvents into ExecutedTestPlan", () => {
     let executed = new ExecutedTestPlan({ ...makeTestPlan(), events: [] });
-    console.log("initial created OK, events:", executed.events.length);
 
-    for (let index = 0; index < parts.length; index++) {
-      const part = parts[index];
-      /* console.log(
-        `[${index}] type=${part.type} events_before=${executed.events.length}`
-        ); */
-      executed = executed.addEvent(part);
-      // console.log(`[${index}] events_after=${executed.events.length}`);
+    for (const event of sampleEvents) {
+      executed = executed.addEvent(event);
     }
-
-    console.log("Total events:", executed.events.length);
-    console.log(
-      "Event tags:",
-      executed.events.map((event) => event._tag),
-    );
-
-    console.log("FINISHED EXECUTED:");
-    console.log(executed);
 
     expect(executed.events.length).toBeGreaterThan(0);
 
@@ -91,19 +78,57 @@ describe("reducer", () => {
     expect(hasThinking).toBe(true);
   });
 
-  it("each addEvent returns a new instance for non-trivial parts", async () => {
-    const parts = await Effect.runPromise(loadFixtureParts);
+  it("parses markers from AgentText and applies step status", () => {
+    let executed = new ExecutedTestPlan({ ...makeTestPlan(), events: [] });
+
+    executed = executed.addEvent(
+      new AgentText({ text: "Starting step.\nSTEP_START|step-01|CLI Application Startup" }),
+    );
+    expect(executed.steps[0].status).toBe("active");
+
+    executed = executed.addEvent(new AgentText({ text: "Done.\nSTEP_DONE|step-01|CLI started" }));
+    expect(executed.steps[0].status).toBe("passed");
+  });
+
+  it("handles step failure markers", () => {
+    let executed = new ExecutedTestPlan({ ...makeTestPlan(), events: [] });
+
+    executed = executed.addEvent(
+      new AgentText({ text: "STEP_START|step-01|CLI Application Startup" }),
+    );
+    executed = executed.addEvent(
+      new AgentText({ text: "ASSERTION_FAILED|step-01|Page did not load" }),
+    );
+    expect(executed.steps[0].status).toBe("failed");
+  });
+
+  it("each addEvent returns a new instance", () => {
     const initial = new ExecutedTestPlan({ ...makeTestPlan(), events: [] });
 
     let previous = initial;
-    for (const part of parts.slice(0, 10)) {
-      const next = previous.addEvent(part);
-      if (next !== previous) {
-        expect(next).not.toBe(previous);
-      }
+    for (const event of sampleEvents.slice(0, 4)) {
+      const next = previous.addEvent(event);
+      expect(next).not.toBe(previous);
       previous = next;
     }
 
     expect(previous.events.length).toBeGreaterThan(0);
+  });
+
+  it("exposes activeStep and completedStepCount getters", () => {
+    let executed = new ExecutedTestPlan({ ...makeTestPlan(), events: [] });
+
+    expect(executed.activeStep).toBeUndefined();
+    expect(executed.completedStepCount).toBe(0);
+
+    executed = executed.addEvent(
+      new AgentText({ text: "STEP_START|step-01|CLI Application Startup" }),
+    );
+    expect(executed.activeStep?.id).toBe("step-01");
+    expect(executed.completedStepCount).toBe(0);
+
+    executed = executed.addEvent(new AgentText({ text: "STEP_DONE|step-01|Done" }));
+    expect(executed.activeStep).toBeUndefined();
+    expect(executed.completedStepCount).toBe(1);
   });
 });

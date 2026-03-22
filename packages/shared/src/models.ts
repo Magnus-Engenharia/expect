@@ -1,4 +1,3 @@
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { Match, Option, Predicate, Schema } from "effect";
 
 export interface ChangedFile {
@@ -12,13 +11,29 @@ export interface CommitSummary {
   subject: string;
 }
 
-export const AgentProvider = Schema.Literals(["claude", "codex", "cursor"] as const);
+export const AgentProvider = Schema.Literals([
+  "claude",
+  "codex",
+  "cursor",
+  "gemini-cli",
+  "claude-code",
+  "codex-cli",
+  "cursor-acp",
+  "opencode",
+  "kiro-cli",
+] as const);
 export type AgentProvider = typeof AgentProvider.Type;
 
 export const AGENT_PROVIDER_DISPLAY_NAMES: Record<AgentProvider, string> = {
   claude: "Claude",
   codex: "Codex",
   cursor: "Cursor",
+  "gemini-cli": "Gemini CLI",
+  "claude-code": "Claude Code",
+  "codex-cli": "Codex CLI",
+  "cursor-acp": "Cursor (ACP)",
+  opencode: "OpenCode",
+  "kiro-cli": "Kiro CLI",
 };
 const TOOL_CALL_DISPLAY_TEXT_CHAR_LIMIT = 80;
 const PLANNER_CHANGED_FILE_LIMIT = 12;
@@ -417,23 +432,6 @@ export class RunFinished extends Schema.TaggedClass<RunFinished>()("RunFinished"
   summary: Schema.String,
 }) {}
 
-const serializeToolResult = (value: unknown): string => {
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    value === null ||
-    value === undefined
-  ) {
-    return String(value);
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
 const parseMarker = (line: string): ExecutionEvent | undefined => {
   const pipeIndex = line.indexOf("|");
   if (pipeIndex === -1) return undefined;
@@ -580,55 +578,18 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
 )({
   events: Schema.Array(ExecutionEvent),
 }) {
-  addEvent(part: LanguageModelV3StreamPart): ExecutedTestPlan {
-    if (part.type === "reasoning-start") {
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new AgentThinking({ text: "" })],
-      });
-    }
+  addEvent(event: ExecutionEvent): ExecutedTestPlan {
+    const withEvent = new ExecutedTestPlan({
+      ...this,
+      events: [...this.events, event],
+    });
 
-    if (part.type === "reasoning-delta") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentThinking") return this;
-      return new ExecutedTestPlan({
-        ...this,
-        events: [
-          ...this.events.slice(0, -1),
-          new AgentThinking({ text: lastEvent.text + part.delta }),
-        ],
-      });
-    }
-
-    if (part.type === "text-start") {
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new AgentText({ text: "" })],
-      });
-    }
-
-    if (part.type === "text-delta") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentText") return this;
-      console.error(part.delta);
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events.slice(0, -1), new AgentText({ text: lastEvent.text + part.delta })],
-      });
-    }
-
-    /** @note(rasmus): handle markers when the text block ends */
-    if (part.type === "text-end") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentText") return this;
-      const foundMarkers = lastEvent.text
-        .split("\n")
-        .map(parseMarker)
-        .filter(Predicate.isNotUndefined);
-      if (foundMarkers.length === 0) return this;
-      let result: ExecutedTestPlan = new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, ...foundMarkers],
+    if (event._tag === "AgentText") {
+      const foundMarkers = event.text.split("\n").map(parseMarker).filter(Predicate.isNotUndefined);
+      if (foundMarkers.length === 0) return withEvent;
+      let result = new ExecutedTestPlan({
+        ...withEvent,
+        events: [...withEvent.events, ...foundMarkers],
       });
       for (const marker of foundMarkers) {
         result = result.applyMarker(marker);
@@ -636,30 +597,7 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
       return result;
     }
 
-    if (part.type === "tool-call") {
-      console.error(`tool call: ${part.toolName}`);
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new ToolCall({ toolName: part.toolName, input: part.input })],
-      });
-    }
-
-    if (part.type === "tool-result") {
-      console.error(`tool result: ${part.toolName}`);
-      return new ExecutedTestPlan({
-        ...this,
-        events: [
-          ...this.events,
-          new ToolResult({
-            toolName: part.toolName,
-            result: serializeToolResult(part.result),
-            isError: Boolean(part.isError),
-          }),
-        ],
-      });
-    }
-
-    return this;
+    return withEvent.applyMarker(event);
   }
 
   applyMarker(marker: ExecutionEvent): ExecutedTestPlan {

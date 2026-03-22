@@ -1,21 +1,35 @@
-import type { LanguageModelV3Content, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { Option, Predicate, Schema } from "effect";
-import { serializeToolResult } from "../utils/serialize-tool-result.js";
+import {
+  AgentText,
+  AgentThinking,
+  ToolCall,
+  ToolResult,
+  type ExecutionEvent,
+} from "@browser-tester/shared/models";
+
+const serializeToolResult = (value: unknown): string => {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null ||
+    value === undefined
+  ) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
 
 export class ClaudeTextBlock extends Schema.Class<ClaudeTextBlock>("ClaudeTextBlock")({
   type: Schema.Literal("text"),
   text: Schema.String,
 }) {
-  get aiSdkContent(): LanguageModelV3Content {
-    return { type: "text", text: this.text };
-  }
-
-  streamParts(blockId: string): LanguageModelV3StreamPart[] {
-    return [
-      { type: "text-start", id: blockId },
-      { type: "text-delta", id: blockId, delta: this.text },
-      { type: "text-end", id: blockId },
-    ];
+  get executionEvents(): ExecutionEvent[] {
+    return [new AgentText({ text: this.text })];
   }
 }
 
@@ -23,16 +37,8 @@ export class ClaudeThinkingBlock extends Schema.Class<ClaudeThinkingBlock>("Clau
   type: Schema.Literal("thinking"),
   thinking: Schema.String,
 }) {
-  get aiSdkContent(): LanguageModelV3Content {
-    return { type: "reasoning", text: this.thinking };
-  }
-
-  streamParts(blockId: string): LanguageModelV3StreamPart[] {
-    return [
-      { type: "reasoning-start", id: blockId },
-      { type: "reasoning-delta", id: blockId, delta: this.thinking },
-      { type: "reasoning-end", id: blockId },
-    ];
+  get executionEvents(): ExecutionEvent[] {
+    return [new AgentThinking({ text: this.thinking })];
   }
 }
 
@@ -42,33 +48,8 @@ export class ClaudeToolUseBlock extends Schema.Class<ClaudeToolUseBlock>("Claude
   name: Schema.String,
   input: Schema.Unknown,
 }) {
-  get inputString() {
-    return JSON.stringify(this.input ?? {});
-  }
-
-  get aiSdkContent(): LanguageModelV3Content {
-    return {
-      type: "tool-call",
-      toolCallId: this.id,
-      toolName: this.name,
-      input: this.inputString,
-      providerExecuted: true,
-    };
-  }
-
-  streamParts(_blockId: string): LanguageModelV3StreamPart[] {
-    return [
-      { type: "tool-input-start", id: this.id, toolName: this.name, providerExecuted: true },
-      { type: "tool-input-delta", id: this.id, delta: this.inputString },
-      { type: "tool-input-end", id: this.id },
-      {
-        type: "tool-call",
-        toolCallId: this.id,
-        toolName: this.name,
-        input: this.inputString,
-        providerExecuted: true,
-      },
-    ];
+  get executionEvents(): ExecutionEvent[] {
+    return [new ToolCall({ toolName: this.name, input: this.input })];
   }
 }
 
@@ -81,24 +62,14 @@ export class ClaudeToolResultBlock extends Schema.Class<ClaudeToolResultBlock>(
   content: Schema.Unknown,
   is_error: Schema.optional(Schema.Boolean),
 }) {
-  get aiSdkContent(): LanguageModelV3Content {
-    return {
-      type: "tool-result",
-      toolCallId: this.tool_use_id,
-      toolName: this.name ?? "unknown",
-      result: serializeToolResult(this.content),
-      isError: this.is_error ?? false,
-    };
-  }
-
-  get streamPart(): LanguageModelV3StreamPart {
-    return {
-      type: "tool-result",
-      toolCallId: this.tool_use_id,
-      toolName: this.name ?? "unknown",
-      result: serializeToolResult(this.content),
-      isError: this.is_error ?? false,
-    };
+  get executionEvents(): ExecutionEvent[] {
+    return [
+      new ToolResult({
+        toolName: this.name ?? "unknown",
+        result: serializeToolResult(this.content),
+        isError: Boolean(this.is_error),
+      }),
+    ];
   }
 }
 
@@ -111,24 +82,14 @@ export class ClaudeToolErrorBlock extends Schema.Class<ClaudeToolErrorBlock>(
   error: Schema.Unknown,
   is_error: Schema.optional(Schema.Boolean),
 }) {
-  get aiSdkContent(): LanguageModelV3Content {
-    return {
-      type: "tool-result",
-      toolCallId: this.tool_use_id,
-      toolName: this.name ?? "unknown",
-      result: serializeToolResult(this.error),
-      isError: true,
-    };
-  }
-
-  get streamPart(): LanguageModelV3StreamPart {
-    return {
-      type: "tool-result",
-      toolCallId: this.tool_use_id,
-      toolName: this.name ?? "unknown",
-      result: serializeToolResult(this.error),
-      isError: true,
-    };
+  get executionEvents(): ExecutionEvent[] {
+    return [
+      new ToolResult({
+        toolName: this.name ?? "unknown",
+        result: serializeToolResult(this.error),
+        isError: true,
+      }),
+    ];
   }
 }
 
@@ -151,23 +112,21 @@ export const ClaudeContentBlock = Schema.Union([
 ]);
 export type ClaudeContentBlock = typeof ClaudeContentBlock.Type;
 
-let blockIdCounter = 0;
-
-const decodeAssistantBlocks = (content: readonly unknown[]): LanguageModelV3StreamPart[] =>
+const decodeAssistantBlocks = (content: readonly unknown[]): ExecutionEvent[] =>
   content.filter(Predicate.isReadonlyObject).flatMap((raw) => {
     const parsed = Schema.decodeUnknownOption(ClaudeAssistantBlock)(raw);
     if (Option.isNone(parsed)) return [];
-    return parsed.value.streamParts(`block-${blockIdCounter++}`);
+    return parsed.value.executionEvents;
   });
 
-const decodeToolResponseBlocks = (content: readonly unknown[]): LanguageModelV3StreamPart[] =>
+const decodeToolResponseBlocks = (content: readonly unknown[]): ExecutionEvent[] =>
   content
     .filter(Predicate.isReadonlyObject)
     .filter((raw) => raw.type === "tool_result" || raw.type === "tool_error")
     .flatMap((raw) => {
       const parsed = Schema.decodeUnknownOption(ClaudeToolResponseBlock)(raw);
       if (Option.isNone(parsed)) return [];
-      return [parsed.value.streamPart];
+      return parsed.value.executionEvents;
     });
 
 export class ClaudeAssistantMessage extends Schema.Class<ClaudeAssistantMessage>(
@@ -177,9 +136,9 @@ export class ClaudeAssistantMessage extends Schema.Class<ClaudeAssistantMessage>
   message: Schema.Struct({ content: Schema.Array(Schema.Unknown) }),
   session_id: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
-    const parts = decodeAssistantBlocks(this.message.content);
-    return parts.length > 0 ? Option.some(parts) : Option.none();
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
+    const events = decodeAssistantBlocks(this.message.content);
+    return events.length > 0 ? Option.some(events) : Option.none();
   }
 }
 
@@ -188,10 +147,10 @@ export class ClaudeUserMessage extends Schema.Class<ClaudeUserMessage>("ClaudeUs
   message: Schema.Struct({ content: Schema.Unknown }),
   session_id: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
     if (!Array.isArray(this.message.content)) return Option.none();
-    const parts = decodeToolResponseBlocks(this.message.content);
-    return parts.length > 0 ? Option.some(parts) : Option.none();
+    const events = decodeToolResponseBlocks(this.message.content);
+    return events.length > 0 ? Option.some(events) : Option.none();
   }
 }
 
@@ -206,8 +165,8 @@ export class ClaudeResultSuccess extends Schema.Class<ClaudeResultSuccess>("Clau
   total_cost_usd: Schema.Number,
   session_id: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
-    return Option.some([{ type: "response-metadata", id: this.session_id }]);
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
+    return Option.none();
   }
 }
 
@@ -227,8 +186,8 @@ export class ClaudeResultError extends Schema.Class<ClaudeResultError>("ClaudeRe
   errors: Schema.Array(Schema.String),
   session_id: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
-    return Option.some([{ type: "error", error: this.errors.join("\n") }]);
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
+    return Option.none();
   }
 }
 
@@ -239,7 +198,7 @@ export class ClaudeSystemEvent extends Schema.Class<ClaudeSystemEvent>("ClaudeSy
   type: Schema.Literal("system"),
   subtype: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
     return Option.none();
   }
 }
@@ -259,7 +218,7 @@ export class ClaudeRateLimitEvent extends Schema.Class<ClaudeRateLimitEvent>(
   uuid: Schema.String,
   session_id: Schema.String,
 }) {
-  get streamParts(): Option.Option<LanguageModelV3StreamPart[]> {
+  get executionEvents(): Option.Option<ExecutionEvent[]> {
     return Option.none();
   }
 }

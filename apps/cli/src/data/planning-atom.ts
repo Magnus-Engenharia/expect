@@ -1,8 +1,8 @@
 import { Effect, Option } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import { Agent } from "@browser-tester/agent";
+import { layerFor } from "@browser-tester/acp";
 import { Git, Planner, TestPlanDraft, DraftId } from "@browser-tester/supervisor";
-import type { AgentBackend } from "@browser-tester/agent";
+import type { AgentBackend } from "@browser-tester/acp";
 import type { ChangesFor } from "@browser-tester/shared/models";
 import { cliAtomRuntime } from "./runtime.js";
 
@@ -40,7 +40,7 @@ export const createPlanFn = cliAtomRuntime.fn(
 
       const testPlan = yield* planner
         .plan(draft)
-        .pipe(Effect.provide(Agent.layerFor(input.agentBackend)));
+        .pipe(Effect.provide(layerFor(input.agentBackend)));
 
       console.error(
         "[planning-atom] result:",

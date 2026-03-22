@@ -1,8 +1,8 @@
 import { Effect, Stream } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import { Agent } from "@browser-tester/agent";
+import { layerFor } from "@browser-tester/acp";
 import { ExecutedTestPlan, Executor, Git, Reporter } from "@browser-tester/supervisor";
-import type { AgentBackend } from "@browser-tester/agent";
+import type { AgentBackend } from "@browser-tester/acp";
 import type { TestPlan, TestReport } from "@browser-tester/shared/models";
 import { cliAtomRuntime } from "./runtime.js";
 
@@ -45,7 +45,7 @@ export const executePlanFn = cliAtomRuntime.fn(
             ? option.value
             : new ExecutedTestPlan({ ...input.testPlan, events: [] }),
         ),
-        Effect.provide(Agent.layerFor(input.agentBackend)),
+        Effect.provide(layerFor(input.agentBackend)),
       );
 
       console.error("[execution-atom] stream complete, total events:", finalExecuted.events.length);

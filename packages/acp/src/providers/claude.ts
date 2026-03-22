@@ -2,14 +2,14 @@ import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
-import { ClaudeQueryError } from "./errors.js";
-import { CurrentModel } from "./current-model.js";
-import { ClaudeStreamEvent } from "./schemas/claude-stream.js";
-import { AgentStreamOptions } from "./types.js";
+import { ClaudeQueryError } from "../errors.js";
+import { CurrentModel } from "../current-model.js";
+import { ClaudeStreamEvent } from "../provider-schemas/claude-stream.js";
+import { AgentStreamOptions } from "@browser-tester/shared/agent";
+import type { ExecutionEvent } from "@browser-tester/shared/models";
 import { createBrowserMcpServer, McpRuntime } from "@browser-tester/browser/mcp";
-import { buildClaudeProcessEnv } from "./utils/build-claude-process-env.js";
+import { buildClaudeProcessEnv } from "../utils/build-claude-process-env.js";
 
 const AGENT_TRACES_DIRECTORY_NAME = ".testie-agent-traces";
 
@@ -37,7 +37,7 @@ export class ClaudeProvider extends ServiceMap.Service<
   {
     readonly stream: (
       options: AgentStreamOptions,
-    ) => Stream.Stream<LanguageModelV3StreamPart, ClaudeQueryError>;
+    ) => Stream.Stream<ExecutionEvent, ClaudeQueryError>;
   }
 >()("@browser-tester/ClaudeProvider") {
   static layer = Layer.effect(ClaudeProvider)(
@@ -87,7 +87,7 @@ export class ClaudeProvider extends ServiceMap.Service<
                 Effect.catchTag("SchemaError", Effect.die),
               ),
             ),
-            Stream.map((event) => event.streamParts),
+            Stream.map((event) => event.executionEvents),
             Stream.filter(Option.isSome),
             Stream.flatMap((option) => Stream.fromIterable(option.value)),
             Stream.ensuring(Effect.sync(() => claudeQuery.close())),
