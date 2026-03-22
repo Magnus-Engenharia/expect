@@ -30,7 +30,8 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
       });
 
       return agent.stream(streamOptions).pipe(
-        Stream.mapAccum(initial, (executed, part) => {
+        // @ts-ignore tsgo cannot resolve Stream.mapAccum overload
+        Stream.mapAccum(initial, (executed: ExecutedTestPlan, part) => {
           const next = executed.addEvent(part);
           return [next, next] as const;
         }),
