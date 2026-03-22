@@ -130,6 +130,7 @@ export const layerClaudeAgent = Layer.effect(Agent)(
               let done = false;
 
               updateHandlers.add((update) => {
+                console.error(`[acp-update] ${update.sessionUpdate}`, "title" in update ? (update as any).title : "");
                 const events = mapUpdateToEvents(update);
                 eventQueue.push(...events);
                 if (events.length > 0) resolveNext?.();
@@ -142,9 +143,11 @@ export const layerClaudeAgent = Layer.effect(Agent)(
                   : []),
               ];
 
+              console.error("[acp-exec] sending prompt, sessionId:", session.sessionId);
               connection
                 .prompt({ sessionId: session.sessionId, prompt: promptContent })
                 .then(() => {
+                  console.error("[acp-exec] prompt completed");
                   done = true;
                   resolveNext?.();
                 })
