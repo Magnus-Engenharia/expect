@@ -1,4 +1,4 @@
-import { Effect, Stream } from "effect";
+import { Effect, Option, Stream } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { ExecutedTestPlan, Executor, Git, Reporter } from "@browser-tester/supervisor";
 import { layerFor, type AgentBackend } from "../acp/index.js";
@@ -22,11 +22,10 @@ export const executePlanFn = cliAtomRuntime.fn(
   Effect.fnUntraced(
     function* (input: ExecutePlanInput, _ctx: Atom.FnContext) {
       const reporter = yield* Reporter;
-      console.error("[execution-atom] starting execution for:", input.testPlan.title);
+      yield* Effect.logDebug("Starting execution", { title: input.testPlan.title });
       Atom.set(screenshotPathsAtom, []);
 
       const executor = yield* Executor;
-      console.error("[execution-atom] got executor, calling executePlan...");
 
       const finalExecuted = yield* executor.executePlan(input.testPlan).pipe(
         Stream.tap((executed) =>
@@ -39,18 +38,14 @@ export const executePlanFn = cliAtomRuntime.fn(
           }),
         ),
         Stream.runLast,
-        Effect.map((option) =>
-          option._tag === "Some"
-            ? option.value
-            : new ExecutedTestPlan({ ...input.testPlan, events: [] }),
-        ),
+        Effect.map(Option.getOrElse(() => new ExecutedTestPlan({ ...input.testPlan, events: [] }))),
         Effect.provide(layerFor(input.agentBackend)),
       );
 
-      console.error("[execution-atom] stream complete, total events:", finalExecuted.events.length);
+      yield* Effect.logDebug("Stream complete", { totalEvents: finalExecuted.events.length });
 
       const report = yield* reporter.report(finalExecuted);
-      console.error("[execution-atom] report done, status:", report.status);
+      yield* Effect.logDebug("Report complete", { status: report.status });
 
       if (report.status === "passed") {
         const git = yield* Git;

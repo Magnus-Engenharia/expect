@@ -45,13 +45,15 @@ const parsePlanFile = Effect.fn("Planner.parsePlanFile")(function* (
   });
 
   const parsed = yield* Schema.decodeEffect(Schema.fromJsonString(TestPlanJson))(raw).pipe(
-    Effect.mapError((cause) => new PlanParseError({ cause: `Invalid plan JSON: ${cause}` })),
+    Effect.catchTag("SchemaError", (cause) =>
+      new PlanParseError({ cause: `Invalid plan JSON: ${cause}` }).asEffect(),
+    ),
   );
 
   const steps = parsed.steps.slice(0, PLANNER_MAX_STEP_COUNT).map(
     (step, index) =>
       new TestPlanStep({
-        id: Schema.decodeSync(StepId)(
+        id: StepId.makeUnsafe(
           step.id ?? `step-${String(index + 1).padStart(STEP_ID_PAD_LENGTH, "0")}`,
         ),
         title: step.title,
@@ -65,7 +67,7 @@ const parsePlanFile = Effect.fn("Planner.parsePlanFile")(function* (
 
   return new TestPlan({
     ...draft,
-    id: Schema.decodeSync(PlanId)(parsed.id ?? `plan-${crypto.randomUUID().slice(0, 8)}`),
+    id: PlanId.makeUnsafe(parsed.id ?? `plan-${crypto.randomUUID().slice(0, 8)}`),
     title: parsed.title,
     rationale: parsed.rationale,
     steps,
@@ -78,7 +80,11 @@ export class Planner extends ServiceMap.Service<Planner>()("@supervisor/Planner"
 
     const plan = Effect.fn("Planner.plan")(function* (draft: TestPlanDraft) {
       const stateDir = path.join(process.cwd(), TESTIE_STATE_DIR);
-      fs.mkdirSync(stateDir, { recursive: true });
+      yield* Effect.try({
+        try: () => fs.mkdirSync(stateDir, { recursive: true }),
+        catch: (cause) =>
+          new PlanParseError({ cause: `Could not create state directory: ${cause}` }),
+      });
       const sentinelPath = path.join(stateDir, draft.planFileName);
 
       const runAgent = Effect.gen(function* () {
@@ -94,11 +100,15 @@ export class Planner extends ServiceMap.Service<Planner>()("@supervisor/Planner"
           .pipe(
             Stream.filterMap(extractText),
             Stream.runDrain,
-            Effect.mapError((reason) => new PlanningError({ reason })),
+            Effect.catchTag("AgentStreamError", (reason) =>
+              new PlanningError({ reason }).asEffect(),
+            ),
           );
 
         return yield* parsePlanFile(sentinelPath, draft).pipe(
-          Effect.mapError((reason) => new PlanningError({ reason })),
+          Effect.catchTag("@supervisor/PlanParseError", (reason) =>
+            new PlanningError({ reason }).asEffect(),
+          ),
         );
       });
 

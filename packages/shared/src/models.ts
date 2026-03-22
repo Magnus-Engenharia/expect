@@ -182,7 +182,6 @@ export class TestPlanStep extends Schema.Class<TestPlanStep>("@supervisor/TestPl
   routeHint: Schema.OptionFromNullOr(Schema.String),
   status: StepStatus,
   summary: Schema.Option(Schema.String),
-  // summary: Schema.optionalWith(Schema.String, { default: () => "" }),
 }) {
   update(
     fields: Partial<
@@ -367,7 +366,6 @@ export class TestPlan extends TestPlanDraft.extend<TestPlan>("@supervisor/TestPl
   }
 }
 
-/** @todo(rasmus): REMOVE */
 export const PlanStepJson = Schema.Struct({
   id: Schema.optional(Schema.NullOr(Schema.String)),
   title: Schema.String,
@@ -376,7 +374,6 @@ export const PlanStepJson = Schema.Struct({
   routeHint: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
-/** @todo(rasmus): REMOVE */
 export const TestPlanJson = Schema.Struct({
   id: Schema.optional(Schema.NullOr(Schema.String)),
   title: Schema.String,
@@ -660,47 +657,17 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
   screenshotPaths: Schema.Array(Schema.String),
   pullRequest: Schema.Option(Schema.suspend(() => PullRequest)),
 }) {
-  /** @todo(rasmus): UNUSED */
-  get stepStatuses(): ReadonlyMap<
-    StepId,
-    { status: "passed" | "failed" | "not-run"; summary: string }
-  > {
-    const statuses = new Map<StepId, { status: "passed" | "failed" | "not-run"; summary: string }>(
-      this.steps.map((step) => [step.id, { status: "not-run", summary: "" }]),
-    );
-
-    for (const event of this.events) {
-      if (event._tag === "StepCompleted") {
-        statuses.set(event.stepId, {
-          status: "passed",
-          summary: event.summary,
-        });
-      } else if (event._tag === "StepFailed") {
-        statuses.set(event.stepId, {
-          status: "failed",
-          summary: event.message,
-        });
-      }
-    }
-
-    return statuses;
-  }
-
   get status(): "passed" | "failed" {
-    const statuses = this.stepStatuses;
-    for (const { status } of statuses.values()) {
-      if (status === "failed") return "failed";
-    }
-    return "passed";
+    return this.steps.some((step) => step.status === "failed") ? "failed" : "passed";
   }
 
   get toPlainText(): string {
-    const statuses = this.stepStatuses;
     const lines = [`Status: ${this.status}`, `Summary: ${this.summary}`];
     for (const step of this.steps) {
-      const entry = statuses.get(step.id);
-      const stepStatus = entry?.status ?? "not-run";
-      lines.push(`${stepStatus.toUpperCase()} ${step.title}: ${entry?.summary ?? ""}`);
+      const displayStatus =
+        step.status === "pending" || step.status === "active" ? "not-run" : step.status;
+      const summaryText = Option.getOrElse(step.summary, () => "");
+      lines.push(`${displayStatus.toUpperCase()} ${step.title}: ${summaryText}`);
     }
     return lines.join("\n");
   }

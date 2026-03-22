@@ -3,6 +3,7 @@ import { Effect, Fiber, Layer, Option, Ref, Schema, ServiceMap, Stream } from "e
 import { Executor, Git, Planner, Reporter } from "@browser-tester/supervisor";
 import {
   PROTOCOL_VERSION,
+  ERROR_CODE_PARSE,
   ERROR_CODE_INVALID_PARAMS,
   ERROR_CODE_METHOD_NOT_FOUND,
   StdioTransport,
@@ -75,6 +76,16 @@ const extractPromptText = (prompt: readonly ContentBlock[]): string =>
       block.type === "text" ? text + (text.length > 0 ? "\n" : "") + block.text : text,
     "",
   );
+
+const extractRequestId = (rawLine: string): string | number | undefined => {
+  try {
+    const parsed = JSON.parse(rawLine);
+    if (typeof parsed?.id === "number" || typeof parsed?.id === "string") return parsed.id;
+  } catch {
+    /* not valid JSON */
+  }
+  return undefined;
+};
 
 export class AcpServer extends ServiceMap.Service<
   AcpServer,
@@ -311,7 +322,17 @@ export class AcpServer extends ServiceMap.Service<
         const dispatch = Effect.fn("AcpServer.dispatch")(function* (rawLine: string) {
           const message = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(IncomingMessage))(
             rawLine,
-          ).pipe(Effect.catchTag("SchemaError", () => Effect.succeed(undefined)));
+          ).pipe(
+            Effect.catchTag("SchemaError", () => {
+              const extractedId = extractRequestId(rawLine);
+              if (extractedId !== undefined) {
+                return transport
+                  .sendError(extractedId, ERROR_CODE_PARSE, "Parse error")
+                  .pipe(Effect.map(() => undefined));
+              }
+              return Effect.succeed(undefined);
+            }),
+          );
 
           if (!message?.method) return;
 
@@ -332,7 +353,16 @@ export class AcpServer extends ServiceMap.Service<
               yield* transport.sendResponse(id, {});
             } else if (method === "session/new") {
               const parsed = yield* Schema.decodeUnknownEffect(NewSessionParams)(params ?? {}).pipe(
-                Effect.catchTag("SchemaError", () => Effect.succeed({ cwd: undefined })),
+                Effect.catchTag("SchemaError", (schemaError) =>
+                  Effect.gen(function* () {
+                    yield* transport.sendError(
+                      id,
+                      ERROR_CODE_INVALID_PARAMS,
+                      `Invalid session params: ${schemaError}`,
+                    );
+                    return yield* Effect.die(schemaError);
+                  }),
+                ),
               );
               const sessionId = `sess_${crypto.randomUUID().replace(/-/g, "")}`;
               const cwd = parsed.cwd ?? process.cwd();
@@ -360,8 +390,15 @@ export class AcpServer extends ServiceMap.Service<
               yield* runPrompt(id, params);
             } else if (method === "session/set_mode") {
               const parsed = yield* Schema.decodeUnknownEffect(SetModeParams)(params ?? {}).pipe(
-                Effect.catchTag("SchemaError", () =>
-                  Effect.succeed({ sessionId: "", modeId: "test" }),
+                Effect.catchTag("SchemaError", (schemaError) =>
+                  Effect.gen(function* () {
+                    yield* transport.sendError(
+                      id,
+                      ERROR_CODE_INVALID_PARAMS,
+                      `Invalid set_mode params: ${schemaError}`,
+                    );
+                    return yield* Effect.die(schemaError);
+                  }),
                 ),
               );
               const modeSession = sessions.get(parsed.sessionId);
@@ -384,10 +421,9 @@ export class AcpServer extends ServiceMap.Service<
             }
           } else {
             if (method === "session/cancel") {
-              const parsed = yield* Schema.decodeUnknownEffect(CancelParams)(params ?? {}).pipe(
-                Effect.catchTag("SchemaError", () => Effect.succeed({ sessionId: "" })),
-              );
-              const cancelSession = sessions.get(parsed.sessionId);
+              const parsed = Schema.decodeUnknownOption(CancelParams)(params ?? {});
+              if (Option.isNone(parsed)) return;
+              const cancelSession = sessions.get(parsed.value.sessionId);
               if (cancelSession && Option.isSome(cancelSession.runningFiber)) {
                 yield* Effect.forkChild(Fiber.interrupt(cancelSession.runningFiber.value));
               }

@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto";
 import { Cause, Effect, Option, Stream } from "effect";
+import figures from "figures";
 import { changesForDisplayName, type ChangesFor } from "@browser-tester/shared/models";
 import {
   DraftId,
@@ -11,7 +12,6 @@ import {
   TestPlanDraft,
 } from "@browser-tester/supervisor";
 import { type AgentBackend, layerFor } from "../acp/index.js";
-import figures from "figures";
 import { VERSION } from "../constants.js";
 import { CliRuntime } from "../runtime.js";
 
@@ -84,11 +84,7 @@ export const runHeadless = async (options: HeadlessRunOptions): Promise<void> =>
             }),
           ),
           Stream.runLast,
-          Effect.map((option) =>
-            option._tag === "Some"
-              ? option.value
-              : new ExecutedTestPlan({ ...testPlan, events: [] }),
-          ),
+          Effect.map(Option.getOrElse(() => new ExecutedTestPlan({ ...testPlan, events: [] }))),
         );
 
         const report = yield* Reporter.use((reporter) => reporter.report(finalExecuted)).pipe(
