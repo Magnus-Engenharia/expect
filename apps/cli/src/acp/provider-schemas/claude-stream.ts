@@ -7,23 +7,6 @@ import {
   type ExecutionEvent,
 } from "@browser-tester/shared/models";
 
-const serializeToolResult = (value: unknown): string => {
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    value === null ||
-    value === undefined
-  ) {
-    return String(value);
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
 export class ClaudeTextBlock extends Schema.Class<ClaudeTextBlock>("ClaudeTextBlock")({
   type: Schema.Literal("text"),
   text: Schema.String,
@@ -66,7 +49,7 @@ export class ClaudeToolResultBlock extends Schema.Class<ClaudeToolResultBlock>(
     return [
       new ToolResult({
         toolName: this.name ?? "unknown",
-        result: serializeToolResult(this.content),
+        result: typeof this.content === "string" ? this.content : JSON.stringify(this.content),
         isError: Boolean(this.is_error),
       }),
     ];
@@ -86,7 +69,7 @@ export class ClaudeToolErrorBlock extends Schema.Class<ClaudeToolErrorBlock>(
     return [
       new ToolResult({
         toolName: this.name ?? "unknown",
-        result: serializeToolResult(this.error),
+        result: typeof this.error === "string" ? this.error : JSON.stringify(this.error),
         isError: true,
       }),
     ];
