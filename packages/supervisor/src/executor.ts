@@ -1,7 +1,6 @@
 import { Agent, AgentStreamOptions, AgentStreamError } from "@browser-tester/shared/agent";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
 import { ExecutedTestPlan, RunStarted, type TestPlan } from "@browser-tester/shared/models";
-import { NodeServices } from "@effect/platform-node";
 
 export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervisor/ExecutionError")(
   {
@@ -30,11 +29,7 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
       });
 
       return agent.stream(streamOptions).pipe(
-        // @ts-ignore tsgo cannot resolve Stream.mapAccum overload
-        Stream.mapAccum(initial, (executed: ExecutedTestPlan, part) => {
-          const next = executed.addEvent(part);
-          return [next, next] as const;
-        }),
+        Stream.scan(initial, (executed, part) => executed.addEvent(part)),
         Stream.mapError((reason) => new ExecutionError({ reason })),
       );
     }, Stream.unwrap);
@@ -42,5 +37,5 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
     return { executePlan } as const;
   }),
 }) {
-  static layer = Layer.effect(this)(this.make).pipe(Layer.provide(NodeServices.layer));
+  static layer = Layer.effect(this)(this.make);
 }

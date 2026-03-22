@@ -9,6 +9,8 @@ import { loadThemeName } from "./utils/load-theme.js";
 import { ChangesFor, Git, TestPlanDraft, DraftId } from "@browser-tester/supervisor";
 import { runHeadless } from "./utils/run-test.js";
 import { runAcp } from "./utils/run-acp.js";
+import { initCliAtomRuntime } from "./data/runtime.js";
+import { detectAgentBackend } from "./acp/index.js";
 import { useNavigationStore, Screen } from "./stores/use-navigation.js";
 import { usePreferencesStore } from "./stores/use-preferences.js";
 import { usePlanStore, Plan } from "./stores/use-plan-store.js";
@@ -143,13 +145,17 @@ const runHeadlessForAction = async (
   });
 };
 
+const resolveAgentBackend = async (explicit?: string) => explicit ?? (await detectAgentBackend());
+
 const runInteractiveForAction = async (
   action: "unstaged" | "branch" | "changes" | "commit",
   opts: CommanderOpts,
   commitHash?: string,
 ) => {
   const { changesFor, currentBranch } = await resolveChangesFor(action, commitHash);
-  seedStores(opts, changesFor, currentBranch);
+  const agentBackend = await resolveAgentBackend(opts.agent);
+  seedStores({ ...opts, agent: agentBackend }, changesFor, currentBranch);
+  initCliAtomRuntime(agentBackend);
   renderApp();
 };
 
@@ -176,7 +182,7 @@ program
   .description("run as an ACP agent over stdio (for IDE integration)")
   .option("--codex", "use Codex backend instead of Claude")
   .action(async (acpOpts: { codex?: boolean }) => {
-    const agent: AgentBackend = acpOpts.codex ? "codex" : "claude";
+    const agent = acpOpts.codex ? "codex" : "claude";
     await runAcp(agent);
   });
 
@@ -189,6 +195,8 @@ program.action(async () => {
   if (hasOptions) {
     await runInteractiveForAction("changes", opts);
   } else {
+    const agentBackend = await resolveAgentBackend(opts.agent);
+    initCliAtomRuntime(agentBackend);
     renderApp();
   }
 });

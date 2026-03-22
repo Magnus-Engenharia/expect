@@ -26,6 +26,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.16.1",
     "effect": "4.0.0-beta.28"
   },
   "devDependencies": {

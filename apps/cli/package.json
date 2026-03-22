@@ -29,7 +29,6 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.77",
     "@browser-tester/acp": "workspace:*",
     "@browser-tester/browser": "workspace:*",
     "@browser-tester/shared": "workspace:*",
@@ -37,9 +36,9 @@
     "@effect/atom-react": "4.0.0-beta.35",
     "@effect/platform-node": "4.0.0-beta.28",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@openai/codex-sdk": "^0.114.0",
     "@tanstack/react-query": "^5.80.7",
     "@types/react": "^19.2.14",
+    "@zed-industries/claude-agent-acp": "^0.22.2",
     "cli-truncate": "^5.2.0",
     "commander": "^13.1.0",
     "detect-terminal": "^2.0.0",

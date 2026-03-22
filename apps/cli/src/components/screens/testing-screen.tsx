@@ -47,9 +47,10 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
   const [testPlan, setTestPlan] = useState<TestPlan | undefined>(initialPlan);
   const [planningError, setPlanningError] = useState<string | undefined>(undefined);
 
-  const agentBackend = usePreferencesStore((state) => state.agentBackend);
-  const triggerCreatePlan = useAtomSet(createPlanFn, { mode: "promise" });
-  const [executionResult, triggerExecute] = useAtom(executePlanFn, { mode: "promiseExit" });
+  const planAtom = useMemo(() => createPlanFn(), []);
+  const executeAtom = useMemo(() => executePlanFn(), []);
+  const triggerCreatePlan = useAtomSet(planAtom, { mode: "promise" });
+  const [executionResult, triggerExecute] = useAtom(executeAtom, { mode: "promiseExit" });
   const screenshotPaths = useAtomValue(screenshotPathsAtom);
   const running = testPlan ? AsyncResult.isWaiting(executionResult) : false;
   const done = AsyncResult.isSuccess(executionResult);
@@ -94,7 +95,7 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
     planningStartedRef.current = true;
     setRunStartedAt(Date.now());
 
-    triggerCreatePlan({ changesFor, flowInstruction: instruction, agentBackend })
+    triggerCreatePlan({ changesFor, flowInstruction: instruction })
       .then((plan) => {
         usePlanStore.getState().setReadyTestPlan(plan);
 
@@ -108,7 +109,7 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
       .catch((planError) => {
         setPlanningError(planError instanceof Error ? planError.message : String(planError));
       });
-  }, [testPlan, changesFor, instruction, agentBackend, triggerCreatePlan, setScreen]);
+  }, [testPlan, changesFor, instruction, triggerCreatePlan, setScreen]);
 
   // Execution phase: start when plan becomes available
   const executionStartedRef = useRef(false);
@@ -118,8 +119,8 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
     if (runStartedAt === undefined) {
       setRunStartedAt(Date.now());
     }
-    triggerExecute({ testPlan, agentBackend, onUpdate: handlePlanUpdate });
-  }, [testPlan, agentBackend, triggerExecute, handlePlanUpdate, runStartedAt, exitRequested]);
+    triggerExecute({ testPlan, onUpdate: handlePlanUpdate });
+  }, [testPlan, triggerExecute, handlePlanUpdate, runStartedAt, exitRequested]);
 
   // Exit when exitRequested and no longer running/planning
   useEffect(() => {

@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import { Deferred, Effect, Option, Queue, Ref, Schema, Stream } from "effect";
 import { AcpClientError } from "./errors.js";
 import { PROTOCOL_VERSION, JSON_RPC_VERSION, REQUEST_TIMEOUT_MS } from "./constants.js";
@@ -122,7 +124,7 @@ export const KNOWN_ACP_AGENTS: Record<string, AcpAgentConfig> = {
     displayName: "Gemini CLI",
   }),
   "claude-code": new AcpAgentConfig({
-    command: "claude",
+    command: "claude-agent-acp",
     args: [],
     displayName: "Claude Code",
   }),
@@ -153,6 +155,27 @@ export const KNOWN_ACP_AGENTS: Record<string, AcpAgentConfig> = {
   }),
 };
 
+const ACP_PACKAGES: Record<string, string> = {
+  "claude-agent-acp": "@zed-industries/claude-agent-acp",
+};
+
+const resolveCommand = (command: string): string => {
+  const packageName = ACP_PACKAGES[command];
+  if (!packageName) return command;
+  try {
+    const require = createRequire(import.meta.url);
+    const packageJsonPath = require.resolve(`${packageName}/package.json`);
+    const packageDir = path.dirname(packageJsonPath);
+    const packageJson = require(packageJsonPath);
+    const binEntry =
+      typeof packageJson.bin === "string" ? packageJson.bin : packageJson.bin?.[command];
+    if (binEntry) return path.resolve(packageDir, binEntry);
+  } catch {
+    /* package not installed as dependency — use bare command */
+  }
+  return command;
+};
+
 const parseIncomingLine = (line: string): Option.Option<typeof IncomingJsonRpc.Type> => {
   const trimmed = line.trim();
   if (trimmed.length === 0) return Option.none();
@@ -173,9 +196,13 @@ export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (
     displayName: config.displayName,
   });
 
+  const spawnError = yield* Deferred.make<never, AcpClientError>();
+
+  const resolvedCommand = resolveCommand(config.command);
+
   const child = yield* Effect.try({
     try: () =>
-      spawn(config.command, [...config.args], {
+      spawn(resolvedCommand, [...config.args], {
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env, ...(config.env ?? {}) },
       }),
@@ -183,6 +210,17 @@ export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (
       new AcpClientError({
         cause: `Failed to spawn ${config.displayName}: ${cause instanceof Error ? cause.message : String(cause)}`,
       }),
+  });
+
+  child.on("error", (error) => {
+    Effect.runFork(
+      Deferred.fail(
+        spawnError,
+        new AcpClientError({
+          cause: `${config.displayName} process error: ${error.message}`,
+        }),
+      ),
+    );
   });
 
   const writeRaw = (payload: unknown) => {
@@ -292,7 +330,7 @@ export const connectAcpAgent = Effect.fn("connectAcpAgent")(function* (
     const deferred = yield* Deferred.make<unknown, AcpClientError>();
     pendingRequests.set(id, deferred);
     yield* writeMessage({ jsonrpc: JSON_RPC_VERSION, id, method, params });
-    return yield* Deferred.await(deferred).pipe(
+    return yield* Effect.race(Deferred.await(deferred), Deferred.await(spawnError)).pipe(
       Effect.timeout(REQUEST_TIMEOUT_MS),
       Effect.catchTag("TimeoutError", () =>
         new AcpClientError({
