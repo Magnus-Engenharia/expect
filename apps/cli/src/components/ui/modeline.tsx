@@ -11,6 +11,8 @@ import { usePlanExecutionStore } from "../../stores/use-plan-execution-store.js"
 import { useGitState } from "../../hooks/use-git-state.js";
 import { Clickable } from "./clickable.js";
 import { TextShimmer } from "./text-shimmer.js";
+import { LIVE_VIEW_URL } from "../../live-view-url.js";
+import { openUrl } from "../../utils/open-url.js";
 
 const useHintSegments = (screen: Screen): HintSegment[] => {
   const COLORS = useColors();
@@ -122,7 +124,10 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
         },
       ];
     case "Testing": {
-      return [{ key: "esc", label: "cancel" }];
+      return [
+        { key: "o", label: "live view", cta: true, onClick: () => openUrl(LIVE_VIEW_URL) },
+        { key: "esc", label: "cancel" },
+      ];
     }
     case "Results": {
       const hints: HintSegment[] = [{ key: "y", label: "copy", color: COLORS.PRIMARY, cta: true }];

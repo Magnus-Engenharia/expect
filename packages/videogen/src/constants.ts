@@ -2,3 +2,5 @@ export const EVENT_COLLECT_INTERVAL_MS = 500;
 
 export const REPLAY_PLAYER_WIDTH_PX = 960;
 export const REPLAY_PLAYER_HEIGHT_PX = 540;
+
+export const LIVE_VIEW_REDIRECT_DELAY_MS = 1500;

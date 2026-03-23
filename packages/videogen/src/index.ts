@@ -9,6 +9,7 @@ export { loadSession } from "./session";
 export { SessionLoadError, ViewerPushError, ViewerSourceNotFoundError } from "./errors";
 export {
   EVENT_COLLECT_INTERVAL_MS,
+  LIVE_VIEW_REDIRECT_DELAY_MS,
   REPLAY_PLAYER_HEIGHT_PX,
   REPLAY_PLAYER_WIDTH_PX,
 } from "./constants";

@@ -24,7 +24,7 @@ export const createViewerClient = (baseUrl: string, runId: string): ViewerClient
           body: JSON.stringify(body),
         }),
       catch: (cause) => new ViewerPushError({ url, cause: String(cause) }),
-    }).pipe(Effect.catchTag("ViewerPushError", (error) => Effect.logDebug(error.message)));
+    }).pipe(Effect.catchTag("ViewerPushError", (error) => Effect.logWarning(error.message)));
   });
 
   return {

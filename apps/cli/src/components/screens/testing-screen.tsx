@@ -31,6 +31,8 @@ import { Image } from "../ui/image.js";
 import { ErrorMessage } from "../ui/error-message.js";
 import { createPlanFn } from "../../data/planning-atom.js";
 import { executePlanFn, screenshotPathsAtom } from "../../data/execution-atom.js";
+import { LIVE_VIEW_URL } from "../../live-view-url.js";
+import { openUrl } from "../../utils/open-url.js";
 
 interface TestingScreenProps {
   changesFor: ChangesFor;
@@ -166,6 +168,11 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
       if (key.escape || normalizedInput === "n") {
         setShowCancelConfirmation(false);
       }
+      return;
+    }
+
+    if (normalizedInput === "o" && (running || planning)) {
+      openUrl(LIVE_VIEW_URL);
       return;
     }
 

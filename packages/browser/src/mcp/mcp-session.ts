@@ -6,6 +6,9 @@ import { FileSystem } from "effect/FileSystem";
 import {
   buildViewerHtml,
   EVENT_COLLECT_INTERVAL_MS,
+  LIVE_VIEW_REDIRECT_DELAY_MS,
+  startLiveViewServer,
+  type LiveViewHandle,
   type ViewerRunState,
 } from "@browser-tester/videogen";
 import { Browser } from "../browser";
@@ -13,7 +16,10 @@ import { NavigationError } from "../errors";
 import { collectAllEvents } from "../recorder";
 import { evaluateRuntime } from "../utils/evaluate-runtime";
 import type { AnnotatedScreenshotOptions, SnapshotOptions, SnapshotResult } from "../types";
-import { BROWSER_TESTER_REPLAY_OUTPUT_ENV_NAME } from "./constants";
+import {
+  BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME,
+  BROWSER_TESTER_REPLAY_OUTPUT_ENV_NAME,
+} from "./constants";
 import { McpSessionNotOpenError } from "./errors";
 
 interface ConsoleEntry {
@@ -94,9 +100,11 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
     const replayOutputPath = yield* Config.option(
       Config.string(BROWSER_TESTER_REPLAY_OUTPUT_ENV_NAME),
     );
+    const liveViewUrl = yield* Config.option(Config.string(BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME));
     const sessionRef = yield* Ref.make<BrowserSessionData | undefined>(undefined);
     const pollingFiberRef = yield* Ref.make<Fiber.Fiber<unknown> | undefined>(undefined);
     const latestRunStateRef = yield* Ref.make<ViewerRunState | undefined>(undefined);
+    const liveViewRef = yield* Ref.make<LiveViewHandle | undefined>(undefined);
 
     const requireSession = Effect.fn("McpSession.requireSession")(function* () {
       const session = yield* Ref.get(sessionRef);
@@ -125,6 +133,7 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
 
     const pushStepEvent = Effect.fn("McpSession.pushStepEvent")(function* (state: ViewerRunState) {
       yield* Ref.set(latestRunStateRef, state);
+      yield* Effect.sync(() => Ref.getUnsafe(liveViewRef)?.pushRunState(state));
     });
 
     const pollPageEvents = Effect.sync(() => Ref.getUnsafe(sessionRef)).pipe(
@@ -137,6 +146,7 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
             Effect.sync(() => {
               if (Array.isArray(events) && events.length > 0) {
                 session.accumulatedReplayEvents.push(...events);
+                Ref.getUnsafe(liveViewRef)?.pushReplayEvents(events);
               }
             }),
           ),
@@ -173,6 +183,19 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
       yield* evaluateRuntime(pageResult.page, "startRecording").pipe(
         Effect.catchCause((cause) => Effect.logDebug("rrweb recording failed to start", { cause })),
       );
+
+      if (Option.isSome(liveViewUrl)) {
+        const handle = yield* startLiveViewServer({ liveViewUrl: liveViewUrl.value }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logDebug("Live view server failed to start", { cause }).pipe(
+              Effect.as(undefined),
+            ),
+          ),
+        );
+        if (handle) {
+          yield* Ref.set(liveViewRef, handle);
+        }
+      }
 
       const fiber = yield* pollPageEvents.pipe(
         Effect.repeat(Schedule.spaced(EVENT_COLLECT_INTERVAL_MS)),
@@ -225,6 +248,7 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
 
       let replaySessionPath: string | undefined;
       let reportPath: string | undefined;
+      let completedReportHtml: string | undefined;
 
       yield* Effect.gen(function* () {
         if (!activeSession.page.isClosed()) {
@@ -289,11 +313,24 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
                 ),
               );
             reportPath = htmlReportPath;
+            completedReportHtml = reportHtml;
           }
         }
       }).pipe(
         Effect.catchCause((cause) => Effect.logDebug("Failed during close cleanup", { cause })),
       );
+
+      const liveView = yield* Ref.get(liveViewRef);
+      if (liveView) {
+        if (completedReportHtml) {
+          liveView.complete(completedReportHtml);
+          yield* Effect.sleep(LIVE_VIEW_REDIRECT_DELAY_MS);
+        }
+        yield* liveView.close.pipe(
+          Effect.catchCause((cause) => Effect.logDebug("Failed to close live view", { cause })),
+        );
+        yield* Ref.set(liveViewRef, undefined);
+      }
 
       yield* Effect.tryPromise(() => activeSession.browser.close()).pipe(
         Effect.catchCause((cause) => Effect.logDebug("Failed to close browser", { cause })),

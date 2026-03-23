@@ -11,6 +11,7 @@ export interface LiveViewHandle {
   readonly pushReplayEvents: (events: eventWithTime[]) => void;
   readonly pushRunState: (state: ViewerRunState) => void;
   readonly getLatestRunState: () => ViewerRunState | undefined;
+  readonly complete: (reportHtml: string) => void;
   readonly close: Effect.Effect<void>;
 }
 
@@ -44,6 +45,7 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
   const sseClients = new Set<SseClient>();
   const accumulatedReplayEvents: eventWithTime[] = [];
   let latestRunState: ViewerRunState | undefined;
+  let finalReportHtml: string | undefined;
 
   const stepsPubSub = yield* PubSub.unbounded<ViewerRunState>();
 
@@ -150,6 +152,25 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
       return;
     }
 
+    if (pathname === "/report") {
+      if (finalReportHtml) {
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          ...NO_CACHE_HEADERS,
+        });
+        response.end(finalReportHtml);
+      } else {
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          ...NO_CACHE_HEADERS,
+        });
+        response.end(
+          '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="2;url=/"></head><body><p>Report not yet available. Redirecting&hellip;</p></body></html>',
+        );
+      }
+      return;
+    }
+
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...NO_CACHE_HEADERS });
     response.end("Not found");
   };
@@ -171,6 +192,10 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
       PubSub.publishUnsafe(stepsPubSub, state);
     },
     getLatestRunState: () => latestRunState,
+    complete: (reportHtml: string) => {
+      finalReportHtml = reportHtml;
+      broadcastSse("complete", "{}");
+    },
     close: Effect.gen(function* () {
       yield* Fiber.interrupt(stepsBroadcastFiber);
       for (const client of sseClients) client.end();

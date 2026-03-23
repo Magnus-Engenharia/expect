@@ -254,7 +254,10 @@ export const createBrowserMcpServer = <E>(
           const session = yield* McpSession;
           const result = yield* session.close();
           if (!result) return textResult("No browser open.");
-          return textResult("Browser closed.");
+          const parts = ["Browser closed."];
+          if (result.reportPath) parts.push(`Report: ${result.reportPath}`);
+          if (result.replaySessionPath) parts.push(`Replay: ${result.replaySessionPath}`);
+          return textResult(parts.join("\n"));
         }),
       ),
   );

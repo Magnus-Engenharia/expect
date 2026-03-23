@@ -25,6 +25,7 @@ const buildLoadEventsScript = (source: EventsSource): string => {
       const es = new EventSource('/events');
       es.addEventListener('replay', (msg) => { try { for (const e of JSON.parse(msg.data)) { allEvents.push(e); if (player) player.getReplayer().addEvent(e); } if (!player && allEvents.length >= 2) initPlayer(allEvents); } catch {} });
       es.addEventListener('steps', (msg) => { try { updateSteps(JSON.parse(msg.data)); } catch {} });
+      es.addEventListener('complete', () => { window.location.href = '/report'; });
       es.onerror = () => { if (statusEl) statusEl.textContent = 'Connection lost. Retrying...'; };`;
   }
 

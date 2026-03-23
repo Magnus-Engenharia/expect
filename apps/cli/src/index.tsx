@@ -14,6 +14,10 @@ import { usePreferencesStore } from "./stores/use-preferences.js";
 import { usePlanStore, Plan } from "./stores/use-plan-store.js";
 import { queryClient } from "./query-client.js";
 import { setInkInstance } from "./utils/clear-ink-display.js";
+import { LIVE_VIEW_URL } from "./live-view-url.js";
+import { BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME } from "@browser-tester/browser/mcp";
+
+process.env[BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME] = LIVE_VIEW_URL;
 
 const DEFAULT_SKIP_PLANNING = true;
 
