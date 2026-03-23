@@ -129,7 +129,7 @@ export const buildReplayViewerHtml = (options: ReplayViewerOptions): string => {
         statusEl?.remove();
         player = new rrwebPlayer({ target: container, props: {
           events, width: ${REPLAY_PLAYER_WIDTH_PX}, height: ${REPLAY_PLAYER_HEIGHT_PX},
-          autoPlay: ${isLive}, showController: ${!isLive}, ${isLive ? "liveMode: true," : ""}
+          autoPlay: ${isLive}, showController: true, ${isLive ? "liveMode: true," : ""}
         }});
         ${isLive ? "player.getReplayer().startLive();" : ""}
       };

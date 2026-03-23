@@ -32,7 +32,7 @@ export const LiveReplayPlayer = ({ events }: { events: eventWithTime[] }) => {
           width: REPLAY_PLAYER_WIDTH_PX,
           height: REPLAY_PLAYER_HEIGHT_PX,
           autoPlay: true,
-          showController: false,
+          showController: true,
           liveMode: true,
         },
       }) as RrwebPlayerHandle;
@@ -55,7 +55,9 @@ export const LiveReplayPlayer = ({ events }: { events: eventWithTime[] }) => {
     return (
       <Card>
         <CardContent className="py-4 text-center text-muted-foreground">
-          {events.length === 0 ? "Waiting for replay events\u2026" : "Waiting for more events\u2026"}
+          {events.length === 0
+            ? "Waiting for replay events\u2026"
+            : "Waiting for more events\u2026"}
         </CardContent>
       </Card>
     );

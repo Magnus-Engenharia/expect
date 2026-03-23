@@ -1,8 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { eventWithTime } from "@rrweb/types";
 import { Effect, Fiber, PubSub, Schema, Stream } from "effect";
+import { buildReplayViewerHtml } from "./replay-viewer";
 import { ViewerRunState } from "./viewer-events";
-import { buildViewerShell } from "./viewer-server";
 
 const decodeRunState = Schema.decodeUnknownSync(ViewerRunState);
 
@@ -21,7 +21,10 @@ export interface StartLiveViewServerOptions {
 
 type SseClient = ServerResponse<IncomingMessage>;
 
-const NO_CACHE_HEADERS = { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } as const;
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store",
+  "Access-Control-Allow-Origin": "*",
+} as const;
 
 const listenServer = (server: Server, host: string, port: number) =>
   Effect.callback<void, Error>((resume) => {
@@ -49,15 +52,10 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
 
   const stepsPubSub = yield* PubSub.unbounded<ViewerRunState>();
 
-  const viewerHtml = yield* buildViewerShell().pipe(
-    Effect.catchCause((cause) =>
-      Effect.logDebug("Viewer build failed, using fallback", { cause }).pipe(
-        Effect.as(
-          '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:system-ui;background:#0f172a;color:#94a3b8;display:flex;align-items:center;justify-content:center;height:100vh}</style></head><body><p>Live view unavailable (viewer build failed).</p></body></html>',
-        ),
-      ),
-    ),
-  );
+  const viewerHtml = buildReplayViewerHtml({
+    title: "Browser Tester Live View",
+    eventsSource: "sse",
+  });
 
   const broadcastSse = (eventType: string, data: string): void => {
     const message = `event: ${eventType}\ndata: ${data}\n\n`;
@@ -114,14 +112,12 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
     });
   };
 
+  const viteMiddleware = (globalThis as Record<string, unknown>)["__browserTesterViteHandler"] as
+    | ((request: IncomingMessage, response: SseClient, next: () => void) => void)
+    | undefined;
+
   const routeRequest = (request: IncomingMessage, response: SseClient): void => {
     const pathname = new URL(request.url ?? "/", parsedUrl).pathname;
-
-    if (pathname === "/") {
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...NO_CACHE_HEADERS });
-      response.end(viewerHtml);
-      return;
-    }
 
     if (pathname === "/events") {
       handleSseRequest(request, response);
@@ -176,13 +172,39 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
       return;
     }
 
+    if (viteMiddleware) {
+      viteMiddleware(request, response, () => {
+        response.writeHead(404, {
+          "Content-Type": "text/plain; charset=utf-8",
+          ...NO_CACHE_HEADERS,
+        });
+        response.end("Not found");
+      });
+      return;
+    }
+
+    if (pathname === "/") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...NO_CACHE_HEADERS });
+      response.end(viewerHtml);
+      return;
+    }
+
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...NO_CACHE_HEADERS });
     response.end("Not found");
   };
 
-  const server = createServer(routeRequest);
+  const existingServer = (globalThis as Record<string, unknown>)["__browserTesterLiveViewServer"];
+  const server =
+    existingServer && typeof (existingServer as Server).on === "function"
+      ? (existingServer as Server)
+      : createServer();
 
-  yield* listenServer(server, parsedUrl.hostname, Number(parsedUrl.port));
+  server.removeAllListeners("request");
+  server.on("request", routeRequest);
+
+  if (!server.listening) {
+    yield* listenServer(server, parsedUrl.hostname, Number(parsedUrl.port));
+  }
 
   const stepsBroadcastFiber = yield* Stream.fromPubSub(stepsPubSub).pipe(
     Stream.tap((state) => Effect.sync(() => broadcastRunState(state))),
@@ -205,6 +227,14 @@ export const startLiveViewServer = Effect.fn("LiveViewServer.start")(function* (
       yield* Fiber.interrupt(stepsBroadcastFiber);
       for (const client of sseClients) client.end();
       sseClients.clear();
+      const viteDevServer = (globalThis as Record<string, unknown>)["__browserTesterViteServer"];
+      if (viteDevServer) {
+        delete (globalThis as Record<string, unknown>)["__browserTesterViteServer"];
+        delete (globalThis as Record<string, unknown>)["__browserTesterViteHandler"];
+        yield* Effect.tryPromise(() =>
+          (viteDevServer as { close: () => Promise<void> }).close(),
+        ).pipe(Effect.catchCause(() => Effect.void));
+      }
       yield* closeServer(server);
     }),
   } satisfies LiveViewHandle;

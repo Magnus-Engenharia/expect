@@ -1,22 +1,29 @@
 import { Effect, Option } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import { Agent } from "@browser-tester/agent";
-import { Git, Planner, TestPlanDraft, DraftId } from "@browser-tester/supervisor";
+import {
+  Git,
+  Planner,
+  TestPlanDraft,
+  TestPlan,
+  TestPlanStep,
+  DraftId,
+} from "@browser-tester/supervisor";
 import type { AgentBackend } from "@browser-tester/agent";
-import type { ChangesFor } from "@browser-tester/shared/models";
+import { type ChangesFor, PlanId, StepId } from "@browser-tester/shared/models";
 import { cliAtomRuntime } from "./runtime.js";
 
 interface CreatePlanInput {
   readonly changesFor: ChangesFor;
   readonly flowInstruction: string;
   readonly agentBackend: AgentBackend;
+  readonly skipPlanning: boolean;
 }
 
 export const createPlanFn = cliAtomRuntime.fn(
   Effect.fnUntraced(
     function* (input: CreatePlanInput, _ctx: Atom.FnContext) {
       const git = yield* Git;
-      const planner = yield* Planner;
 
       const currentBranch = yield* git.getCurrentBranch;
       const fileStats = yield* git.getFileStats(input.changesFor);
@@ -36,8 +43,30 @@ export const createPlanFn = cliAtomRuntime.fn(
         requiresCookies: false,
       });
 
+      if (input.skipPlanning) {
+        console.error("[planning-atom] skipping AI planner, creating single-step plan");
+        return new TestPlan({
+          ...draft,
+          id: PlanId.makeUnsafe(crypto.randomUUID()),
+          title: input.flowInstruction,
+          rationale: "",
+          steps: [
+            new TestPlanStep({
+              id: StepId.makeUnsafe("step-01"),
+              title: input.flowInstruction,
+              instruction: input.flowInstruction,
+              expectedOutcome: "The instruction is completed successfully",
+              routeHint: Option.none(),
+              status: "pending",
+              summary: Option.none(),
+            }),
+          ],
+        });
+      }
+
       console.error("[planning-atom] prompt length:", draft.prompt.length);
 
+      const planner = yield* Planner;
       const testPlan = yield* planner
         .plan(draft)
         .pipe(Effect.provide(Agent.layerFor(input.agentBackend)));

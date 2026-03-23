@@ -45,7 +45,11 @@ const buildToTmpDir = Effect.fn("ViewerServer.buildToTmpDir")(function* (viewerR
     Effect.catchTag("UnknownError", Effect.die),
   );
   yield* Effect.tryPromise(() =>
-    vite.build({ root: viewerRoot, logLevel: "warn", build: { outDir: tmpDir, emptyOutDir: true } }),
+    vite.build({
+      root: viewerRoot,
+      logLevel: "warn",
+      build: { outDir: tmpDir, emptyOutDir: true },
+    }),
   ).pipe(Effect.catchTag("UnknownError", Effect.die));
 
   return tmpDir;

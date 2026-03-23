@@ -96,11 +96,11 @@ export const TestingScreen = ({ changesFor, instruction }: TestingScreenProps) =
     planningStartedRef.current = true;
     setRunStartedAt(Date.now());
 
-    triggerCreatePlan({ changesFor, flowInstruction: instruction, agentBackend })
+    const { skipPlanning } = usePreferencesStore.getState();
+    triggerCreatePlan({ changesFor, flowInstruction: instruction, agentBackend, skipPlanning })
       .then((plan) => {
         usePlanStore.getState().setReadyTestPlan(plan);
 
-        const { skipPlanning } = usePreferencesStore.getState();
         if (skipPlanning) {
           setTestPlan(plan);
         } else {

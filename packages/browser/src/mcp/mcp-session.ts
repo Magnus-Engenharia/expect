@@ -101,10 +101,22 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
       Config.string(BROWSER_TESTER_REPLAY_OUTPUT_ENV_NAME),
     );
     const liveViewUrl = yield* Config.option(Config.string(BROWSER_TESTER_LIVE_VIEW_URL_ENV_NAME));
+    const liveViewRef = yield* Ref.make<LiveViewHandle | undefined>(undefined);
+
+    if (Option.isSome(liveViewUrl)) {
+      const handle = yield* startLiveViewServer({ liveViewUrl: liveViewUrl.value }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logDebug("Live view server failed to start", { cause }).pipe(Effect.as(undefined)),
+        ),
+      );
+      if (handle) {
+        yield* Ref.set(liveViewRef, handle);
+      }
+    }
+
     const sessionRef = yield* Ref.make<BrowserSessionData | undefined>(undefined);
     const pollingFiberRef = yield* Ref.make<Fiber.Fiber<unknown> | undefined>(undefined);
     const latestRunStateRef = yield* Ref.make<ViewerRunState | undefined>(undefined);
-    const liveViewRef = yield* Ref.make<LiveViewHandle | undefined>(undefined);
 
     const requireSession = Effect.fn("McpSession.requireSession")(function* () {
       const session = yield* Ref.get(sessionRef);
@@ -183,19 +195,6 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
       yield* evaluateRuntime(pageResult.page, "startRecording").pipe(
         Effect.catchCause((cause) => Effect.logDebug("rrweb recording failed to start", { cause })),
       );
-
-      if (Option.isSome(liveViewUrl)) {
-        const handle = yield* startLiveViewServer({ liveViewUrl: liveViewUrl.value }).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logDebug("Live view server failed to start", { cause }).pipe(
-              Effect.as(undefined),
-            ),
-          ),
-        );
-        if (handle) {
-          yield* Ref.set(liveViewRef, handle);
-        }
-      }
 
       const fiber = yield* pollPageEvents.pipe(
         Effect.repeat(Schedule.spaced(EVENT_COLLECT_INTERVAL_MS)),
