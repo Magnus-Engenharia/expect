@@ -51,6 +51,18 @@ const buildToTmpDir = Effect.fn("ViewerServer.buildToTmpDir")(function* (viewerR
   return tmpDir;
 });
 
+export const buildViewerShell = Effect.fn("buildViewerShell")(function* () {
+  const fileSystem = yield* FileSystem;
+  const viewerRoot = yield* resolveViewerRoot();
+
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const distDir = yield* buildToTmpDir(viewerRoot);
+      return yield* fileSystem.readFileString(join(distDir, "index.html"));
+    }),
+  );
+});
+
 export const buildViewerHtml = Effect.fn("buildViewerHtml")(function* (
   options: BuildViewerHtmlOptions,
 ) {

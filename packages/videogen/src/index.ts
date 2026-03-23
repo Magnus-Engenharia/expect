@@ -1,6 +1,6 @@
 export { startLiveViewServer } from "./live-view-server";
 export type { LiveViewHandle, StartLiveViewServerOptions } from "./live-view-server";
-export { buildViewerHtml } from "./viewer-server";
+export { buildViewerHtml, buildViewerShell } from "./viewer-server";
 export type { BuildViewerHtmlOptions } from "./viewer-server";
 export { createViewerClient } from "./viewer-client";
 export type { ViewerClient } from "./viewer-client";
