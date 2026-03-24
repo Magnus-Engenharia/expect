@@ -41,7 +41,10 @@ export interface EventMap {
   "error:expected": { readonly error_tag: string; readonly error_message: string };
 
   // Session
-  "session:started": undefined;
+  "session:started": {
+    readonly mode: "interactive" | "headless";
+    readonly skip_planning: boolean;
+  };
   "session:ended": { readonly session_ms: number };
 
   // Flows

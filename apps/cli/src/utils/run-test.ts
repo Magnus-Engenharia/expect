@@ -32,7 +32,10 @@ export const runHeadless = (options: HeadlessRunOptions) =>
     const analytics = yield* Analytics;
 
     const sessionStartedAt = Date.now();
-    yield* analytics.capture("session:started");
+    yield* analytics.capture("session:started", {
+      mode: "headless",
+      skip_planning: true,
+    });
 
     console.log(`expect v${VERSION}`);
     console.log(`Testing ${changesForDisplayName(options.changesFor)}`);

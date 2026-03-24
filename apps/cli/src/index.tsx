@@ -51,9 +51,9 @@ Examples:
 
 const isHeadless = () => !process.stdin.isTTY;
 
-const renderApp = async (agent: AgentBackend) => {
+const renderApp = async (agent: AgentBackend, skipPlanning = DEFAULT_SKIP_PLANNING) => {
   const sessionStartedAt = Date.now();
-  await trackSessionStarted();
+  await trackSessionStarted(skipPlanning);
 
   const initialTheme = loadThemeName() ?? undefined;
   process.stdout.write(ALT_SCREEN_ON);
