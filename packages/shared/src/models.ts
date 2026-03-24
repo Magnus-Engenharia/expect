@@ -1,5 +1,189 @@
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
-import { Match, Option, Predicate, Schema } from "effect";
+import { DateTime, Match, Option, Predicate, Schema } from "effect";
+
+const AcpToolCallStatus = Schema.Literals([
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+] as const);
+
+const AcpToolKind = Schema.Literals([
+  "read",
+  "edit",
+  "delete",
+  "move",
+  "search",
+  "execute",
+  "think",
+  "fetch",
+  "switch_mode",
+  "other",
+] as const);
+
+const AcpStopReason = Schema.Literals([
+  "end_turn",
+  "max_tokens",
+  "max_turn_requests",
+  "refusal",
+  "cancelled",
+] as const);
+
+const AcpContentBlock = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("text"), text: Schema.String }),
+  Schema.Struct({
+    type: Schema.Literal("image"),
+    data: Schema.String,
+    mimeType: Schema.String,
+  }),
+  Schema.Struct({ type: Schema.Literal("resource_link"), uri: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("resource"), uri: Schema.String }),
+]);
+
+const AcpToolCallContent = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("content"),
+    content: AcpContentBlock,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("diff"),
+    path: Schema.String,
+    oldText: Schema.optional(Schema.NullOr(Schema.String)),
+    newText: Schema.optional(Schema.NullOr(Schema.String)),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("terminal"),
+    terminalId: Schema.String,
+  }),
+]);
+
+const AcpToolCallLocation = Schema.Struct({
+  path: Schema.String,
+  lineNumber: Schema.optional(Schema.NullOr(Schema.Number)),
+});
+
+export class AcpAgentMessageChunk extends Schema.Class<AcpAgentMessageChunk>(
+  "AcpAgentMessageChunk",
+)({
+  sessionUpdate: Schema.Literal("agent_message_chunk"),
+  content: AcpContentBlock,
+  messageId: Schema.optional(Schema.NullOr(Schema.String)),
+}) {}
+
+export class AcpAgentThoughtChunk extends Schema.Class<AcpAgentThoughtChunk>(
+  "AcpAgentThoughtChunk",
+)({
+  sessionUpdate: Schema.Literal("agent_thought_chunk"),
+  content: AcpContentBlock,
+  messageId: Schema.optional(Schema.NullOr(Schema.String)),
+}) {}
+
+export class AcpUserMessageChunk extends Schema.Class<AcpUserMessageChunk>("AcpUserMessageChunk")({
+  sessionUpdate: Schema.Literal("user_message_chunk"),
+  content: AcpContentBlock,
+  messageId: Schema.optional(Schema.NullOr(Schema.String)),
+}) {}
+
+export class AcpToolCall extends Schema.Class<AcpToolCall>("AcpToolCall")({
+  sessionUpdate: Schema.Literal("tool_call"),
+  toolCallId: Schema.String,
+  title: Schema.String,
+  kind: Schema.optional(AcpToolKind),
+  status: Schema.optional(AcpToolCallStatus),
+  content: Schema.optional(Schema.Array(AcpToolCallContent)),
+  locations: Schema.optional(Schema.Array(AcpToolCallLocation)),
+  rawInput: Schema.optional(Schema.Unknown),
+  rawOutput: Schema.optional(Schema.Unknown),
+}) {}
+
+export class AcpToolCallUpdate extends Schema.Class<AcpToolCallUpdate>("AcpToolCallUpdate")({
+  sessionUpdate: Schema.Literal("tool_call_update"),
+  toolCallId: Schema.String,
+  title: Schema.optional(Schema.NullOr(Schema.String)),
+  kind: Schema.optional(Schema.NullOr(AcpToolKind)),
+  status: Schema.optional(Schema.NullOr(AcpToolCallStatus)),
+  content: Schema.optional(Schema.NullOr(Schema.Array(AcpToolCallContent))),
+  locations: Schema.optional(Schema.NullOr(Schema.Array(AcpToolCallLocation))),
+  rawInput: Schema.optional(Schema.Unknown),
+  rawOutput: Schema.optional(Schema.Unknown),
+}) {}
+
+const AcpPlanEntryStatus = Schema.Literals(["pending", "in_progress", "completed"] as const);
+
+const AcpPlanEntryPriority = Schema.Literals(["high", "medium", "low"] as const);
+
+export class AcpPlanUpdate extends Schema.Class<AcpPlanUpdate>("AcpPlanUpdate")({
+  sessionUpdate: Schema.Literal("plan"),
+  entries: Schema.Array(
+    Schema.Struct({
+      content: Schema.String,
+      priority: AcpPlanEntryPriority,
+      status: AcpPlanEntryStatus,
+    }),
+  ),
+}) {}
+
+export class AcpAvailableCommandsUpdate extends Schema.Class<AcpAvailableCommandsUpdate>(
+  "AcpAvailableCommandsUpdate",
+)({
+  sessionUpdate: Schema.Literal("available_commands_update"),
+}) {}
+
+export class AcpCurrentModeUpdate extends Schema.Class<AcpCurrentModeUpdate>(
+  "AcpCurrentModeUpdate",
+)({
+  sessionUpdate: Schema.Literal("current_mode_update"),
+}) {}
+
+export class AcpConfigOptionUpdate extends Schema.Class<AcpConfigOptionUpdate>(
+  "AcpConfigOptionUpdate",
+)({
+  sessionUpdate: Schema.Literal("config_option_update"),
+}) {}
+
+export class AcpSessionInfoUpdate extends Schema.Class<AcpSessionInfoUpdate>(
+  "AcpSessionInfoUpdate",
+)({
+  sessionUpdate: Schema.Literal("session_info_update"),
+}) {}
+
+export class AcpUsageUpdate extends Schema.Class<AcpUsageUpdate>("AcpUsageUpdate")({
+  sessionUpdate: Schema.Literal("usage_update"),
+}) {}
+
+export const AcpSessionUpdate = Schema.Union([
+  AcpAgentMessageChunk,
+  AcpAgentThoughtChunk,
+  AcpUserMessageChunk,
+  AcpToolCall,
+  AcpToolCallUpdate,
+  AcpPlanUpdate,
+  AcpAvailableCommandsUpdate,
+  AcpCurrentModeUpdate,
+  AcpConfigOptionUpdate,
+  AcpSessionInfoUpdate,
+  AcpUsageUpdate,
+]);
+export type AcpSessionUpdate = typeof AcpSessionUpdate.Type;
+
+export class AcpSessionNotification extends Schema.Class<AcpSessionNotification>(
+  "AcpSessionNotification",
+)({
+  sessionId: Schema.String,
+  update: AcpSessionUpdate,
+}) {}
+
+export const AcpUsage = Schema.Struct({
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cachedReadTokens: Schema.optional(Schema.NullOr(Schema.Number)),
+  cachedWriteTokens: Schema.optional(Schema.NullOr(Schema.Number)),
+  thoughtTokens: Schema.optional(Schema.NullOr(Schema.Number)),
+});
+
+export class AcpPromptResponse extends Schema.Class<AcpPromptResponse>("AcpPromptResponse")({
+  stopReason: AcpStopReason,
+  usage: Schema.optional(Schema.NullOr(AcpUsage)),
+}) {}
 
 export interface ChangedFile {
   path: string;
@@ -165,11 +349,15 @@ export class TestPlanStep extends Schema.Class<TestPlanStep>("@supervisor/TestPl
   routeHint: Schema.OptionFromNullOr(Schema.String),
   status: StepStatus,
   summary: Schema.Option(Schema.String),
-  // summary: Schema.optionalWith(Schema.String, { default: () => "" }),
+  startedAt: Schema.Option(Schema.DateTimeUtc),
+  endedAt: Schema.Option(Schema.DateTimeUtc),
 }) {
   update(
     fields: Partial<
-      Pick<TestPlanStep, "title" | "instruction" | "expectedOutcome" | "status" | "summary">
+      Pick<
+        TestPlanStep,
+        "title" | "instruction" | "expectedOutcome" | "status" | "summary" | "startedAt" | "endedAt"
+      >
     >,
   ): TestPlanStep {
     return new TestPlanStep({ ...this, ...fields });
@@ -369,27 +557,46 @@ export const TestPlanJson = Schema.Struct({
 
 export class RunStarted extends Schema.TaggedClass<RunStarted>()("RunStarted", {
   plan: TestPlan,
-}) {}
+}) {
+  get id(): string {
+    return `run-started-${this.plan.id}`;
+  }
+}
 
 export class StepStarted extends Schema.TaggedClass<StepStarted>()("StepStarted", {
   stepId: StepId,
   title: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `step-started-${this.stepId}`;
+  }
+}
 
 export class StepCompleted extends Schema.TaggedClass<StepCompleted>()("StepCompleted", {
   stepId: StepId,
   summary: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `step-completed-${this.stepId}`;
+  }
+}
 
 export class StepFailed extends Schema.TaggedClass<StepFailed>()("StepFailed", {
   stepId: StepId,
   message: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `step-failed-${this.stepId}`;
+  }
+}
 
 export class ToolCall extends Schema.TaggedClass<ToolCall>()("ToolCall", {
   toolName: Schema.String,
   input: Schema.Unknown,
 }) {
+  get id(): string {
+    return `tool-call-${this.toolName}-${JSON.stringify(this.input)}`;
+  }
   get displayText(): string {
     if (Predicate.isObject(this.input) && "command" in this.input) {
       return String(this.input.command).slice(0, TOOL_CALL_DISPLAY_TEXT_CHAR_LIMIT);
@@ -402,20 +609,36 @@ export class ToolResult extends Schema.TaggedClass<ToolResult>()("ToolResult", {
   toolName: Schema.String,
   result: Schema.String,
   isError: Schema.Boolean,
-}) {}
+}) {
+  get id(): string {
+    return `tool-result-${this.toolName}-${this.result}`;
+  }
+}
 
 export class AgentThinking extends Schema.TaggedClass<AgentThinking>()("AgentThinking", {
   text: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `agent-thinking-${this.text}`;
+  }
+}
 
 export class AgentText extends Schema.TaggedClass<AgentText>()("AgentText", {
   text: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `agent-text-${this.text}`;
+  }
+}
 
 export class RunFinished extends Schema.TaggedClass<RunFinished>()("RunFinished", {
   status: Schema.Literals(["passed", "failed"] as const),
   summary: Schema.String,
-}) {}
+}) {
+  get id(): string {
+    return `run-finished-${this.status}`;
+  }
+}
 
 const serializeToolResult = (value: unknown): string => {
   if (
@@ -580,86 +803,94 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
 )({
   events: Schema.Array(ExecutionEvent),
 }) {
-  addEvent(part: LanguageModelV3StreamPart): ExecutedTestPlan {
-    if (part.type === "reasoning-start") {
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new AgentThinking({ text: "" })],
-      });
-    }
-
-    if (part.type === "reasoning-delta") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentThinking") return this;
-      return new ExecutedTestPlan({
-        ...this,
-        events: [
-          ...this.events.slice(0, -1),
-          new AgentThinking({ text: lastEvent.text + part.delta }),
-        ],
-      });
-    }
-
-    if (part.type === "text-start") {
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new AgentText({ text: "" })],
-      });
-    }
-
-    if (part.type === "text-delta") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentText") return this;
-      console.error(part.delta);
-      return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events.slice(0, -1), new AgentText({ text: lastEvent.text + part.delta })],
-      });
-    }
-
-    /** @note(rasmus): handle markers when the text block ends */
-    if (part.type === "text-end") {
-      const lastEvent = this.events.at(-1);
-      if (lastEvent?._tag !== "AgentText") return this;
-      const foundMarkers = lastEvent.text
-        .split("\n")
-        .map(parseMarker)
-        .filter(Predicate.isNotUndefined);
-      if (foundMarkers.length === 0) return this;
-      let result: ExecutedTestPlan = new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, ...foundMarkers],
-      });
-      for (const marker of foundMarkers) {
-        result = result.applyMarker(marker);
+  addEvent(update: AcpSessionUpdate): ExecutedTestPlan {
+    if (update.sessionUpdate === "agent_thought_chunk") {
+      if (update.content.type !== "text" || update.content.text === undefined) return this;
+      const base = this.finalizeTextBlock();
+      const lastEvent = base.events.at(-1);
+      if (lastEvent?._tag === "AgentThinking") {
+        return new ExecutedTestPlan({
+          ...base,
+          events: [
+            ...base.events.slice(0, -1),
+            new AgentThinking({ text: lastEvent.text + update.content.text }),
+          ],
+        });
       }
-      return result;
-    }
-
-    if (part.type === "tool-call") {
-      console.error(`tool call: ${part.toolName}`);
       return new ExecutedTestPlan({
-        ...this,
-        events: [...this.events, new ToolCall({ toolName: part.toolName, input: part.input })],
+        ...base,
+        events: [...base.events, new AgentThinking({ text: update.content.text })],
       });
     }
 
-    if (part.type === "tool-result") {
-      console.error(`tool result: ${part.toolName}`);
+    if (update.sessionUpdate === "agent_message_chunk") {
+      if (update.content.type !== "text" || update.content.text === undefined) return this;
+      const lastEvent = this.events.at(-1);
+      if (lastEvent?._tag === "AgentText") {
+        return new ExecutedTestPlan({
+          ...this,
+          events: [
+            ...this.events.slice(0, -1),
+            new AgentText({ text: lastEvent.text + update.content.text }),
+          ],
+        });
+      }
       return new ExecutedTestPlan({
         ...this,
+        events: [...this.events, new AgentText({ text: update.content.text })],
+      });
+    }
+
+    if (update.sessionUpdate === "tool_call") {
+      let result = this.finalizeTextBlock();
+      return new ExecutedTestPlan({
+        ...result,
         events: [
-          ...this.events,
-          new ToolResult({
-            toolName: part.toolName,
-            result: serializeToolResult(part.result),
-            isError: Boolean(part.isError),
+          ...result.events,
+          new ToolCall({
+            toolName: update.title,
+            input: JSON.stringify(update.rawInput ?? {}),
           }),
         ],
       });
     }
 
+    if (update.sessionUpdate === "tool_call_update") {
+      if (update.status === "completed" || update.status === "failed") {
+        return new ExecutedTestPlan({
+          ...this,
+          events: [
+            ...this.events,
+            new ToolResult({
+              toolName: update.title ?? "",
+              result: serializeToolResult(update.rawOutput),
+              isError: update.status === "failed",
+            }),
+          ],
+        });
+      }
+      return this;
+    }
+
     return this;
+  }
+
+  private finalizeTextBlock(): ExecutedTestPlan {
+    const lastEvent = this.events.at(-1);
+    if (lastEvent?._tag !== "AgentText") return this;
+    const foundMarkers = lastEvent.text
+      .split("\n")
+      .map(parseMarker)
+      .filter(Predicate.isNotUndefined);
+    if (foundMarkers.length === 0) return this;
+    let result: ExecutedTestPlan = new ExecutedTestPlan({
+      ...this,
+      events: [...this.events, ...foundMarkers],
+    });
+    for (const marker of foundMarkers) {
+      result = result.applyMarker(marker);
+    }
+    return result;
   }
 
   applyMarker(marker: ExecutionEvent): ExecutedTestPlan {
@@ -667,7 +898,12 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
       return new ExecutedTestPlan({
         ...this,
         steps: this.steps.map((step) =>
-          step.id === marker.stepId ? step.update({ status: "active" }) : step,
+          step.id === marker.stepId
+            ? step.update({
+                status: "active",
+                startedAt: Option.some(DateTime.nowUnsafe()),
+              })
+            : step,
         ),
       });
     }
@@ -679,6 +915,7 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
             ? step.update({
                 status: "passed",
                 summary: Option.some(marker.summary),
+                endedAt: Option.some(DateTime.nowUnsafe()),
               })
             : step,
         ),
@@ -692,6 +929,7 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
             ? step.update({
                 status: "failed",
                 summary: Option.some(marker.message),
+                endedAt: Option.some(DateTime.nowUnsafe()),
               })
             : step,
         ),
@@ -756,12 +994,34 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
 
   get toPlainText(): string {
     const statuses = this.stepStatuses;
-    const lines = [`Status: ${this.status}`, `Summary: ${this.summary}`];
+    const passedCount = this.steps.filter(
+      (step) => statuses.get(step.id)?.status === "passed",
+    ).length;
+    const failedCount = this.steps.filter(
+      (step) => statuses.get(step.id)?.status === "failed",
+    ).length;
+
+    const icon = this.status === "passed" ? "\u2705" : "\u274C";
+    const lines = [
+      `${icon} ${this.title} \u2014 ${this.status.toUpperCase()}`,
+      "",
+      this.summary,
+      "",
+      `${passedCount} passed, ${failedCount} failed out of ${this.steps.length} steps`,
+      "",
+    ];
+
     for (const step of this.steps) {
       const entry = statuses.get(step.id);
       const stepStatus = entry?.status ?? "not-run";
-      lines.push(`${stepStatus.toUpperCase()} ${step.title}: ${entry?.summary ?? ""}`);
+      const stepIcon =
+        stepStatus === "passed" ? "\u2713" : stepStatus === "failed" ? "\u2717" : "\u2013";
+      lines.push(`  ${stepIcon} ${step.title}`);
+      if (entry?.summary) {
+        lines.push(`    ${entry.summary}`);
+      }
     }
+
     return lines.join("\n");
   }
 }

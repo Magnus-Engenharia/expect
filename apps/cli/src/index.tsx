@@ -14,6 +14,8 @@ import { usePreferencesStore } from "./stores/use-preferences.js";
 import { usePlanStore, Plan } from "./stores/use-plan-store.js";
 import { queryClient } from "./query-client.js";
 import { setInkInstance } from "./utils/clear-ink-display.js";
+import { RegistryProvider } from "@effect/atom-react";
+import { agentProviderAtom } from "./data/runtime.js";
 
 const DEFAULT_SKIP_PLANNING = true;
 
@@ -25,6 +27,7 @@ interface CommanderOpts {
   flow?: string;
   yes?: boolean;
   agent?: AgentBackend;
+  verbose?: boolean;
 }
 
 const program = new Command()
@@ -35,6 +38,7 @@ const program = new Command()
   .option("-f, --flow <slug>", "reuse a saved flow by its slug")
   .option("-y, --yes", "skip plan review and run immediately")
   .option("-a, --agent <provider>", "agent provider to use (claude or codex)")
+  .option("--verbose", "enable verbose logging")
   .addHelpText(
     "after",
     `
@@ -46,16 +50,18 @@ Examples:
 
 const isHeadless = () => !process.stdin.isTTY;
 
-const renderApp = async () => {
+const renderApp = async (agent: AgentBackend) => {
   const initialTheme = loadThemeName() ?? undefined;
   process.stdout.write(ALT_SCREEN_ON);
   process.on("exit", () => process.stdout.write(ALT_SCREEN_OFF));
   const instance = render(
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider initialTheme={initialTheme}>
-        <App />
-      </ThemeProvider>
-    </QueryClientProvider>,
+    <RegistryProvider initialValues={[[agentProviderAtom, Option.some(agent)]]}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider initialTheme={initialTheme}>
+          <App agent={agent} />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </RegistryProvider>,
   );
   setInkInstance(instance);
   await instance.waitUntilExit();
@@ -75,7 +81,10 @@ const resolveChangesFor = async (
 
       if (action === "commit" && commitHash) {
         return {
-          changesFor: ChangesFor.makeUnsafe({ _tag: "Commit", hash: commitHash }),
+          changesFor: ChangesFor.makeUnsafe({
+            _tag: "Commit",
+            hash: commitHash,
+          }),
           currentBranch,
         };
       }
@@ -118,7 +127,7 @@ const seedStores = (opts: CommanderOpts, changesFor: ChangesFor, currentBranch: 
       isHeadless: false,
       requiresCookies: false,
     });
-    usePlanStore.setState({ plan: Plan.draft(draft), readyTestPlan: undefined });
+    usePlanStore.setState({ plan: Plan.draft(draft) });
     useNavigationStore.setState({
       screen: Screen.Testing({ changesFor, instruction: opts.message }),
     });
@@ -136,7 +145,8 @@ const runHeadlessForAction = async (
   return runHeadless({
     changesFor,
     instruction: opts.message ?? DEFAULT_INSTRUCTION,
-    agent: opts.agent,
+    agent: opts.agent ?? "claude",
+    verbose: opts.verbose ?? false,
   });
 };
 
@@ -147,7 +157,7 @@ const runInteractiveForAction = async (
 ) => {
   const { changesFor, currentBranch } = await resolveChangesFor(action, commitHash);
   seedStores(opts, changesFor, currentBranch);
-  renderApp();
+  renderApp(opts.agent ?? "claude");
 };
 
 program
@@ -177,7 +187,7 @@ program.action(async () => {
   if (hasOptions) {
     await runInteractiveForAction("changes", opts);
   } else {
-    renderApp();
+    renderApp(opts.agent ?? "claude");
   }
 });
 

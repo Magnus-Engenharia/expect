@@ -1,13 +1,17 @@
-import { Agent, AgentStreamOptions, ClaudeQueryError, CodexRunError } from "@browser-tester/agent";
+import {
+  AcpSessionCreateError,
+  AcpStreamError,
+  Agent,
+  AgentStreamOptions,
+} from "@browser-tester/agent";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
 import { ExecutedTestPlan, RunStarted, type TestPlan } from "@browser-tester/shared/models";
 import { NodeServices } from "@effect/platform-node";
-import { Updates } from "./updates";
 
 export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervisor/ExecutionError")(
   {
     _tag: Schema.tag("@supervisor/ExecutionError"),
-    reason: Schema.Union([ClaudeQueryError, CodexRunError]),
+    reason: Schema.Union([AcpStreamError, AcpSessionCreateError]),
   },
 ) {
   message = `Execution failed: ${this.reason.message}`;
@@ -15,10 +19,9 @@ export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervis
 
 export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Executor", {
   make: Effect.gen(function* () {
-    const updates = yield* Updates;
+    const agent = yield* Agent;
 
     const executePlan = Effect.fn("Executor.executePlan")(function* (plan: TestPlan) {
-      const agent = yield* Agent;
       const initial = new ExecutedTestPlan({
         ...plan,
         events: [new RunStarted({ plan })],
@@ -35,17 +38,17 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
         Stream.mapAccum(
           () => initial,
           (executed, part) => {
+            /* console.log("PART:  ");
+              console.dir(part, { depth: null }); */
             const next = executed.addEvent(part);
+            /* console.log("NEXT:  ");
+              console.dir(next.events, { depth: null });
+              console.log(
+                " --- --- --- --- --- --- --- --- ---  --- --- --- --- --- --- --- --- ---  --- --- --- --- --- --- --- --- --- "
+                ); */
             return [next, [next]] as const;
           },
         ),
-        Stream.tap((executed) => {
-          const lastEvent = executed.events.at(-1);
-          if (lastEvent && lastEvent._tag !== "AgentText") {
-            return updates.publish(lastEvent);
-          }
-          return Effect.void;
-        }),
         Stream.mapError((reason) => new ExecutionError({ reason })),
       );
     }, Stream.unwrap);
@@ -53,8 +56,5 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
     return { executePlan } as const;
   }),
 }) {
-  static layer = Layer.effect(this)(this.make).pipe(
-    Layer.provide(NodeServices.layer),
-    Layer.provide(Updates.layer),
-  );
+  static layer = Layer.effect(this)(this.make).pipe(Layer.provide(NodeServices.layer));
 }

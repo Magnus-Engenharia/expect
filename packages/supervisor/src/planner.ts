@@ -1,9 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
-import { Agent, AgentStreamOptions, ClaudeQueryError, CodexRunError } from "@browser-tester/agent";
-import { Effect, Layer, Option, Result, Schema, ServiceMap, Stream } from "effect";
+import {
+  AcpSessionCreateError,
+  AcpStreamError,
+  Agent,
+  AgentStreamOptions,
+} from "@browser-tester/agent";
+import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
 import {
   PlanId,
   StepId,
@@ -25,15 +29,10 @@ export class PlanParseError extends Schema.ErrorClass<PlanParseError>("@supervis
 
 export class PlanningError extends Schema.ErrorClass<PlanningError>("@supervisor/PlanningError")({
   _tag: Schema.tag("@supervisor/PlanningError"),
-  reason: Schema.Union([ClaudeQueryError, CodexRunError, PlanParseError]),
+  reason: Schema.Union([AcpStreamError, AcpSessionCreateError, PlanParseError]),
 }) {
   message = `Planning failed: ${this.reason.message}`;
 }
-
-const extractTextDelta = (
-  part: LanguageModelV3StreamPart,
-): Result.Result<string, LanguageModelV3StreamPart> =>
-  part.type === "text-delta" ? Result.succeed(part.delta) : Result.fail(part);
 
 const PLANNER_MAX_ATTEMPTS = 3;
 
@@ -63,6 +62,8 @@ const parsePlanFile = (
           routeHint: step.routeHint ? Option.some(step.routeHint) : Option.none(),
           status: "pending",
           summary: Option.none(),
+          startedAt: Option.none(),
+          endedAt: Option.none(),
         }),
     );
 
@@ -77,8 +78,9 @@ const parsePlanFile = (
 
 export class Planner extends ServiceMap.Service<Planner>()("@supervisor/Planner", {
   make: Effect.gen(function* () {
+    const agent = yield* Agent;
+
     const plan = Effect.fn("Planner.plan")(function* (draft: TestPlanDraft) {
-      const agent = yield* Agent;
       const stateDir = path.join(process.cwd(), TESTIE_STATE_DIR);
       fs.mkdirSync(stateDir, { recursive: true });
       const sentinelPath = path.join(stateDir, draft.planFileName);
@@ -94,7 +96,6 @@ export class Planner extends ServiceMap.Service<Planner>()("@supervisor/Planner"
             }),
           )
           .pipe(
-            Stream.filterMap(extractTextDelta),
             Stream.runDrain,
             Effect.mapError((reason) => new PlanningError({ reason })),
           );

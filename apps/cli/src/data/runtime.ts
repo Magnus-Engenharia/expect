@@ -1,22 +1,13 @@
-import { Layer, Logger, References } from "effect";
+import { Effect, Layer, Option } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import { DevTools } from "effect/unstable/devtools";
-import { Executor, Git, Planner, Reporter, Updates } from "@browser-tester/supervisor";
+import { Agent, AgentBackend } from "@browser-tester/agent";
+import { layerCli } from "../layers.js";
 
-const stderrLogger = Logger.make(({ logLevel, message, date }) => {
-  console.error(`[effect ${logLevel}] ${date.toISOString()} ${message}`);
-});
+export const agentProviderAtom = Atom.make<Option.Option<AgentBackend>>(Option.none());
 
 export const cliAtomRuntime = Atom.runtime(
-  Layer.mergeAll(
-    Planner.layer,
-    Executor.layer,
-    Reporter.layer,
-    Updates.layer,
-    DevTools.layer(),
-    Git.withRepoRoot(process.cwd()),
-  ).pipe(
-    Layer.provideMerge(Logger.layer([stderrLogger])),
-    Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, "All")),
-  ),
-);
+  Effect.fnUntraced(function* (get) {
+    const agentProvider = yield* get.some(agentProviderAtom);
+    return layerCli({ verbose: true, agent: agentProvider });
+  }, Layer.unwrap),
+).pipe(Atom.keepAlive);

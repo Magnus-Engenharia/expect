@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, useInput } from "ink";
 import { MouseProvider } from "../hooks/mouse-context.js";
 import { PrPickerScreen } from "./screens/pr-picker-screen.js";
@@ -16,12 +16,22 @@ import { usePlanExecutionStore } from "../stores/use-plan-execution-store.js";
 import { useGitState } from "../hooks/use-git-state.js";
 import { clearInkDisplay } from "../utils/clear-ink-display.js";
 import { useStdoutDimensions } from "../hooks/use-stdout-dimensions.js";
+import { AgentBackend } from "@browser-tester/agent";
+import { useAtomSet } from "@effect/atom-react";
+import { agentProviderAtom } from "../data/runtime.js";
+import { Option } from "effect";
 
-export const App = () => {
+export const App = ({ agent }: { agent: AgentBackend }) => {
   const screen = useNavigationStore((state) => state.screen);
   const setScreen = useNavigationStore((state) => state.setScreen);
   const navigateTo = useNavigationStore((state) => state.navigateTo);
   const { data: gitState, isLoading: gitStateLoading } = useGitState();
+
+  /** @note(rasmus): this constructs the Layer with the agent provider lazily */
+  const setAgentProvider = useAtomSet(agentProviderAtom);
+  useEffect(() => {
+    setAgentProvider(Option.some(agent));
+  }, [agent]);
 
   const goBack = () => {
     if (screen._tag === "ReviewPlan") {
@@ -34,7 +44,6 @@ export const App = () => {
     }
     if (screen._tag === "Results") {
       usePlanStore.getState().setPlan(undefined);
-      usePlanStore.getState().setReadyTestPlan(undefined);
       usePlanExecutionStore.getState().setExecutedPlan(undefined);
       setScreen(Screen.Main());
       return;

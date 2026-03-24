@@ -70,7 +70,8 @@ export const ResultsScreen = ({ report }: ResultsScreenProps) => {
         <Text color={COLORS.TEXT}>{report.summary}</Text>
         {Option.isSome(report.pullRequest) ? (
           <Text color={COLORS.DIM}>
-            PR: {report.pullRequest.value.title} (#{report.pullRequest.value.number})
+            PR: {report.pullRequest.value.title} (#
+            {report.pullRequest.value.number})
           </Text>
         ) : null}
       </RuledBox>
@@ -93,7 +94,9 @@ export const ResultsScreen = ({ report }: ResultsScreenProps) => {
             {"• "}
             {step.title}
             {": "}
-            <Text color={COLORS.TEXT}>{step.summary}</Text>
+            <Text color={COLORS.TEXT}>
+              {Option.getOrElse(step.summary, () => "no summary found")}
+            </Text>
           </Text>
         ))}
       </Box>
