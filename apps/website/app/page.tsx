@@ -1327,7 +1327,7 @@ export default function Home() {
       </motion.div>
       <motion.div {...stagger(3)} className="w-82.75 flex justify-start">
         <div
-          className={`${testSignifierRegular.className} mt-12 w-66.75 h-fit tracking-[-0.02em] text-black dark:text-[color(display-p3_0.92_0.92_0.92)] text-[17.5px]/6.25`}
+          className={`${testSignifierRegular.className} mt-12 w-66.75 h-fit tracking-[-0.02em] text-black dark:text-[color(display-p3_0.92_0.92_0.92)] text-[18px]/6.25`}
         >
           Installation
         </div>
