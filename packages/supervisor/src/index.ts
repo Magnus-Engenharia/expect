@@ -2,6 +2,7 @@ export { Updates } from "./updates.js";
 export { Planner, PlanningError } from "./planner.js";
 export { Executor, ExecutionError } from "./executor.js";
 export { Reporter } from "./reporter.js";
+export { EXPECT_STATE_DIR, REPLAY_FILE_NAME } from "./constants.js";
 export {
   AgentProvider,
   type ChangedFile,

@@ -2,17 +2,28 @@ import { useCallback, useRef, useState } from "react";
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
 import type { eventWithTime } from "@rrweb/types";
-import { REPLAY_PLAYER_HEIGHT_PX, REPLAY_PLAYER_WIDTH_PX } from "../../src/constants";
+import {
+  EVENT_COLLECT_INTERVAL_MS,
+  REPLAY_FILE_NAME,
+  REPLAY_PLAYER_HEIGHT_PX,
+  REPLAY_PLAYER_WIDTH_PX,
+  RUN_STATE_FILE_NAME,
+  EXPECT_STATE_DIR,
+} from "../../src/constants";
 import type { ViewerRunState } from "../../src/viewer-events";
 import { useMountEffect } from "./hooks/use-mount-effect";
 import { StepsPanel } from "./steps-panel";
 
+const REPLAY_URL = `/${EXPECT_STATE_DIR}/${REPLAY_FILE_NAME}`;
+const RUN_STATE_URL = `/${EXPECT_STATE_DIR}/${RUN_STATE_FILE_NAME}`;
+
 export const App = () => {
   const [runState, setRunState] = useState<ViewerRunState | undefined>();
-  const [status, setStatus] = useState("Loading replay\u2026");
+  const [status, setStatus] = useState("Waiting for test run\u2026");
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<rrwebPlayer | undefined>();
   const eventsRef = useRef<eventWithTime[]>([]);
+  const eventCountRef = useRef(0);
 
   const initPlayer = useCallback((events: eventWithTime[]) => {
     if (playerRef.current) {
@@ -29,72 +40,54 @@ export const App = () => {
         width: REPLAY_PLAYER_WIDTH_PX,
         height: REPLAY_PLAYER_HEIGHT_PX,
         autoPlay: true,
-        showController: false,
-        liveMode: true,
+        showController: true,
       },
     });
-    playerRef.current.getReplayer().startLive();
   }, []);
 
   useMountEffect(() => {
-    let eventSource: EventSource | undefined;
-
-    const isJsonResponse = (response: Response) =>
-      response.ok && Boolean(response.headers.get("content-type")?.includes("application/json"));
-
-    const connectSse = () => {
-      eventSource = new EventSource("/events");
-
-      eventSource.addEventListener("replay", (message) => {
-        try {
-          const events: eventWithTime[] = JSON.parse(message.data);
-          for (const event of events) {
-            eventsRef.current.push(event);
-            if (playerRef.current) playerRef.current.getReplayer().addEvent(event);
+    const poll = async () => {
+      try {
+        const replayResponse = await fetch(REPLAY_URL);
+        if (replayResponse.ok) {
+          const text = await replayResponse.text();
+          if (text.trim()) {
+            const lines = text.trim().split("\n");
+            if (lines.length > eventCountRef.current) {
+              const newLines = lines.slice(eventCountRef.current);
+              for (const line of newLines) {
+                const event: eventWithTime = JSON.parse(line);
+                eventsRef.current.push(event);
+                if (playerRef.current) {
+                  playerRef.current.getReplayer().addEvent(event);
+                }
+              }
+              eventCountRef.current = lines.length;
+              if (!playerRef.current && eventsRef.current.length >= 2) {
+                initPlayer(eventsRef.current);
+              }
+              setStatus("");
+            }
           }
-          if (!playerRef.current && eventsRef.current.length >= 2) {
-            initPlayer(eventsRef.current);
-          }
-        } catch {
-          /* ignore malformed events */
         }
-      });
-
-      eventSource.addEventListener("steps", (message) => {
-        try {
-          setRunState(JSON.parse(message.data));
-        } catch {
-          /* ignore malformed steps */
-        }
-      });
-
-      eventSource.onerror = () => {
-        setStatus("Connection lost. Retrying...");
-      };
-    };
-
-    const bootstrap = async () => {
-      const probeResponse = await fetch("/latest.json");
-      if (!isJsonResponse(probeResponse)) {
-        setStatus("Waiting for test run...");
-        return;
+      } catch {
+        /* file not available yet */
       }
 
-      eventsRef.current = await probeResponse.json();
-      if (eventsRef.current.length >= 2) initPlayer(eventsRef.current);
-
-      const stepsResponse = await fetch("/steps");
-      if (isJsonResponse(stepsResponse)) {
-        const state = await stepsResponse.json();
-        if (state?.steps) setRunState(state);
+      try {
+        const stateResponse = await fetch(RUN_STATE_URL);
+        if (stateResponse.ok) {
+          const state: ViewerRunState = await stateResponse.json();
+          if (state?.steps) setRunState(state);
+        }
+      } catch {
+        /* run state not available yet */
       }
-
-      connectSse();
     };
 
-    bootstrap();
-
-    return () => eventSource?.close();
+    poll();
+    const interval = setInterval(poll, EVENT_COLLECT_INTERVAL_MS);
+    return () => clearInterval(interval);
   });
 
   return (

@@ -4,12 +4,14 @@ import { Config, Effect, Fiber, Layer, Option, Ref, Schedule, ServiceMap } from 
 import { FileSystem } from "effect/FileSystem";
 import {
   collectAllEvents,
+  createReplayLog,
   evaluateRecorderRuntime,
   buildReplayViewerHtml,
   startLiveViewServer,
   EVENT_COLLECT_INTERVAL_MS,
   type eventWithTime,
   type LiveViewHandle,
+  type ReplayLog,
   type ViewerRunState,
 } from "@browser-tester/recorder";
 import { Browser } from "../browser";
@@ -39,6 +41,7 @@ export interface BrowserSessionData {
   readonly consoleMessages: ConsoleEntry[];
   readonly networkRequests: NetworkEntry[];
   readonly replayOutputPath: string | undefined;
+  readonly replayLog: ReplayLog | undefined;
   readonly accumulatedReplayEvents: eventWithTime[];
   readonly trackedPages: Set<Page>;
   lastSnapshot: SnapshotResult | undefined;
@@ -128,10 +131,8 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
 
     const pushStepEvent = Effect.fn("McpSession.pushStepEvent")(function* (state: ViewerRunState) {
       yield* Ref.set(latestRunStateRef, state);
-      const liveView = yield* Ref.get(liveViewRef);
-      if (liveView) {
-        liveView.pushRunState(state);
-      }
+      const session = yield* Ref.get(sessionRef);
+      session?.replayLog?.writeRunState(state);
     });
 
     const open = Effect.fn("McpSession.open")(function* (url: string, options: OpenOptions = {}) {
@@ -143,13 +144,15 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
         waitUntil: options.waitUntil,
       });
 
+      const outputPath = Option.getOrUndefined(replayOutputPath);
       const sessionData: BrowserSessionData = {
         browser: pageResult.browser,
         context: pageResult.context,
         page: pageResult.page,
         consoleMessages: [],
         networkRequests: [],
-        replayOutputPath: Option.getOrUndefined(replayOutputPath),
+        replayOutputPath: outputPath,
+        replayLog: outputPath ? createReplayLog(outputPath) : undefined,
         accumulatedReplayEvents: [],
         trackedPages: new Set(),
         lastSnapshot: undefined,
@@ -161,15 +164,35 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
         Effect.catchCause((cause) => Effect.logDebug("rrweb recording failed to start", { cause })),
       );
 
+      const pollPage = Effect.sync(() => Ref.getUnsafe(sessionRef)?.page).pipe(
+        Effect.flatMap((page) => {
+          if (!page || page.isClosed()) return Effect.void;
+          return evaluateRecorderRuntime(page, "getEvents").pipe(
+            Effect.tap((events) =>
+              Effect.sync(() => {
+                if (Array.isArray(events) && events.length > 0) {
+                  const session = Ref.getUnsafe(sessionRef);
+                  session?.accumulatedReplayEvents.push(...events);
+                  session?.replayLog?.appendEvents(events);
+                }
+              }),
+            ),
+            Effect.catchCause((cause) =>
+              Effect.logDebug("Replay event collection failed", { cause }),
+            ),
+          );
+        }),
+      );
+
+      const fiber = yield* pollPage.pipe(
+        Effect.repeat(Schedule.spaced(EVENT_COLLECT_INTERVAL_MS)),
+        Effect.forkDetach,
+      );
+      yield* Ref.set(pollingFiberRef, fiber);
+
       const existingLiveView = yield* Ref.get(liveViewRef);
       if (Option.isSome(liveViewUrl) && !existingLiveView) {
-        const handle = yield* startLiveViewServer({
-          liveViewUrl: liveViewUrl.value,
-          getPage: () => Ref.getUnsafe(sessionRef)?.page,
-          onEventsCollected: (events) => {
-            Ref.getUnsafe(sessionRef)?.accumulatedReplayEvents.push(...events);
-          },
-        }).pipe(
+        const handle = yield* startLiveViewServer(liveViewUrl.value).pipe(
           Effect.catchCause((cause) =>
             Effect.logDebug("Live view server failed to start", { cause }).pipe(
               Effect.as(undefined),
@@ -179,33 +202,6 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
         if (handle) {
           yield* Ref.set(liveViewRef, handle);
         }
-      }
-
-      const hasLiveView = Boolean(yield* Ref.get(liveViewRef));
-      if (!hasLiveView) {
-        const pollPage = Effect.sync(() => Ref.getUnsafe(sessionRef)?.page).pipe(
-          Effect.flatMap((page) => {
-            if (!page || page.isClosed()) return Effect.void;
-            return evaluateRecorderRuntime(page, "getEvents").pipe(
-              Effect.tap((events) =>
-                Effect.sync(() => {
-                  if (Array.isArray(events) && events.length > 0) {
-                    Ref.getUnsafe(sessionRef)?.accumulatedReplayEvents.push(...events);
-                  }
-                }),
-              ),
-              Effect.catchCause((cause) =>
-                Effect.logDebug("Replay event collection failed", { cause }),
-              ),
-            );
-          }),
-        );
-
-        const fiber = yield* pollPage.pipe(
-          Effect.repeat(Schedule.spaced(EVENT_COLLECT_INTERVAL_MS)),
-          Effect.forkDetach,
-        );
-        yield* Ref.set(pollingFiberRef, fiber);
       }
 
       const injectedCookieCount = yield* Effect.tryPromise(() => pageResult.context.cookies()).pipe(
@@ -273,29 +269,33 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
           );
           if (finalEvents.length > 0) {
             activeSession.accumulatedReplayEvents.push(...finalEvents);
+            activeSession.replayLog?.appendEvents(finalEvents);
           }
         }
 
         const resolvedReplayOutputPath = activeSession.replayOutputPath;
         if (resolvedReplayOutputPath && activeSession.accumulatedReplayEvents.length > 0) {
-          const ndjson =
-            activeSession.accumulatedReplayEvents.map((event) => JSON.stringify(event)).join("\n") +
-            "\n";
+          if (!activeSession.replayLog) {
+            const ndjson =
+              activeSession.accumulatedReplayEvents
+                .map((event) => JSON.stringify(event))
+                .join("\n") + "\n";
 
-          yield* fileSystem
-            .makeDirectory(dirname(resolvedReplayOutputPath), { recursive: true })
-            .pipe(
-              Effect.catchCause((cause) =>
-                Effect.logDebug("Failed to create replay output directory", { cause }),
-              ),
-            );
-          yield* fileSystem
-            .writeFileString(resolvedReplayOutputPath, ndjson)
-            .pipe(
-              Effect.catchCause((cause) =>
-                Effect.logDebug("Failed to write replay file", { cause }),
-              ),
-            );
+            yield* fileSystem
+              .makeDirectory(dirname(resolvedReplayOutputPath), { recursive: true })
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logDebug("Failed to create replay output directory", { cause }),
+                ),
+              );
+            yield* fileSystem
+              .writeFileString(resolvedReplayOutputPath, ndjson)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logDebug("Failed to write replay file", { cause }),
+                ),
+              );
+          }
           replaySessionPath = resolvedReplayOutputPath;
 
           const runState = yield* Ref.get(latestRunStateRef);

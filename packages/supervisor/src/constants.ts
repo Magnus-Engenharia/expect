@@ -36,5 +36,4 @@ export const STEP_ID_PAD_LENGTH = 2;
 export const PLANNER_MAX_STEP_COUNT = 8;
 export const EXPECT_STATE_DIR = ".expect";
 export const TESTED_FINGERPRINT_FILE = "last-tested";
-export const RUN_DIRECTORY_PREFIX = "expect-run-";
 export const REPLAY_FILE_NAME = "browser-flow.ndjson";
