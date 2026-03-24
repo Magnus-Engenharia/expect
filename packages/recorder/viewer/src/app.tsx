@@ -37,6 +37,35 @@ export const App = () => {
   }, []);
 
   useMountEffect(() => {
+    const eventSource = new EventSource("/events");
+
+    eventSource.addEventListener("replay", (message) => {
+      try {
+        const events: eventWithTime[] = JSON.parse(message.data);
+        for (const event of events) {
+          eventsRef.current.push(event);
+          if (playerRef.current) playerRef.current.getReplayer().addEvent(event);
+        }
+        if (!playerRef.current && eventsRef.current.length >= 2) {
+          initPlayer(eventsRef.current);
+        }
+      } catch {
+        /* ignore malformed events */
+      }
+    });
+
+    eventSource.addEventListener("steps", (message) => {
+      try {
+        setRunState(JSON.parse(message.data));
+      } catch {
+        /* ignore malformed steps */
+      }
+    });
+
+    eventSource.onerror = () => {
+      setStatus("Connection lost. Retrying...");
+    };
+
     const bootstrap = async () => {
       const latestResponse = await fetch("/latest.json");
       if (latestResponse.ok) {
@@ -49,38 +78,11 @@ export const App = () => {
         const state = await stepsResponse.json();
         if (state?.steps) setRunState(state);
       }
-
-      const eventSource = new EventSource("/events");
-
-      eventSource.addEventListener("replay", (message) => {
-        try {
-          const events: eventWithTime[] = JSON.parse(message.data);
-          for (const event of events) {
-            eventsRef.current.push(event);
-            if (playerRef.current) playerRef.current.getReplayer().addEvent(event);
-          }
-          if (!playerRef.current && eventsRef.current.length >= 2) {
-            initPlayer(eventsRef.current);
-          }
-        } catch {
-          /* ignore malformed events */
-        }
-      });
-
-      eventSource.addEventListener("steps", (message) => {
-        try {
-          setRunState(JSON.parse(message.data));
-        } catch {
-          /* ignore malformed steps */
-        }
-      });
-
-      eventSource.onerror = () => {
-        setStatus("Connection lost. Retrying...");
-      };
     };
 
     bootstrap();
+
+    return () => eventSource.close();
   });
 
   return (
