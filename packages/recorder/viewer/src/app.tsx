@@ -37,52 +37,64 @@ export const App = () => {
   }, []);
 
   useMountEffect(() => {
-    const eventSource = new EventSource("/events");
+    let eventSource: EventSource | undefined;
 
-    eventSource.addEventListener("replay", (message) => {
-      try {
-        const events: eventWithTime[] = JSON.parse(message.data);
-        for (const event of events) {
-          eventsRef.current.push(event);
-          if (playerRef.current) playerRef.current.getReplayer().addEvent(event);
+    const isJsonResponse = (response: Response) =>
+      response.ok && Boolean(response.headers.get("content-type")?.includes("application/json"));
+
+    const connectSse = () => {
+      eventSource = new EventSource("/events");
+
+      eventSource.addEventListener("replay", (message) => {
+        try {
+          const events: eventWithTime[] = JSON.parse(message.data);
+          for (const event of events) {
+            eventsRef.current.push(event);
+            if (playerRef.current) playerRef.current.getReplayer().addEvent(event);
+          }
+          if (!playerRef.current && eventsRef.current.length >= 2) {
+            initPlayer(eventsRef.current);
+          }
+        } catch {
+          /* ignore malformed events */
         }
-        if (!playerRef.current && eventsRef.current.length >= 2) {
-          initPlayer(eventsRef.current);
+      });
+
+      eventSource.addEventListener("steps", (message) => {
+        try {
+          setRunState(JSON.parse(message.data));
+        } catch {
+          /* ignore malformed steps */
         }
-      } catch {
-        /* ignore malformed events */
-      }
-    });
+      });
 
-    eventSource.addEventListener("steps", (message) => {
-      try {
-        setRunState(JSON.parse(message.data));
-      } catch {
-        /* ignore malformed steps */
-      }
-    });
-
-    eventSource.onerror = () => {
-      setStatus("Connection lost. Retrying...");
+      eventSource.onerror = () => {
+        setStatus("Connection lost. Retrying...");
+      };
     };
 
     const bootstrap = async () => {
-      const latestResponse = await fetch("/latest.json");
-      if (latestResponse.ok) {
-        eventsRef.current = await latestResponse.json();
-        if (eventsRef.current.length >= 2) initPlayer(eventsRef.current);
+      const probeResponse = await fetch("/latest.json");
+      if (!isJsonResponse(probeResponse)) {
+        setStatus("Waiting for test run...");
+        return;
       }
 
+      eventsRef.current = await probeResponse.json();
+      if (eventsRef.current.length >= 2) initPlayer(eventsRef.current);
+
       const stepsResponse = await fetch("/steps");
-      if (stepsResponse.ok) {
+      if (isJsonResponse(stepsResponse)) {
         const state = await stepsResponse.json();
         if (state?.steps) setRunState(state);
       }
+
+      connectSse();
     };
 
     bootstrap();
 
-    return () => eventSource.close();
+    return () => eventSource?.close();
   });
 
   return (
