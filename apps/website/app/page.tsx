@@ -5,7 +5,6 @@ import { useTheme } from "next-themes";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { useDelayedFlag } from "@/hooks/use-delayed-flag";
 import { berkeleyMonoRegular, restartHardRegular, testSignifierRegular } from "@/app/fonts";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { motion, AnimatePresence, useMotionValue } from "motion/react";
 import { useSound } from "@/hooks/use-sound";
 import { clickSoftSound } from "@/lib/click-soft";
@@ -1811,158 +1810,41 @@ function ThemeToggle({
   theme: string | undefined;
   setTheme: (t: string) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const indicatorRef = useRef<HTMLDivElement>(null);
-  const hasInitialized = useRef(false);
-  const isAnimating = useRef(false);
-  const [indicator, setIndicator] = useState<{
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
   const [playSwitchOff] = useSound(switchOffSound, { volume: 0.1 });
   const [playSwitchOn] = useSound(switchOnSound, { volume: 0.1 });
   const { trigger: haptic } = useWebHaptics();
-  const prevTheme = useRef(theme);
-
-  const themeIndex = (t: string | undefined) => (t === "dark" ? 1 : 0);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    const el = indicatorRef.current;
-    if (!container) return;
-
-    const items = container.querySelectorAll<HTMLElement>("[data-slot='toggle-group-item']");
-    const targetIdx = themeIndex(theme);
-    const targetItem = items[targetIdx];
-    if (!targetItem) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const targetRect = targetItem.getBoundingClientRect();
-    const targetLeft = targetRect.left - containerRect.left;
-    const circleSize = targetRect.width;
-
-    if (!hasInitialized.current || !el) {
-      setIndicator({ left: targetLeft, width: circleSize, height: circleSize });
-      hasInitialized.current = true;
-      prevTheme.current = theme;
-      return;
-    }
-
-    const prevIdx = themeIndex(prevTheme.current);
-    const prevItem = items[prevIdx];
-    if (!prevItem) return;
-    const prevRect = prevItem.getBoundingClientRect();
-
-    const fromLeft = Math.min(prevRect.left, targetRect.left) - containerRect.left;
-    const toRight = Math.max(prevRect.right, targetRect.right) - containerRect.left;
-    const spanWidth = toRight - fromLeft;
-
-    const movingRight = targetIdx > prevIdx;
-    isAnimating.current = true;
-
-    const easeOut = "cubic-bezier(0.22, 1, 0.36, 1)";
-    const easeInOut = "cubic-bezier(0.4, 0, 0.2, 1)";
-    const spring = "cubic-bezier(0.34, 1.4, 0.64, 1)";
-
-    el.style.transition = "none";
-    el.style.left = `${prevRect.left - containerRect.left}px`;
-    el.style.width = `${circleSize}px`;
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.style.transition = `left 0.22s ${easeOut}, width 0.22s ${easeOut}, transform 0.16s ${easeInOut}`;
-        el.style.left = `${fromLeft}px`;
-        el.style.width = `${spanWidth}px`;
-        el.style.transform = "scaleY(0.85) scaleX(1.06)";
-      });
-    });
-
-    const timeout = setTimeout(() => {
-      el.style.transition = `left 0.2s ${easeOut}, width 0.2s ${easeOut}, transform 0.22s ${spring}`;
-      el.style.left = `${targetLeft + (movingRight ? 1.5 : -1.5)}px`;
-      el.style.width = `${circleSize}px`;
-      el.style.transform = "scaleY(1.03) scaleX(0.98)";
-    }, 160);
-
-    const settleTimeout = setTimeout(() => {
-      el.style.transition = `left 0.16s ${easeOut}, transform 0.2s ${spring}`;
-      el.style.left = `${targetLeft}px`;
-      el.style.transform = "scaleY(1) scaleX(1)";
-    }, 320);
-
-    const syncTimeout = setTimeout(() => {
-      setIndicator({ left: targetLeft, width: circleSize, height: circleSize });
-      isAnimating.current = false;
-    }, 500);
-
-    hasInitialized.current = true;
-    prevTheme.current = theme;
-
-    return () => {
-      clearTimeout(timeout);
-      clearTimeout(settleTimeout);
-      clearTimeout(syncTimeout);
-    };
-  }, [theme]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const recalc = () => {
-      if (isAnimating.current) return;
-      const items = container.querySelectorAll<HTMLElement>("[data-slot='toggle-group-item']");
-      const targetItem = items[themeIndex(theme)];
-      if (!targetItem) return;
-      const containerRect = container.getBoundingClientRect();
-      const targetRect = targetItem.getBoundingClientRect();
-      const el = indicatorRef.current;
-      if (el) el.style.transition = "none";
-      setIndicator({
-        left: targetRect.left - containerRect.left,
-        width: targetRect.width,
-        height: targetRect.width,
-      });
-    };
-
-    const observer = new ResizeObserver(recalc);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [theme]);
+  const isDarkTheme = theme === "dark";
 
   return (
-    <div ref={containerRef} className="size-fit">
-      <ToggleGroup
-        value={[theme === "dark" ? "dark" : "light"]}
-        onValueChange={(value) => {
-          const next = value[0];
-          if (!next || next === theme) return;
-          if (next === "dark") {
-            playSwitchOff();
-          } else if (theme === "dark") {
-            playSwitchOn();
-          }
-          haptic("soft");
-          setTheme(next);
-        }}
-        className="relative !gap-1 !rounded-full !bg-white !p-1 [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:!bg-transparent dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px]"
-      >
-        {indicator && (
-          <div
-            ref={indicatorRef}
-            className="absolute rounded-full [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px] pointer-events-none"
-            style={{
-              left: indicator.left,
-              width: indicator.width,
-              height: indicator.height,
-            }}
-          />
-        )}
-        <ToggleGroupItem
-          value="light"
+    <div className="size-fit">
+      <div className="relative flex items-center gap-1 rounded-full bg-white p-1 [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:bg-transparent dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px]">
+        <motion.div
+          className="pointer-events-none absolute top-1 rounded-full [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px]"
+          initial={false}
+          animate={{
+            left: isDarkTheme ? "calc(100% - 2rem)" : "0.25rem",
+          }}
+          transition={{
+            type: "spring",
+            stiffness: 420,
+            damping: 28,
+            mass: 0.3,
+          }}
+          style={{
+            width: "1.75rem",
+            height: "1.75rem",
+          }}
+        />
+        <button
+          type="button"
           aria-label="Light mode"
-          className={`relative z-10 !rounded-full !p-1.5 sm:!p-1 !h-auto !min-w-0 !bg-transparent !border-0 hover:!bg-transparent aria-pressed:!bg-transparent text-black dark:text-white transition-opacity duration-75 ${theme !== "light" ? "opacity-40 hover:!opacity-80" : ""}`}
+          onClick={() => {
+            if (!isDarkTheme) return;
+            playSwitchOn();
+            haptic("soft");
+            setTheme("light");
+          }}
+          className={`relative z-10 rounded-full p-1.5 sm:p-1 text-black dark:text-white transition-opacity duration-75 ${isDarkTheme ? "opacity-40 hover:opacity-80" : ""}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -1986,11 +1868,17 @@ function ThemeToggle({
               strokeLinecap="round"
             />
           </svg>
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="dark"
+        </button>
+        <button
+          type="button"
           aria-label="Dark mode"
-          className={`relative z-10 !rounded-full !p-1.5 sm:!p-1 !h-auto !min-w-0 !bg-transparent !border-0 hover:!bg-transparent aria-pressed:!bg-transparent text-black dark:text-white transition-opacity duration-75 ${theme !== "dark" ? "opacity-40 hover:!opacity-80" : ""}`}
+          onClick={() => {
+            if (isDarkTheme) return;
+            playSwitchOff();
+            haptic("soft");
+            setTheme("dark");
+          }}
+          className={`relative z-10 rounded-full p-1.5 sm:p-1 text-black dark:text-white transition-opacity duration-75 ${!isDarkTheme ? "opacity-40 hover:opacity-80" : ""}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -2003,15 +1891,19 @@ function ThemeToggle({
             style={{ flexShrink: 0 }}
           >
             <path
-              d="M21.5 14.078C20.3 14.719 18.93 15.082 17.475 15.082C12.749 15.082 8.918 11.251 8.918 6.525C8.918 5.07 9.281 3.7 9.922 2.5C5.668 3.497 2.5 7.315 2.5 11.873C2.5 17.19 6.81 21.5 12.127 21.5C16.685 21.5 20.503 18.332 21.5 14.078Z"
+              d="M17 12C17 14.761 14.761 17 12 17C9.239 17 7 14.761 7 12C7 9.239 9.239 7 12 7C14.761 7 17 9.239 17 12Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M12 2V3.5M12 20.5V22M19.071 19.071L18.01 18.011M5.989 5.989L4.929 4.929M22 12H20.5M3.5 12H2M19.071 4.929L18.011 5.989M5.99 18.011L4.929 19.071"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
           </svg>
-        </ToggleGroupItem>
-      </ToggleGroup>
+        </button>
+      </div>
     </div>
   );
 }

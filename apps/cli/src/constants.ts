@@ -21,21 +21,4 @@ export const CLICK_SUPPORT_ENABLED =
 
 export const CONTEXT_PICKER_VISIBLE_COUNT = 8;
 
-export const TEST_FILE_CONTENT_SIZE_LIMIT_BYTES = 256 * 1024;
-export const TEST_FILE_SCAN_LIMIT = 50;
-
-export const HEALTHCHECK_LINT_KEYWORDS = ["lint", "check", "format", "typecheck", "type-check"];
-export const HEALTHCHECK_SCRIPT_TIMEOUT_MS = 120_000;
-
 export const GIT_STATE_TIMEOUT_MS = 10_000;
-
-export const LOCK_FILE_TO_AGENT: Record<string, string> = {
-  "pnpm-lock.yaml": "pnpm",
-  "pnpm-workspace.yaml": "pnpm",
-  "yarn.lock": "yarn",
-  "package-lock.json": "npm",
-  "npm-shrinkwrap.json": "npm",
-  "bun.lock": "bun",
-  "bun.lockb": "bun",
-  "deno.lock": "deno",
-};

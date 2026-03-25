@@ -23,5 +23,3 @@ export const stopRecording = () => {
   stopFn = undefined;
   return events;
 };
-
-export const getEvents = () => [...events];
