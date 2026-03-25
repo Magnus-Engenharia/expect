@@ -8,6 +8,7 @@ import { ThemeProvider } from "./components/theme-context.js";
 import { loadThemeName } from "./utils/load-theme.js";
 import { ChangesFor, Git, TestPlanDraft, DraftId } from "@expect/supervisor";
 import { runHeadless } from "./utils/run-test.js";
+import { runInit } from "./commands/init.js";
 import type { AgentBackend } from "@expect/agent";
 import { useNavigationStore, Screen } from "./stores/use-navigation.js";
 import { usePreferencesStore } from "./stores/use-preferences.js";
@@ -181,6 +182,13 @@ program
     const opts = program.opts<CommanderOpts>();
     if (isHeadless()) return runHeadlessForAction("branch", opts);
     await runInteractiveForAction("branch", opts);
+  });
+
+program
+  .command("init")
+  .description("install expect globally and set up skill")
+  .action(async () => {
+    await runInit();
   });
 
 program.action(async () => {

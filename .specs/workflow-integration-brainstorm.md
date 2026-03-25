@@ -102,7 +102,7 @@ Scans the app, generates `expect.plan.md` describing all flows it can detect. Li
 Like a coverage badge but for browser verification. PRs without a Expect run show "unverified." Teams start requiring it culturally before it's enforced technically.
 
 ```
-[![Expect](https://expect.run/badge/repo/pr/123)](link-to-recording)
+[![Expect](https://expect.dev/badge/repo/pr/123)](link-to-recording)
 ```
 
 ### Free Local, Metered CI
