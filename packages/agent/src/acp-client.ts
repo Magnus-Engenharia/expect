@@ -1,8 +1,21 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as acp from "@agentclientprotocol/sdk";
-import { Cause, Effect, FiberMap, Layer, Option, Queue, Schema, ServiceMap, Stream } from "effect";
-import { AcpSessionUpdate } from "@expect/shared/models";
+import {
+  Cause,
+  Effect,
+  FiberMap,
+  Layer,
+  Match,
+  Option,
+  Queue,
+  Schema,
+  ServiceMap,
+  Stream,
+} from "effect";
+import { AcpSessionUpdate, AgentProvider } from "@expect/shared/models";
+import { hasStringMessage } from "@expect/shared/utils";
+
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { NodeServices } from "@effect/platform-node";
 
@@ -13,7 +26,22 @@ export class AcpStreamError extends Schema.ErrorClass<AcpStreamError>("AcpStream
   _tag: Schema.tag("AcpStreamError"),
   cause: Schema.Unknown,
 }) {
+  displayName = `An unexpected error occurred while streaming`;
   message = `Streaming failed: ${this.cause}`;
+}
+
+export class AcpProviderUnauthenticatedError extends Schema.ErrorClass<AcpProviderUnauthenticatedError>(
+  "AcpProviderUnauthenticatedError",
+)({
+  _tag: Schema.tag("AcpProviderUnauthenticatedError"),
+  provider: AgentProvider,
+}) {
+  displayName = `Your ${this.provider} agent is not authenticated`;
+  message = Match.value(this.provider).pipe(
+    Match.when("claude", () => "Please log in using `claude login`, and then re-run expect."),
+    Match.when("codex", () => "Please log in using `codex login`, and then re-run expect."),
+    Match.orElse(() => "Please sign in to your coding agent, and then re-run expect."),
+  );
 }
 
 export class AcpSessionCreateError extends Schema.ErrorClass<AcpSessionCreateError>(
@@ -22,7 +50,8 @@ export class AcpSessionCreateError extends Schema.ErrorClass<AcpSessionCreateErr
   _tag: Schema.tag("AcpSessionCreateError"),
   cause: Schema.Unknown,
 }) {
-  message = `Creating session failed: ${this.cause}`;
+  displayName = `Creating a chat session failed`;
+  message = `Creating session failed: ${Cause.pretty(Cause.fail(this.cause))}`;
 }
 
 export class AcpConnectionInitError extends Schema.ErrorClass<AcpConnectionInitError>(
@@ -46,6 +75,7 @@ export class AcpAdapterNotFoundError extends Schema.ErrorClass<AcpAdapterNotFoun
 export class AcpAdapter extends ServiceMap.Service<
   AcpAdapter,
   {
+    readonly provider: AgentProvider;
     readonly bin: string;
     readonly args: readonly string[];
     readonly env: Record<string, string>;
@@ -59,6 +89,7 @@ export class AcpAdapter extends ServiceMap.Service<
         );
         const binPath = require.resolve("@zed-industries/codex-acp/bin/codex-acp.js");
         return AcpAdapter.of({
+          provider: "codex",
           bin: process.execPath,
           args: [binPath],
           env: {},
@@ -79,6 +110,7 @@ export class AcpAdapter extends ServiceMap.Service<
         );
         const binPath = require.resolve("@zed-industries/claude-agent-acp/dist/index.js");
         return AcpAdapter.of({
+          provider: "claude",
           bin: process.execPath,
           args: [binPath],
           env: {},
@@ -172,7 +204,17 @@ export class AcpClient extends ServiceMap.Service<AcpClient>()("@expect/AcpClien
       const mcpServers = buildMcpServers(mcpEnv);
       return yield* Effect.tryPromise({
         try: () => connection.newSession({ cwd, mcpServers }),
-        catch: (cause) => new AcpSessionCreateError({ cause }),
+        catch: (cause) => {
+          const message = hasStringMessage(cause) ? cause.message : String(cause);
+
+          const AUTH_ERRORS = ["authentication"];
+          if (AUTH_ERRORS.some((error) => message.toLowerCase().includes(error))) {
+            return new AcpProviderUnauthenticatedError({
+              provider: adapter.provider,
+            });
+          }
+          return new AcpSessionCreateError({ cause });
+        },
       }).pipe(
         Effect.map(({ sessionId }) => SessionId.makeUnsafe(sessionId)),
         Effect.tap((sessionId) =>

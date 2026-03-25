@@ -3,7 +3,11 @@ import figures from "figures";
 import { useColors } from "../theme-context";
 
 interface ErrorMessageProps {
-  error: { readonly _tag: string; readonly message: string };
+  error: {
+    readonly _tag: string;
+    readonly displayName?: string;
+    readonly message: string;
+  };
   type: "error" | "defect";
 }
 
@@ -25,7 +29,7 @@ export const ErrorMessage = ({ error, type }: ErrorMessageProps) => {
     >
       <Box paddingBottom={1}>
         <Text color={COLORS.RED} bold>
-          {figures.warning} {error._tag}
+          {figures.warning} {error.displayName ?? error._tag}
         </Text>
       </Box>
       <Box paddingBottom={1}>

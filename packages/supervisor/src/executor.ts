@@ -1,5 +1,11 @@
 import * as path from "node:path";
-import { AcpSessionCreateError, AcpStreamError, Agent, AgentStreamOptions } from "@expect/agent";
+import {
+  AcpProviderUnauthenticatedError,
+  AcpSessionCreateError,
+  AcpStreamError,
+  Agent,
+  AgentStreamOptions,
+} from "@expect/agent";
 import { Effect, Layer, Option, Schema, ServiceMap, Stream } from "effect";
 import {
   type ChangesFor,
@@ -25,11 +31,12 @@ import {
 
 export class ExecutionError extends Schema.ErrorClass<ExecutionError>("@supervisor/ExecutionError")(
   {
-    _tag: Schema.tag("@supervisor/ExecutionError"),
-    reason: Schema.Union([AcpStreamError, AcpSessionCreateError]),
+    _tag: Schema.tag("ExecutionError"),
+    reason: Schema.Union([AcpStreamError, AcpSessionCreateError, AcpProviderUnauthenticatedError]),
   },
 ) {
-  message = `Execution failed: ${this.reason.message}`;
+  displayName = this.reason.displayName ?? `Browser testing failed`;
+  message = this.reason.message;
 }
 
 export interface ExecuteOptions {
@@ -123,7 +130,10 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
 
       const mcpEnv = [{ name: EXPECT_REPLAY_OUTPUT_ENV_NAME, value: replayOutputPath }];
       if (options.liveViewUrl) {
-        mcpEnv.push({ name: EXPECT_LIVE_VIEW_URL_ENV_NAME, value: options.liveViewUrl });
+        mcpEnv.push({
+          name: EXPECT_LIVE_VIEW_URL_ENV_NAME,
+          value: options.liveViewUrl,
+        });
       }
 
       const streamOptions = new AgentStreamOptions({
