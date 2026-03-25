@@ -83,7 +83,7 @@ const expectSubpathPlugin = (): Plugin => {
 
 export default defineConfig({
   pack: {
-    entry: ["src/index.tsx"],
+    entry: ["src/index.tsx", "src/browser-mcp.ts"],
     format: ["esm"],
     dts: true,
     clean: true,

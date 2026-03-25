@@ -140,7 +140,7 @@ export class AcpClient extends ServiceMap.Service<AcpClient>()("@expect/AcpClien
 
     const connection = new acp.ClientSideConnection((_agent) => client, ndJsonStream);
 
-    const browserMcpBinPath = fileURLToPath(import.meta.resolve("@expect/browser/cli"));
+    const browserMcpBinPath = fileURLToPath(new URL("./browser-mcp.js", import.meta.url));
 
     const buildMcpServers = (
       env: ReadonlyArray<{ name: string; value: string }>,
