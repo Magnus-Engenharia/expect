@@ -31,9 +31,7 @@ const parseStringValue = (value: string): string => {
   return value;
 };
 
-const isSavedFlowStep = (
-  value: unknown,
-): value is SavedFlowFileData["flow"]["steps"][number] =>
+const isSavedFlowStep = (value: unknown): value is SavedFlowFileData["flow"]["steps"][number] =>
   Predicate.isObject(value) &&
   typeof value.id === "string" &&
   typeof value.title === "string" &&
@@ -56,9 +54,7 @@ const normalizeSavedFlow = (value: unknown): SavedFlowFileData["flow"] => {
   };
 };
 
-const normalizeSavedFlowEnvironment = (
-  value: unknown,
-): SavedFlowFileData["environment"] => {
+const normalizeSavedFlowEnvironment = (value: unknown): SavedFlowFileData["environment"] => {
   if (!Predicate.isObject(value)) {
     return {
       baseUrl: "",
