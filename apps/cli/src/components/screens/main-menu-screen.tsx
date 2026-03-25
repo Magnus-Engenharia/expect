@@ -132,6 +132,7 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
     if (errorMessage) setErrorMessage(undefined);
   });
 
+  const isSingleLine = !value.includes("\n");
   const showSuggestion = value === "" && !picker.pickerOpen && suggestions.length > 0;
   const showCycleHint = showSuggestion && !hasCycled && columns >= MIN_COLUMNS_FOR_CYCLE_HINT;
   const currentSuggestion = suggestions[suggestionIndex % suggestions.length];
@@ -169,6 +170,15 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
         if (input && !key.ctrl && !key.meta) {
           picker.setPickerQuery(picker.pickerQuery + input);
         }
+        return;
+      }
+
+      if (isSingleLine && key.upArrow) {
+        navigateHistoryBack();
+        return;
+      }
+      if (isSingleLine && key.downArrow) {
+        navigateHistoryForward();
         return;
       }
 
@@ -247,8 +257,8 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
                   placeholder={currentSuggestion ? `${currentSuggestion}  [tab]` : ""}
                   value={value}
                   onSubmit={submit}
-                  onUpArrowAtTop={navigateHistoryBack}
-                  onDownArrowAtBottom={navigateHistoryForward}
+                  onUpArrowAtTop={isSingleLine ? undefined : navigateHistoryBack}
+                  onDownArrowAtBottom={isSingleLine ? undefined : navigateHistoryForward}
                   onChange={handleInputChange}
                 />
               </Box>
