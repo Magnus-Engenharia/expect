@@ -20,6 +20,7 @@ interface ExecuteInput {
   readonly agentBackend: AgentBackend;
   readonly replayHost?: string;
   readonly onUpdate: (executed: ExecutedTestPlan) => void;
+  readonly onReplayUrl?: (url: string) => void;
 }
 
 export interface ExecutionResult {
@@ -29,7 +30,6 @@ export interface ExecutionResult {
 }
 
 export const screenshotPathsAtom = Atom.make<readonly string[]>([]);
-export const replayUrlAtom = Atom.make<string | undefined>(undefined);
 
 const execute = Effect.fnUntraced(
   function* (input: ExecuteInput, _ctx: Atom.FnContext) {
@@ -53,7 +53,7 @@ const execute = Effect.fnUntraced(
       replayUrl = `${proxyHandle.url}/replay?live=true`;
 
       yield* Effect.logInfo("Replay viewer available", { replayUrl });
-      yield* Effect.sync(() => Atom.set(replayUrlAtom, replayUrl));
+      yield* Effect.sync(() => input.onReplayUrl?.(replayUrl!));
     }
 
     const executeOptions: ExecuteOptions = {

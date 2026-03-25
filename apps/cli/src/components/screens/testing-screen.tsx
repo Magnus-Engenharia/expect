@@ -26,7 +26,7 @@ import cliTruncate from "cli-truncate";
 import { formatElapsedTime } from "../../utils/format-elapsed-time";
 import { Image } from "../ui/image";
 import { ErrorMessage } from "../ui/error-message";
-import { executeFn, replayUrlAtom, screenshotPathsAtom } from "../../data/execution-atom";
+import { executeFn, screenshotPathsAtom } from "../../data/execution-atom";
 import { formatToolCall, type FormattedToolCall } from "../../utils/format-tool-call";
 import { useScrollableList } from "../../hooks/use-scrollable-list";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions";
@@ -268,7 +268,7 @@ export const TestingScreen = ({
     mode: "promiseExit",
   });
   const screenshotPaths = useAtomValue(screenshotPathsAtom);
-  const liveReplayUrl = useAtomValue(replayUrlAtom);
+  const [liveReplayUrl, setLiveReplayUrl] = useState<string | undefined>(undefined);
 
   const isExecuting = AsyncResult.isWaiting(executionResult);
   const isExecutionComplete = AsyncResult.isSuccess(executionResult);
@@ -398,6 +398,7 @@ export const TestingScreen = ({
       agentBackend,
       replayHost,
       onUpdate: setExecutedPlan,
+      onReplayUrl: setLiveReplayUrl,
     });
 
     return () => {
