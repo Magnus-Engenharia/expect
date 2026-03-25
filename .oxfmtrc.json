@@ -1,0 +1,5 @@
+{
+  "semi": true,
+  "singleQuote": false,
+  "ignorePatterns": ["archive", ".next", "dist"]
+}
