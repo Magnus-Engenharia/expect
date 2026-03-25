@@ -1,17 +1,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as acp from "@agentclientprotocol/sdk";
-import {
-  Cause,
-  Effect,
-  FiberMap,
-  Layer,
-  Option,
-  Queue,
-  Schema,
-  ServiceMap,
-  Stream,
-} from "effect";
+import { Cause, Effect, FiberMap, Layer, Option, Queue, Schema, ServiceMap, Stream } from "effect";
 import { AcpSessionUpdate } from "@expect/shared/models";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { NodeServices } from "@effect/platform-node";
