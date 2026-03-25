@@ -1,5 +1,8 @@
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 import { detectAvailableAgents } from "@expect/agent";
+import figures from "figures";
+import pc from "picocolors";
+import { VERSION } from "../constants";
 import { highlighter } from "../utils/highlighter";
 import { logger } from "../utils/logger";
 import { prompts } from "../utils/prompts";
@@ -37,14 +40,12 @@ export const detectPackageManager = (): PackageManager => {
 const detectNonInteractive = (yesFlag: boolean): boolean =>
   yesFlag || isRunningInAgent() || isHeadless();
 
-const tryRun = (command: string): boolean => {
-  try {
-    execSync(command, { stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
-  }
-};
+const tryRun = (command: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    exec(command, (error) => {
+      resolve(Boolean(!error));
+    });
+  });
 
 interface InitOptions {
   yes?: boolean;
@@ -56,7 +57,9 @@ export const runInit = async (options: InitOptions = {}) => {
   const installCommand = GLOBAL_INSTALL_COMMANDS[packageManager];
 
   logger.break();
-  logger.log(`  ${highlighter.info("expect")} ${highlighter.dim("— AI-powered browser testing")}`);
+  logger.log(
+    `  ${pc.red(figures.cross)}${pc.green(figures.tick)} ${pc.bold("Expect")} ${highlighter.dim(`v${VERSION}`)}`,
+  );
   logger.break();
 
   const availableAgents = detectAvailableAgents();
@@ -79,7 +82,7 @@ export const runInit = async (options: InitOptions = {}) => {
   }
 
   const globalSpinner = spinner("Installing expect-cli globally...").start();
-  const globalSuccess = tryRun(installCommand);
+  const globalSuccess = await tryRun(installCommand);
 
   if (globalSuccess) {
     globalSpinner.succeed(
@@ -106,7 +109,7 @@ export const runInit = async (options: InitOptions = {}) => {
 
   if (installSkill) {
     const skillSpinner = spinner("Installing skill...").start();
-    const skillSuccess = tryRun(SKILL_COMMAND);
+    const skillSuccess = await tryRun(SKILL_COMMAND);
 
     if (skillSuccess) {
       skillSpinner.succeed("Skill installed.");
