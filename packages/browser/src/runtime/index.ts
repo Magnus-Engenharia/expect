@@ -2,6 +2,8 @@ import { finder } from "@medv/finder";
 import { record } from "rrweb";
 import type { eventWithTime } from "@rrweb/types";
 
+const RRWEB_CHECKOUT_INTERVAL_MS = 10_000;
+
 const FCP_GOOD_MS = 1800;
 const FCP_POOR_MS = 3000;
 const LCP_GOOD_MS = 2500;
@@ -260,6 +262,8 @@ export const startRecording = (): void => {
   eventBuffer.length = 0;
   stopFn =
     record({
+      checkoutEveryNms: RRWEB_CHECKOUT_INTERVAL_MS,
+      sampling: { input: "last" },
       emit(event) {
         eventBuffer.push(event);
       },

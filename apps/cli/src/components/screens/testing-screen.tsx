@@ -26,7 +26,7 @@ import cliTruncate from "cli-truncate";
 import { formatElapsedTime } from "../../utils/format-elapsed-time";
 import { Image } from "../ui/image";
 import { ErrorMessage } from "../ui/error-message";
-import { executeFn, screenshotPathsAtom } from "../../data/execution-atom";
+import { executeFn, replayUrlAtom, screenshotPathsAtom } from "../../data/execution-atom";
 import { formatToolCall, type FormattedToolCall } from "../../utils/format-tool-call";
 import { useScrollableList } from "../../hooks/use-scrollable-list";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions";
@@ -268,6 +268,7 @@ export const TestingScreen = ({
     mode: "promiseExit",
   });
   const screenshotPaths = useAtomValue(screenshotPathsAtom);
+  const liveReplayUrl = useAtomValue(replayUrlAtom);
 
   const isExecuting = AsyncResult.isWaiting(executionResult);
   const isExecutionComplete = AsyncResult.isSuccess(executionResult);
@@ -451,6 +452,13 @@ export const TestingScreen = ({
       return;
     }
 
+    if (normalizedInput === "o" && !key.ctrl && !key.meta && liveReplayUrl) {
+      const { exec } = require("node:child_process") as typeof import("node:child_process");
+      const escapedUrl = liveReplayUrl.replace(/"/g, '\\"');
+      exec(`open "${escapedUrl}"`);
+      return;
+    }
+
     if (key.ctrl && input === "o") {
       toggleExpanded();
       return;
@@ -511,6 +519,14 @@ export const TestingScreen = ({
             <Text color={COLORS.TEXT}>{instruction}</Text>
           </Text>
         </Box>
+
+        {liveReplayUrl && isExecuting && (
+          <Box marginTop={0}>
+            <Text color={COLORS.DIM}>
+              {"  "}Press <Text color={COLORS.PRIMARY}>o</Text> to open live preview
+            </Text>
+          </Box>
+        )}
 
         {expanded ? (
           <Box flexDirection="column" marginTop={1}>

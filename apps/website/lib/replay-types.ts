@@ -12,4 +12,5 @@ export interface ViewerRunState {
   readonly status: "running" | "passed" | "failed";
   readonly summary: string | undefined;
   readonly steps: readonly ViewerStepEvent[];
+  readonly done?: boolean;
 }

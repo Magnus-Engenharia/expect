@@ -64,15 +64,19 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
   const app = new Hono();
 
   let cachedEvents: unknown[] = [];
-  let cachedSteps: unknown = { title: "", status: "running", steps: [] };
+  let cachedSteps: Record<string, unknown> = { title: "", status: "running", steps: [] };
+  let runDone = false;
 
-  const isTerminalStatus = () => {
-    const status = (cachedSteps as Record<string, unknown>)?.status;
-    return status === "passed" || status === "failed";
+  const markDoneIfTerminal = () => {
+    const status = cachedSteps?.status;
+    if (status === "passed" || status === "failed") {
+      runDone = true;
+      cachedSteps = { ...cachedSteps, done: true };
+    }
   };
 
   app.get("/latest.json", async (context) => {
-    if (isTerminalStatus()) return context.json(cachedEvents);
+    if (runDone) return context.json(cachedEvents);
     try {
       const upstream = await fetch(`${options.liveViewUrl}/latest.json`);
       if (!upstream.ok) return context.json(cachedEvents);
@@ -95,13 +99,14 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
   });
 
   app.get("/steps", async (context) => {
-    if (isTerminalStatus()) return context.json(cachedSteps);
+    if (runDone) return context.json(cachedSteps);
     try {
       const upstream = await fetch(`${options.liveViewUrl}/steps`);
       if (!upstream.ok) return context.json(cachedSteps);
-      const data: unknown = await upstream.json();
+      const data = (await upstream.json()) as Record<string, unknown>;
       cachedSteps = data;
-      return context.json(data);
+      markDoneIfTerminal();
+      return context.json(cachedSteps);
     } catch {
       return context.json(cachedSteps);
     }
@@ -110,8 +115,9 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
   app.post("/steps", async (context) => {
     try {
       const body = await context.req.text();
-      const parsed: unknown = JSON.parse(body);
+      const parsed = JSON.parse(body) as Record<string, unknown>;
       cachedSteps = parsed;
+      markDoneIfTerminal();
       const upstream = await fetch(`${options.liveViewUrl}/steps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

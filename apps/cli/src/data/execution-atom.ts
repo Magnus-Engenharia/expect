@@ -29,6 +29,7 @@ export interface ExecutionResult {
 }
 
 export const screenshotPathsAtom = Atom.make<readonly string[]>([]);
+export const replayUrlAtom = Atom.make<string | undefined>(undefined);
 
 const execute = Effect.fnUntraced(
   function* (input: ExecuteInput, _ctx: Atom.FnContext) {
@@ -51,12 +52,8 @@ const execute = Effect.fnUntraced(
       });
       replayUrl = `${proxyHandle.url}/replay?live=true`;
 
-      yield* Effect.logInfo("Opening replay viewer", { replayUrl });
-      yield* Effect.sync(() => {
-        const { exec } = require("node:child_process") as typeof import("node:child_process");
-        const escapedUrl = replayUrl!.replace(/"/g, '\\"');
-        exec(`open "${escapedUrl}"`);
-      });
+      yield* Effect.logInfo("Replay viewer available", { replayUrl });
+      yield* Effect.sync(() => Atom.set(replayUrlAtom, replayUrl));
     }
 
     const executeOptions: ExecuteOptions = {

@@ -9,7 +9,7 @@ import { startRecording, stopRecording } from "@/lib/rrweb";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import type { ViewerRunState } from "@/lib/replay-types";
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 500;
 const RECORDING_TICK_MS = 1000;
 const RIPPLE_DELAY_STYLE: CSSProperties = { animationDelay: "1s" };
 
@@ -127,7 +127,7 @@ const LiveMode = () => {
 
   const events = eventsQuery.data ?? [];
   const steps = stepsQuery.data;
-  const isRunning = !steps || steps.status === "running";
+  const isRunning = !steps || (steps.status === "running" && !steps.done);
 
   useEffect(() => {
     if (events.length <= prevEventCountRef.current) return;

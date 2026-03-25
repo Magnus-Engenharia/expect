@@ -528,6 +528,28 @@ export const ReplayViewer = ({
             />
           </MacWindow>
         </div>
+        {!hasEvents && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+            style={{ fontFamily: CONTROL_FONT_FAMILY }}
+          >
+            {live && (
+              <>
+                <div className="flex size-12 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm">
+                  <div className="size-3 animate-pulse rounded-full bg-neutral-400" />
+                </div>
+                <span className="text-sm font-medium text-white/90 drop-shadow-sm">
+                  Waiting for browser session...
+                </span>
+              </>
+            )}
+            {!live && (
+              <span className="text-sm font-medium text-white/90 drop-shadow-sm">
+                No recording available
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div
@@ -536,6 +558,11 @@ export const ReplayViewer = ({
       >
         <div className="mt-1.5 flex items-center justify-between gap-4 p-0 antialiased [font-synthesis:none]">
           <div className="flex min-w-0 items-center gap-1.5">
+            {!stepLabel && !stepTitle && live && (
+              <div className="h-4.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-base/4.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]">
+                Waiting for steps...
+              </div>
+            )}
             {stepLabel && (
               <Calligraph
                 as="div"
