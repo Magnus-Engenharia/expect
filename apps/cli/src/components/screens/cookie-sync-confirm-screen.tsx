@@ -42,12 +42,13 @@ export const CookieSyncConfirmScreen = ({
   const setScreen = useNavigationStore((state) => state.setScreen);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const activateOption = (_option: ConfirmOption) => {
+  const activateOption = (option: ConfirmOption) => {
     setScreen(
       Screen.Testing({
         changesFor,
         instruction,
         savedFlow,
+        requiresCookies: option.id === "enable-sync",
       }),
     );
   };

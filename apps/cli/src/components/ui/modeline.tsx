@@ -63,6 +63,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
                 changesFor: screen.changesFor,
                 instruction: screen.instruction,
                 savedFlow: screen.savedFlow,
+                requiresCookies: true,
               }),
             );
           },
@@ -78,6 +79,7 @@ const useHintSegments = (screen: Screen): HintSegment[] => {
                 changesFor: screen.changesFor,
                 instruction: screen.instruction,
                 savedFlow: screen.savedFlow,
+                requiresCookies: false,
               }),
             );
           },

@@ -31,6 +31,7 @@ const selectFlow = (flow: SavedFlowFileData, mainBranch: string) => {
         userInstruction: flow.flow.userInstruction,
         steps,
       },
+      requiresCookies: flow.environment.cookies,
     }),
   );
 };

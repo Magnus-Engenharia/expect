@@ -30,12 +30,18 @@ const buildLoadEventsScript = (source: EventsSource): string => {
 
   const escapedPath = source.ndjsonPath.replaceAll("'", "\\'");
   return `
-      const res = await fetch('${escapedPath}');
-      if (res.ok) {
-        allEvents = (await res.text()).trim().split('\\n').map(l => JSON.parse(l));
+      if (window.__EXPECT_REPLAY_NDJSON__) {
+        allEvents = window.__EXPECT_REPLAY_NDJSON__.trim().split('\\n').map(l => JSON.parse(l));
         if (allEvents.length >= 2) initPlayer(allEvents);
         else if (statusEl) statusEl.textContent = 'No replay events recorded.';
-      } else if (statusEl) statusEl.textContent = 'Failed to load replay.';`;
+      } else {
+        const res = await fetch('${escapedPath}');
+        if (res.ok) {
+          allEvents = (await res.text()).trim().split('\\n').map(l => JSON.parse(l));
+          if (allEvents.length >= 2) initPlayer(allEvents);
+          else if (statusEl) statusEl.textContent = 'No replay events recorded.';
+        } else if (statusEl) statusEl.textContent = 'Failed to load replay.';
+      }`;
 };
 
 const buildStepsScript = (steps?: ViewerRunState): string => {
@@ -113,10 +119,19 @@ export const buildReplayViewerHtml = (options: ReplayViewerOptions): string => {
   const source = options.eventsSource;
   const isLive = source === "sse";
 
+  const ndjsonLoaderScript =
+    source !== undefined && source !== "sse"
+      ? `
+    <script>
+      (function(){var b=location.pathname.split('/').pop().replace(/\\.html$/,'');document.write('<scr'+'ipt src="'+b+'.ndjson.js"></scr'+'ipt>');})();
+    </script>`
+      : "";
+
   const replaySection =
     source !== undefined
       ? `
     <div id="replay-container"><div class="status" id="status">Loading replay…</div></div>
+    ${ndjsonLoaderScript}
     <script type="module">
       import rrwebPlayer from '${RRWEB_PLAYER_JS}';
       const container = document.getElementById('replay-container');

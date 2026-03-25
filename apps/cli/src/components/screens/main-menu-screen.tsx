@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import figures from "figures";
 import { ChangesFor, checkoutBranch } from "@expect/supervisor";
 import type { GitState, TestContext } from "@expect/shared/models";
 import { usePreferencesStore } from "../../stores/use-preferences";
+import { useProjectPreferencesStore } from "../../stores/use-project-preferences";
 import { useNavigationStore, Screen } from "../../stores/use-navigation";
 import { useColors } from "../theme-context";
 import { Clickable } from "../ui/clickable";
@@ -33,6 +35,8 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedCurrentInput, setSavedCurrentInput] = useState("");
+  const cookiesEnabled = useProjectPreferencesStore((state) => state.cookiesEnabled);
+  const toggleCookies = useProjectPreferencesStore((state) => state.toggleCookies);
 
   const navigateHistoryBack = useCallback(() => {
     if (instructionHistory.length === 0) return;
@@ -108,9 +112,14 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
       console.error("[main-menu] changesFor:", changesFor._tag);
 
       usePreferencesStore.getState().rememberInstruction(trimmed);
-      setScreen(Screen.Testing({ changesFor, instruction: trimmed }));
+
+      if (cookiesEnabled) {
+        setScreen(Screen.Testing({ changesFor, instruction: trimmed, requiresCookies: true }));
+      } else {
+        setScreen(Screen.CookieSyncConfirm({ changesFor, instruction: trimmed }));
+      }
     },
-    [value, activeContext, gitState, setScreen],
+    [value, activeContext, gitState, setScreen, cookiesEnabled],
   );
 
   const valueRef = useRef(value);
@@ -132,6 +141,11 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
   useInput(
     (input, key) => {
       if (picker.pickerOpen) return;
+
+      if (key.ctrl && input === "k") {
+        toggleCookies();
+        return;
+      }
 
       if (key.tab && !key.shift && showSuggestion && currentSuggestion) {
         setValue(currentSuggestion);
@@ -219,6 +233,37 @@ export const MainMenu = ({ gitState }: MainMenuProps) => {
             </Box>
           </RuledBox>
         </Clickable>
+        <Box marginTop={1} paddingX={1}>
+          <Clickable fullWidth={false} onClick={toggleCookies}>
+            <Box>
+              <Text backgroundColor="#b45309" color="white" bold>
+                {" IMPORT COOKIES "}
+              </Text>
+              <Text> </Text>
+              <Text
+                backgroundColor={cookiesEnabled ? undefined : "black"}
+                color={cookiesEnabled ? COLORS.DIM : "white"}
+                bold={!cookiesEnabled}
+              >
+                {" OFF "}
+              </Text>
+              <Text
+                backgroundColor={cookiesEnabled ? "#16a34a" : undefined}
+                color={cookiesEnabled ? "white" : COLORS.DIM}
+                bold={cookiesEnabled}
+              >
+                {" ON "}
+              </Text>
+              <Text color={COLORS.DIM}> [ctrl+k]</Text>
+            </Box>
+          </Clickable>
+          {cookiesEnabled && (
+            <Text color={COLORS.YELLOW}>
+              {" "}
+              {figures.warning} Your keychain password will be requested to import browser cookies
+            </Text>
+          )}
+        </Box>
         {picker.pickerOpen ? (
           <Box flexDirection="column">
             <Box marginBottom={0} paddingX={1}>

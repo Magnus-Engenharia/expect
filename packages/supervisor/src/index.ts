@@ -29,6 +29,7 @@ export type { SavedFlowFileData, SavedFlowEnvironment } from "./types";
 export { checkoutBranch, getLocalBranches } from "./git";
 export { Github, GitHubCommandError } from "./github";
 export { promptHistoryStorage } from "./prompt-history";
+export { projectPreferencesStorage } from "./project-preferences";
 export {
   categorizeChangedFiles,
   formatFileCategories,

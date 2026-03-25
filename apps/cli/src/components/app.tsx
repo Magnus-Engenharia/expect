@@ -81,6 +81,7 @@ export const App = ({ agent }: { agent: AgentBackend }) => {
             changesFor={screen.changesFor}
             instruction={screen.instruction}
             savedFlow={screen.savedFlow}
+            requiresCookies={screen.requiresCookies}
           />
         );
       case "Results":

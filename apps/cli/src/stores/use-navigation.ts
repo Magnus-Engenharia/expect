@@ -6,7 +6,12 @@ export type Screen = Data.TaggedEnum<{
   Main: {};
   SelectPr: {};
   CookieSyncConfirm: { changesFor: ChangesFor; instruction: string; savedFlow?: SavedFlow };
-  Testing: { changesFor: ChangesFor; instruction: string; savedFlow?: SavedFlow };
+  Testing: {
+    changesFor: ChangesFor;
+    instruction: string;
+    savedFlow?: SavedFlow;
+    requiresCookies?: boolean;
+  };
   Results: { report: TestReport };
   SavedFlowPicker: {};
 }>;

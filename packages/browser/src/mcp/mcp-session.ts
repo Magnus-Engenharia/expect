@@ -319,6 +319,16 @@ export class McpSession extends ServiceMap.Service<McpSession>()("@browser/McpSe
               ),
             );
           reportPath = htmlReportPath;
+
+          const ndjsonJsPath = `${resolvedReplayOutputPath}.js`;
+          const ndjsonJsContent = `window.__EXPECT_REPLAY_NDJSON__ = ${JSON.stringify(ndjson)};\n`;
+          yield* fileSystem
+            .writeFileString(ndjsonJsPath, ndjsonJsContent)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logDebug("Failed to write ndjson.js wrapper", { cause }),
+              ),
+            );
         }
       }).pipe(
         Effect.catchCause((cause) => Effect.logDebug("Failed during close cleanup", { cause })),

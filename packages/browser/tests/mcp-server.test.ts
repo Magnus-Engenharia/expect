@@ -75,6 +75,7 @@ describe("MCP server tools", () => {
       "console_logs",
       "network_requests",
       "open",
+      "performance_metrics",
       "playwright",
       "screenshot",
     ]);

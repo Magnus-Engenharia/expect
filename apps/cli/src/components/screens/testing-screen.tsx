@@ -33,6 +33,7 @@ interface TestingScreenProps {
   changesFor: ChangesFor;
   instruction: string;
   savedFlow?: SavedFlow;
+  requiresCookies?: boolean;
 }
 
 const getStepElapsedMs = (step: TestPlanStep): number | undefined => {
@@ -43,7 +44,12 @@ const getStepElapsedMs = (step: TestPlanStep): number | undefined => {
   return endMs - DateTime.toEpochMillis(step.startedAt.value);
 };
 
-export const TestingScreen = ({ changesFor, instruction, savedFlow }: TestingScreenProps) => {
+export const TestingScreen = ({
+  changesFor,
+  instruction,
+  savedFlow,
+  requiresCookies = false,
+}: TestingScreenProps) => {
   const setScreen = useNavigationStore((state) => state.setScreen);
   const COLORS = useColors();
   const [columns] = useStdoutDimensions();
@@ -73,7 +79,7 @@ export const TestingScreen = ({ changesFor, instruction, savedFlow }: TestingScr
         changesFor,
         instruction,
         isHeadless: true,
-        requiresCookies: false,
+        requiresCookies,
         savedFlow,
       },
       agentBackend,
@@ -83,7 +89,7 @@ export const TestingScreen = ({ changesFor, instruction, savedFlow }: TestingScr
     return () => {
       triggerExecute(Atom.Interrupt);
     };
-  }, [triggerExecute, agentBackend, changesFor, instruction, savedFlow]);
+  }, [triggerExecute, agentBackend, changesFor, instruction, savedFlow, requiresCookies]);
 
   useEffect(() => {
     if (isExecutionComplete && executedPlan && report) {
