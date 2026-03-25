@@ -12,6 +12,7 @@ import type { ViewerRunState, ViewerStepEvent } from "@/lib/replay-types";
 
 const SPEEDS = [1, 2, 4, 8] as const;
 const TIMER_INTERVAL_MS = 100;
+const LIVE_EDGE_THRESHOLD_MS = 2000;
 const IDLE_THRESHOLD_MS = 1000;
 const IDLE_SPEED = 2;
 const CONTROL_BUTTON_SHADOW = [
@@ -283,51 +284,85 @@ export const ReplayViewer = ({
   }, [live, events.length]);
 
   const setupScalingAndZoom = () => {
-    if (!replayRef.current || !backdropRef.current) return;
+    if (!replayRef.current || !backdropRef.current) return undefined;
 
     const replayContainer = replayRef.current;
     const wrapper = replayContainer.querySelector(".replayer-wrapper") as HTMLElement | undefined;
-    if (!wrapper) return;
+    if (!wrapper) return undefined;
 
     const iframe = wrapper.querySelector("iframe");
-    if (!iframe) return;
-
-    const recordedWidth = Number(iframe.getAttribute("width")) || iframe.offsetWidth;
-    const recordedHeight = Number(iframe.getAttribute("height")) || iframe.offsetHeight;
-
-    if (!recordedWidth || !recordedHeight) return;
-
-    const fitScale = Math.min(
-      replayContainer.clientWidth / recordedWidth,
-      replayContainer.clientHeight / recordedHeight,
-    );
-
-    wrapper.style.position = "absolute";
-    wrapper.style.top = "0";
-    wrapper.style.left = "0";
-    wrapper.style.transformOrigin = "top left";
-    wrapper.style.transform = `scale(${fitScale})`;
-    wrapper.style.width = `${recordedWidth}px`;
-    wrapper.style.height = `${recordedHeight}px`;
-
-    const cursorEl = wrapper.querySelector(".replayer-mouse") as HTMLElement | undefined;
-    if (!cursorEl) return;
+    if (!iframe) return undefined;
 
     const backdrop = backdropRef.current;
     const zoomContainer = backdrop.parentElement;
-    if (!zoomContainer) return;
 
-    const backdropRect = backdrop.getBoundingClientRect();
-    const replayRect = replayContainer.getBoundingClientRect();
-    const offsetX = replayRect.left - backdropRect.left;
-    const offsetY = replayRect.top - backdropRect.top;
+    let currentFitScale = 1;
+    let currentCenterX = 0;
+    let currentCenterY = 0;
 
-    cleanupZoomRef.current = createCursorZoom(zoomContainer, backdrop, cursorEl, {
-      mapCursor: (x, y) => ({
-        x: x * fitScale + offsetX,
-        y: y * fitScale + offsetY,
-      }),
+    const applyScale = () => {
+      const recordedWidth = Number(iframe.getAttribute("width")) || 0;
+      const recordedHeight = Number(iframe.getAttribute("height")) || 0;
+      const containerWidth = replayContainer.clientWidth;
+      const containerHeight = replayContainer.clientHeight;
+
+      if (!recordedWidth || !recordedHeight || !containerWidth || !containerHeight) return;
+
+      const fitScale = Math.min(
+        containerWidth / recordedWidth,
+        containerHeight / recordedHeight,
+      );
+
+      const scaledWidth = recordedWidth * fitScale;
+      const scaledHeight = recordedHeight * fitScale;
+      const centerX = (containerWidth - scaledWidth) / 2;
+      const centerY = (containerHeight - scaledHeight) / 2;
+
+      currentFitScale = fitScale;
+      currentCenterX = centerX;
+      currentCenterY = centerY;
+
+      wrapper.style.position = "absolute";
+      wrapper.style.top = "0";
+      wrapper.style.left = "0";
+      wrapper.style.transformOrigin = "top left";
+      wrapper.style.transform = `translate(${centerX}px, ${centerY}px) scale(${fitScale})`;
+      wrapper.style.width = `${recordedWidth}px`;
+      wrapper.style.height = `${recordedHeight}px`;
+    };
+
+    applyScale();
+
+    const resizeObserver = new ResizeObserver(applyScale);
+    resizeObserver.observe(replayContainer);
+
+    const iframeObserver = new MutationObserver(applyScale);
+    iframeObserver.observe(iframe, {
+      attributes: true,
+      attributeFilter: ["width", "height"],
     });
+
+    let cleanupCursorZoom: (() => void) | undefined;
+
+    const cursorEl = wrapper.querySelector(".replayer-mouse") as HTMLElement | undefined;
+    if (cursorEl && zoomContainer) {
+      cleanupCursorZoom = createCursorZoom(zoomContainer, backdrop, cursorEl, {
+        mapCursor: (x, y) => {
+          const backdropRect = backdrop.getBoundingClientRect();
+          const replayRect = replayContainer.getBoundingClientRect();
+          return {
+            x: x * currentFitScale + currentCenterX + (replayRect.left - backdropRect.left),
+            y: y * currentFitScale + currentCenterY + (replayRect.top - backdropRect.top),
+          };
+        },
+      });
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+      iframeObserver.disconnect();
+      cleanupCursorZoom?.();
+    };
   };
 
   const handlePlay = async () => {
@@ -363,16 +398,13 @@ export const ReplayViewer = ({
     });
     replayerRef.current = replayer;
 
-    const startTime = Math.min(currentTime, replayDuration);
+    const startTime = liveRef.current ? replayDuration : Math.min(currentTime, replayDuration);
     setCurrentTime(startTime);
     replayer.play(startTime);
     setPlaying(true);
     startTimer();
 
-    // HACK: defer scaling until rrweb sets iframe dimensions after first frame
-    requestAnimationFrame(() => {
-      requestAnimationFrame(setupScalingAndZoom);
-    });
+    cleanupZoomRef.current = setupScalingAndZoom();
   };
 
   const seekTo = (timeMs: number) => {
@@ -423,6 +455,7 @@ export const ReplayViewer = ({
   const replayStartMs = events.length > 0 ? events[0].timestamp : 0;
   const hasEvents = events.length > 1;
   const canPlay = hasEvents;
+  const isAtLiveEdge = live && totalTime - currentTime < LIVE_EDGE_THRESHOLD_MS;
   const timeLabel = formatPaperTime(currentTime);
   const totalTimeLabel = formatPaperTime(totalTime);
 
@@ -487,29 +520,21 @@ export const ReplayViewer = ({
             </div>
           )}
 
-          {live && (
-            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-red-500/10">
-              <div className="h-full w-full rounded-full bg-red-500/40" />
-              <div className="absolute inset-y-0 right-0 w-8 animate-pulse rounded-r-full bg-red-500/80" />
-            </div>
-          )}
-          {!live && (
-            <input
-              type="range"
-              value={Math.min(currentTime, totalTime || 1)}
-              min={0}
-              max={totalTime || 1}
-              step={100}
-              disabled={!hasEvents}
-              onChange={handleSeek}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[color(display-p3_0.897_0.897_0.897)] outline-none disabled:cursor-default [&::-moz-range-thumb]:size-0 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:border-0 [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-webkit-slider-thumb]:size-0 [&::-webkit-slider-thumb]:appearance-none"
-              style={{
-                background: hasEvents
-                  ? `linear-gradient(to right, oklch(0.345 0 0) 0%, oklch(0.431 0 0) ${((Math.min(currentTime, totalTime || 1) / (totalTime || 1)) * 100).toFixed(1)}%, color(display-p3 0.897 0.897 0.897) ${((Math.min(currentTime, totalTime || 1) / (totalTime || 1)) * 100).toFixed(1)}%, color(display-p3 0.897 0.897 0.897) 100%)`
-                  : undefined,
-              }}
-            />
-          )}
+          <input
+            type="range"
+            value={Math.min(currentTime, totalTime || 1)}
+            min={0}
+            max={totalTime || 1}
+            step={100}
+            disabled={!hasEvents}
+            onChange={handleSeek}
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[color(display-p3_0.897_0.897_0.897)] outline-none disabled:cursor-default [&::-moz-range-thumb]:size-0 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:border-0 [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-webkit-slider-thumb]:size-0 [&::-webkit-slider-thumb]:appearance-none"
+            style={{
+              background: hasEvents
+                ? `linear-gradient(to right, oklch(0.345 0 0) 0%, oklch(0.431 0 0) ${((Math.min(currentTime, totalTime || 1) / (totalTime || 1)) * 100).toFixed(1)}%, color(display-p3 0.897 0.897 0.897) ${((Math.min(currentTime, totalTime || 1) / (totalTime || 1)) * 100).toFixed(1)}%, color(display-p3 0.897 0.897 0.897) 100%)`
+                : undefined,
+            }}
+          />
 
           <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-1">
@@ -525,25 +550,22 @@ export const ReplayViewer = ({
                 {!playing && <PlayIcon className="size-[22px]" />}
               </button>
 
+              <span className="inline-flex items-center gap-2.5 pl-2 text-[15px] leading-4.5 font-medium tracking-[0em] tabular-nums text-[color(display-p3_0.361_0.361_0.361)]">
+                <span>{timeLabel}</span>
+                <span className="text-[color(display-p3_0.727_0.727_0.727)]">/</span>
+                <span>{totalTimeLabel}</span>
+              </span>
               {live && (
-                <>
-                  <span className="pl-2 text-[15px] leading-4.5 font-medium tracking-[0em] tabular-nums text-[color(display-p3_0.361_0.361_0.361)]">
-                    {timeLabel}
+                <button
+                  type="button"
+                  onClick={() => seekTo(totalTime)}
+                  className="ml-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 transition-opacity hover:bg-red-500/20 active:scale-[0.97]"
+                >
+                  <span className={`size-1.5 rounded-full bg-red-500 ${isAtLiveEdge ? "animate-pulse" : ""}`} />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
+                    Live
                   </span>
-                  <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1">
-                    <span className="size-1.5 animate-pulse rounded-full bg-red-500" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
-                      Live
-                    </span>
-                  </span>
-                </>
-              )}
-              {!live && (
-                <span className="inline-flex items-center gap-2.5 pl-2 text-[15px] leading-4.5 font-medium tracking-[0em] tabular-nums text-[color(display-p3_0.361_0.361_0.361)]">
-                  <span>{timeLabel}</span>
-                  <span className="text-[color(display-p3_0.727_0.727_0.727)]">/</span>
-                  <span>{totalTimeLabel}</span>
-                </span>
+                </button>
               )}
             </div>
 
