@@ -5,7 +5,7 @@
 
 Let agents test your code in a real browser. One command scans your unstaged changes or branch diff, generates a test plan, and runs it against a live browser.
 
-### **[See it in action](https://expect.dev)**
+### **[See it in action →](https://expect.dev)**
 
 ## Install
 
