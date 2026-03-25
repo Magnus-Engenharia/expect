@@ -2032,7 +2032,7 @@ function InstallCommands() {
         </div>
       </div>
       <CommandRow
-        command="npx skills add https://github.com/millionco/expect --skill expect-cli"
+        command="npx skills add https://github.com/millionco/expect --skill expect"
         fade
       />
     </div>

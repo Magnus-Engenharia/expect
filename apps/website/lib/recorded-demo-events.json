@@ -1397,7 +1397,7 @@
                                             "childNodes": [
                                               {
                                                 "type": 3,
-                                                "textContent": "npx skills add https://github.com/millionco/expect --skill expect-cli",
+                                                "textContent": "npx skills add https://github.com/millionco/expect --skill expect",
                                                 "id": 147
                                               }
                                             ],
