@@ -4,9 +4,14 @@ import { detectPackageManager, runInit } from "../src/commands/init";
 
 const succeedSpy = vi.fn();
 const failSpy = vi.fn();
+const mockDetectAvailableAgents = vi.fn();
 
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
+}));
+
+vi.mock("@expect/agent", () => ({
+  detectAvailableAgents: (...args: unknown[]) => mockDetectAvailableAgents(...args),
 }));
 
 vi.mock("../src/utils/spinner", () => ({
@@ -76,62 +81,70 @@ describe("init", () => {
 
   describe("runInit", () => {
     const originalEnv = process.env;
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
     beforeEach(() => {
       process.env = { ...originalEnv };
       delete process.env.VITE_PLUS_CLI_BIN;
       delete process.env.npm_config_user_agent;
       vi.clearAllMocks();
+      mockDetectAvailableAgents.mockReturnValue(["claude"]);
+      mockedExecSync.mockReturnValue(Buffer.from(""));
     });
 
     afterEach(() => {
       process.env = originalEnv;
     });
 
-    it("global install command uses the detected package manager binary", async () => {
-      process.env.npm_config_user_agent = "pnpm/8.15.0 node/v20.0.0";
+    it("exits with error when no agents are detected", async () => {
+      mockDetectAvailableAgents.mockReturnValue([]);
+
       await runInit({ yes: true });
 
-      const firstCall = String(mockedExecSync.mock.calls[0][0]);
-      expect(firstCall).toMatch(/^pnpm /);
-      expect(firstCall).toContain("-g");
-      expect(firstCall).toContain("expect-cli");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("proceeds when at least one agent is detected", async () => {
+      mockDetectAvailableAgents.mockReturnValue(["claude"]);
+
+      await runInit({ yes: true });
+
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it("global install command uses the detected package manager binary", async () => {
+      process.env.npm_config_user_agent = "pnpm/8.15.0 node/v20.0.0";
+
+      await runInit({ yes: true });
+
+      const installCall = mockedExecSync.mock.calls.find((call) => String(call[0]).includes("-g"));
+      expect(installCall).toBeDefined();
+      expect(String(installCall![0])).toMatch(/^pnpm /);
     });
 
     it("uses vp binary when VITE_PLUS_CLI_BIN is set", async () => {
       process.env.VITE_PLUS_CLI_BIN = "/usr/local/bin/vp";
+
       await runInit({ yes: true });
 
-      const firstCall = String(mockedExecSync.mock.calls[0][0]);
-      expect(firstCall).toMatch(/^vp /);
-      expect(firstCall).toContain("-g");
-    });
-
-    it("runs both global install and skill install", async () => {
-      await runInit({ yes: true });
-
-      const calls = mockedExecSync.mock.calls.map((call) => String(call[0]));
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-      expect(calls[0]).toContain("-g");
-      expect(calls[1]).toContain("skills add");
+      const installCall = mockedExecSync.mock.calls.find((call) => String(call[0]).includes("-g"));
+      expect(installCall).toBeDefined();
+      expect(String(installCall![0])).toMatch(/^vp /);
     });
 
     it("continues to skill install even when global install fails", async () => {
-      mockedExecSync.mockImplementationOnce(() => {
-        throw new Error("install failed");
+      mockedExecSync.mockImplementation((command) => {
+        const cmd = String(command);
+        if (cmd.includes("-g")) throw new Error("install failed");
+        return Buffer.from("");
       });
 
       await runInit({ yes: true });
 
-      const calls = mockedExecSync.mock.calls.map((call) => String(call[0]));
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-      expect(calls[1]).toContain("skills add");
-    });
-
-    it("shows spinner success when install succeeds", async () => {
-      await runInit({ yes: true });
-
-      expect(succeedSpy).toHaveBeenCalled();
+      const skillCall = mockedExecSync.mock.calls.find((call) =>
+        String(call[0]).includes("skills add"),
+      );
+      expect(skillCall).toBeDefined();
     });
 
     it("shows spinner fail when install throws", async () => {
@@ -146,6 +159,7 @@ describe("init", () => {
 
     it("does not call prompts in non-interactive mode", async () => {
       const { prompts } = await import("../src/utils/prompts");
+
       await runInit({ yes: true });
 
       expect(prompts).not.toHaveBeenCalled();

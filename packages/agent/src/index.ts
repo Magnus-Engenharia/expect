@@ -11,3 +11,4 @@ export {
 export { Agent, type AgentBackend } from "./agent";
 
 export { PROVIDER_ID, EMPTY_USAGE, STOP_REASON } from "./schemas/index";
+export { detectAvailableAgents, type SupportedAgent } from "./detect-agents";

@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { detectAvailableAgents } from "@expect/agent";
 import { highlighter } from "../utils/highlighter";
 import { logger } from "../utils/logger";
 import { prompts } from "../utils/prompts";
@@ -17,6 +18,8 @@ const GLOBAL_INSTALL_COMMANDS: Record<PackageManager, string> = {
 };
 
 const SKILL_COMMAND = "npx skills add https://github.com/millionco/expect --skill expect-cli";
+
+export { detectAvailableAgents };
 
 export const detectPackageManager = (): PackageManager => {
   if (process.env.VITE_PLUS_CLI_BIN) return "vp";
@@ -55,6 +58,25 @@ export const runInit = async (options: InitOptions = {}) => {
   logger.break();
   logger.log(`  ${highlighter.info("expect")} ${highlighter.dim("— AI-powered browser testing")}`);
   logger.break();
+
+  const availableAgents = detectAvailableAgents();
+
+  if (availableAgents.length === 0) {
+    logger.error(
+      "No supported coding agent found. expect requires one of: Claude Code, Codex, or Cursor.",
+    );
+    logger.break();
+    logger.log(`  Install one to get started:`);
+    logger.log(
+      `    ${highlighter.info("Claude Code")}  ${highlighter.dim("https://docs.anthropic.com/en/docs/claude-code")}`,
+    );
+    logger.log(
+      `    ${highlighter.info("Codex")}        ${highlighter.dim("https://github.com/openai/codex")}`,
+    );
+    logger.log(`    ${highlighter.info("Cursor")}       ${highlighter.dim("https://cursor.com")}`);
+    logger.break();
+    process.exit(1);
+  }
 
   const globalSpinner = spinner("Installing expect-cli globally...").start();
   const globalSuccess = tryRun(installCommand);

@@ -17,6 +17,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Expect",
   description: "Let agents test your code in a real browser.",
+  openGraph: {
+    title: "Expect",
+    description: "Let agents test your code in a real browser.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1600,
+        height: 900,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Expect",
+    description: "Let agents test your code in a real browser.",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
@@ -38,7 +55,12 @@ export default function RootLayout({
             strategy="beforeInteractive"
           />
         )}
-        <ThemeProvider attribute="class" defaultTheme="light" themes={["light", "dark"]} disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          themes={["light", "dark"]}
+          disableTransitionOnChange
+        >
           {children}
         </ThemeProvider>
       </body>

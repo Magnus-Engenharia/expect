@@ -76,6 +76,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
+    "@expect/agent": "workspace:*",
     "@expect/shared": "workspace:*",
     "@expect/supervisor": "workspace:*",
     "@types/node-notifier": "^8.0.5",
