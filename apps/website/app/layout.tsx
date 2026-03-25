@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "https://www.expect.dev",
+  ),
   title: "Expect",
   description: "Let agents test your code in a real browser.",
   openGraph: {
