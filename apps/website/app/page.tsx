@@ -1063,10 +1063,13 @@ export default function Home() {
         <div className="absolute top-5 left-1/2 h-76.75 w-[31.03125rem] -translate-x-1/2 sm:relative sm:top-auto sm:left-auto sm:translate-x-0 sm:translate-y-5">
           <div className="relative h-76.75 w-full sm:w-93.25">
             <div
-              className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl [box-shadow:color(display-p3_1_1_1)_0px_0px_9px_inset] dark:[box-shadow:color(display-p3_0.08_0.08_0.08)_0px_0px_9px_inset]"
+              className={cn(
+                "pointer-events-none absolute inset-0 overflow-hidden rounded-2xl",
+                !isDark && "[box-shadow:color(display-p3_1_1_1)_0px_0px_9px_inset]",
+              )}
               style={{
                 backgroundImage: isDark
-                  ? "linear-gradient(in oklab 180deg, oklab(22% 0 0 / 88%) 0%, oklab(17% 0 0) 38%, oklab(12% 0 0) 82.16%, oklab(10% 0 0) 100%)"
+                  ? "linear-gradient(in oklab 180deg, oklab(17% 0 0) 0%, oklab(17% 0 0) 82.16%, oklab(17% 0 0 / 0%) 100%)"
                   : "linear-gradient(in oklab 180deg, oklab(100% 0 0 / 65%) 0%, oklab(99% 0 0) 82.16%, oklab(100% 0 0) 100%)",
                 WebkitMaskImage:
                   "linear-gradient(to bottom, black 0%, black 68%, transparent 100%)",
