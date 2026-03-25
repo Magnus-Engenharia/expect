@@ -1,5 +1,8 @@
 Rasmus:
 
+- Improved error surfacing
+  - [ ] Defects
+  - [ ] Expected errors
 - Unauthenticated case.
 - Out of usage case
 -- After launch
