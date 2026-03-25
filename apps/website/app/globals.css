@@ -207,3 +207,42 @@
 .recording-ripple {
   animation: recording-ripple 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes text-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: -100% 50%;
+  }
+}
+
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    color(display-p3 0.45 0.45 0.45) 0%,
+    color(display-p3 0.65 0.65 0.65) 40%,
+    color(display-p3 0.8 0.8 0.8) 50%,
+    color(display-p3 0.65 0.65 0.65) 60%,
+    color(display-p3 0.45 0.45 0.45) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 2s ease-in-out infinite;
+}

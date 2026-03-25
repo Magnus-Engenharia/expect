@@ -132,7 +132,10 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
     }
   });
 
-  const replayHostParsed = new URL(options.replayHost);
+  const normalizedReplayHost = /^https?:\/\//.test(options.replayHost)
+    ? options.replayHost
+    : `http://${options.replayHost}`;
+  const replayHostParsed = new URL(normalizedReplayHost);
 
   app.all("/*", async (context) => {
     const requestPath = context.req.path;
@@ -140,7 +143,7 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
       return context.text("Not Found", 404);
     }
 
-    const upstreamUrl = new URL(requestPath, options.replayHost);
+    const upstreamUrl = new URL(requestPath, normalizedReplayHost);
     upstreamUrl.search = new URL(context.req.url).search;
 
     try {
@@ -168,7 +171,7 @@ export const startReplayProxy = Effect.fn("startReplayProxy")(function* (
   });
 
   serverHandle.on("upgrade", (request, socket, head) => {
-    proxyWebSocketUpgrade(request, socket, head, options.replayHost);
+    proxyWebSocketUpgrade(request, socket, head, normalizedReplayHost);
   });
 
   const address = serverHandle.address();

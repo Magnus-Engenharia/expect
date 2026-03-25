@@ -1,0 +1,92 @@
+import type { ViewerRunState } from "@/lib/replay-types";
+
+const BASE_MS = 1742907600000;
+
+export const DEMO_TRACE: ViewerRunState = {
+  title: "test expect.dev",
+  status: "passed",
+  summary: undefined,
+  done: true,
+  steps: [
+    {
+      stepId: "demo-step-1",
+      title: "Navigate to expect.dev and verify landing page loads",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS,
+      endedAtMs: BASE_MS + 23_000,
+    },
+    {
+      stepId: "demo-step-2",
+      title: "Verify hero section content and interactive demo button",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 24_000,
+      endedAtMs: BASE_MS + 40_000,
+    },
+    {
+      stepId: "demo-step-3",
+      title: "Test copy-to-clipboard buttons for installation commands",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 41_000,
+      endedAtMs: BASE_MS + 53_000,
+    },
+    {
+      stepId: "demo-step-4",
+      title: "Test dark mode toggle",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 54_000,
+      endedAtMs: BASE_MS + 73_000,
+    },
+    {
+      stepId: "demo-step-5",
+      title: "Verify external links (GitHub and X)",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 74_000,
+      endedAtMs: BASE_MS + 80_000,
+    },
+    {
+      stepId: "demo-step-6",
+      title: "Scroll down to check for additional page content below the fold",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 81_000,
+      endedAtMs: BASE_MS + 93_000,
+    },
+    {
+      stepId: "demo-step-7",
+      title: "Visual regression check — verify layout and styling render correctly",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 94_000,
+      endedAtMs: BASE_MS + 109_000,
+    },
+    {
+      stepId: "demo-step-8",
+      title: "Test responsive behavior at mobile viewport",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 110_000,
+      endedAtMs: BASE_MS + 143_000,
+    },
+    {
+      stepId: "demo-step-9",
+      title: "Test dark mode at mobile viewport",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 144_000,
+      endedAtMs: BASE_MS + 164_000,
+    },
+    {
+      stepId: "demo-step-10",
+      title: "Check for accessibility and console errors across all interactions",
+      status: "passed",
+      summary: undefined,
+      startedAtMs: BASE_MS + 165_000,
+      endedAtMs: BASE_MS + 192_000,
+    },
+  ],
+};

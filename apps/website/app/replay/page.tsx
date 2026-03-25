@@ -1,17 +1,25 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import type { eventWithTime } from "@posthog/rrweb";
 import { ReplayViewer } from "@/components/replay/replay-viewer";
+import { MacWindow } from "@/components/replay/mac-window";
 import { startRecording, stopRecording } from "@/lib/rrweb";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import type { ViewerRunState } from "@/lib/replay-types";
+import { DEMO_TRACE } from "@/lib/demo-trace";
+import { DEMO_EVENTS } from "@/lib/demo-events";
 
 const POLL_INTERVAL_MS = 500;
 const RECORDING_TICK_MS = 1000;
-const RIPPLE_DELAY_STYLE: CSSProperties = { animationDelay: "1s" };
+const VIEWER_SHELL_SHADOW = "color(display-p3 0.788 0.788 0.788 / 20%) 0px 2px 3px";
+const PLAYBACK_BAR_SURFACE_COLOR = "color(display-p3 0.938 0.938 0.938)";
+const PLAYBACK_BAR_SHADOW = "color(display-p3 0.281 0.281 0.281 / 22%) 0px 0px 0px 1px";
+const PLAYBACK_BAR_BUTTON_SHADOW = "color(display-p3 0.847 0.847 0.847) 0px 0px 0px 0.5px";
+const CONTROL_FONT_FAMILY =
+  '"SF Pro Display", "SFProDisplay-Medium", "Inter Variable", system-ui, sans-serif';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -52,46 +60,77 @@ const RecordingMode = () => {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[color(display-p3_0.986_0.986_0.986)]">
-      <div className="flex flex-col items-center gap-10">
-        <div className="relative flex size-24 items-center justify-center">
-          <div className="recording-ripple absolute inset-0 rounded-full border border-red-500/20" />
-          <div
-            className="recording-ripple absolute inset-0 rounded-full border border-red-500/20"
-            style={RIPPLE_DELAY_STYLE}
-          />
-          <div className="flex size-12 items-center justify-center rounded-full bg-red-500/10">
-            <div className="size-4 rounded-full bg-red-500 shadow-[0_0_12px_4px_rgba(239,68,68,0.2)]" />
+    <div
+      data-rrweb-block
+      className="flex h-screen flex-col gap-3 bg-[color(display-p3_0.986_0.986_0.986)] p-6"
+      style={{ fontFamily: CONTROL_FONT_FAMILY }}
+    >
+      <div
+        className="flex h-0 grow overflow-hidden rounded-[26px] border-[7px] border-solid border-[color(display-p3_1_1_1)] bg-[color(display-p3_0.977_0.977_0.977)]"
+        style={{ boxShadow: VIEWER_SHELL_SHADOW }}
+      >
+        <div className="relative min-w-0 flex-1">
+          <div className="absolute inset-0 bg-linear-to-br from-sky-200 to-blue-400 p-6">
+            <div
+              className="glow-pulse pointer-events-none absolute inset-0"
+              style={{ boxShadow: "inset 0 0 120px 40px rgba(96, 165, 250, 0.35)" }}
+            />
+            <MacWindow>
+              <div className="flex h-full flex-col items-center justify-center gap-6">
+                <div className="relative flex size-20 items-center justify-center">
+                  <div className="recording-ripple absolute inset-0 rounded-full border border-red-500/20" />
+                  <div className="flex size-10 items-center justify-center rounded-full bg-red-500/10">
+                    <div className="size-3.5 rounded-full bg-red-500 shadow-[0_0_12px_4px_rgba(239,68,68,0.2)]" />
+                  </div>
+                </div>
+                <p className="max-w-[240px] text-center text-[13px] leading-relaxed text-neutral-400">
+                  Interact with the page, then stop to review the session replay.
+                </p>
+              </div>
+            </MacWindow>
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-col items-center gap-3">
-          <span
-            className="font-mono text-4xl tabular-nums tracking-[0.2em] text-neutral-900"
-            style={{ fontWeight: 200 }}
-          >
-            {formatElapsed(elapsedSeconds)}
-          </span>
-          <div className="flex items-center gap-2 rounded-full bg-red-50 px-3 py-1">
-            <div className="size-1.5 animate-pulse rounded-full bg-red-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-red-600/80">
-              Recording
+      <div className="flex flex-col gap-3 rounded-[28px] px-6 pt-3 pb-5">
+        <div className="mt-1.5 flex items-center justify-between gap-4 p-0 antialiased [font-synthesis:none]">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="h-4.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-base/4.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]">
+              Recording session
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="inline-flex items-center text-[15px] leading-4.5 font-medium tracking-[0em] tabular-nums text-[color(display-p3_0.361_0.361_0.361)]">
+              {formatElapsed(elapsedSeconds)}
             </span>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1">
+              <span className="size-1.5 animate-pulse rounded-full bg-red-500" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
+                Recording
+              </span>
+            </div>
           </div>
         </div>
 
-        <p className="max-w-[260px] text-center text-[13px] leading-relaxed text-neutral-400">
-          Interact with the page, then stop to review the session replay.
-        </p>
-
-        <button
-          type="button"
-          onClick={handleCompleteRecording}
-          className="group flex items-center gap-2.5 rounded-full border border-neutral-200 bg-white px-6 py-3 text-sm font-medium text-neutral-900 shadow-sm transition-all duration-150 ease-out hover:border-neutral-300 hover:shadow-md active:scale-[0.97]"
-        >
-          <div className="size-3 rounded-[3px] bg-red-500 transition-transform duration-150 group-hover:scale-110" />
-          Stop Recording
-        </button>
+        <div className="relative pb-6">
+          <div
+            className="relative h-9.75 overflow-hidden rounded-full"
+            style={{
+              backgroundColor: PLAYBACK_BAR_SURFACE_COLOR,
+              boxShadow: PLAYBACK_BAR_SHADOW,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleCompleteRecording}
+              aria-label="Stop recording"
+              className="absolute inset-y-1.5 left-1.5 z-30 flex w-12.75 items-center justify-center rounded-full bg-white transition-transform duration-150 ease-out active:scale-[0.97]"
+              style={{ boxShadow: PLAYBACK_BAR_BUTTON_SHADOW }}
+            >
+              <div className="size-3 rounded-[3px] bg-red-500" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -150,9 +189,18 @@ const LiveMode = () => {
   );
 };
 
+const DemoMode = () => {
+  return <ReplayViewer events={DEMO_EVENTS} steps={DEMO_TRACE} autoPlay />;
+};
+
 const ReplayPageInner = () => {
   const searchParams = useSearchParams();
   const isLive = searchParams.get("live") === "true";
+  const isDemo = searchParams.get("demo") === "true";
+
+  if (isDemo) {
+    return <DemoMode />;
+  }
 
   if (isLive) {
     return <LiveMode />;

@@ -4,7 +4,7 @@ import { Calligraph } from "calligraph";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { eventWithTime } from "@posthog/rrweb";
 import type { Replayer } from "@posthog/rrweb";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { animate, AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatTime } from "@/lib/format-time";
 import { createCursorZoom } from "@/lib/cursor-zoom";
@@ -24,20 +24,16 @@ const IDLE_SPEED_TIERS = [
   { afterMs: 20000, speed: 8 },
   { afterMs: 40000, speed: 16 },
 ] as const;
-const LIVE_PLAYBACK_BAR_SHADOW =
-  "color(display-p3 0.281 0.281 0.281 / 22%) 0px 0px 0px 1px";
-const LIVE_PLAYBACK_BAR_BUTTON_SHADOW =
-  "color(display-p3 0.847 0.847 0.847) 0px 0px 0px 0.5px";
+const LIVE_PLAYBACK_BAR_SHADOW = "color(display-p3 0.281 0.281 0.281 / 22%) 0px 0px 0px 1px";
+const LIVE_PLAYBACK_BAR_BUTTON_SHADOW = "color(display-p3 0.847 0.847 0.847) 0px 0px 0px 0.5px";
 const LIVE_PLAYBACK_BAR_MARKER_INTERVAL_MS = 10_000;
-const LIVE_PASSED_STEP_MARKER_OUTLINE =
-  "2px solid color(display-p3 0.249 0.701 0.193 / 30%)";
+const LIVE_PASSED_STEP_MARKER_OUTLINE = "2px solid color(display-p3 0.249 0.701 0.193 / 30%)";
 const LIVE_PASSED_STEP_MARKER_BACKGROUND_IMAGE =
   "linear-gradient(in oklab 180deg, oklab(66.4% -0.197 0.139) 0%, oklab(72.7% -0.252 0.178) 100%)";
 const LIVE_FAILED_STEP_MARKER_OUTLINE = "2px solid #FC272F4D";
 const LIVE_FAILED_STEP_MARKER_BACKGROUND_IMAGE =
   "linear-gradient(in oklab 180deg, oklab(63.6% 0.216 0.107) 0%, oklab(67.1% 0.194 0.096) 100%)";
-const LIVE_PLAYBACK_PROGRESS_SHADOW =
-  "color(display-p3 0.615 0.615 0.615 / 20%) 0px 0px 3px";
+const LIVE_PLAYBACK_PROGRESS_SHADOW = "color(display-p3 0.615 0.615 0.615 / 20%) 0px 0px 3px";
 const LIVE_PLAYBACK_PROGRESS_RIGHT_EDGE_SHADOW =
   "inset -1px 0px 0px color(display-p3 0.725 0.725 0.725 / 80%)";
 const LIVE_PLAYBACK_PROGRESS_RIGHT_EDGE_HIDE_PERCENT = 99;
@@ -68,6 +64,133 @@ const PLAYBACK_BAR_RUBBER_BAND_TRANSITION = {
   visualDuration: 0.35,
   bounce: 0.15,
 } as const;
+
+const NOTIFICATION_WINDOW_MS = 3000;
+const NOTIFICATION_MAX_VISIBLE = 3;
+const INPUT_DEBOUNCE_MS = 500;
+const SCROLL_DEBOUNCE_MS = 800;
+const RRWEB_EVENT_INCREMENTAL = 3;
+const RRWEB_EVENT_META = 4;
+const RRWEB_SOURCE_MOUSE_INTERACTION = 2;
+const RRWEB_SOURCE_SCROLL = 3;
+const RRWEB_SOURCE_VIEWPORT_RESIZE = 4;
+const RRWEB_SOURCE_INPUT = 5;
+const RRWEB_SOURCE_MEDIA_INTERACTION = 7;
+const RRWEB_SOURCE_DRAG = 12;
+const RRWEB_MOUSE_CLICK = 2;
+const RRWEB_MOUSE_DBLCLICK = 4;
+const RRWEB_MOUSE_CONTEXT_MENU = 8;
+const RRWEB_MOUSE_FOCUS = 6;
+const RRWEB_MOUSE_TOUCH_START = 9;
+const RRWEB_MEDIA_PLAY = 0;
+const RRWEB_MEDIA_PAUSE = 1;
+
+interface ReplayAction {
+  id: string;
+  label: string;
+  relativeMs: number;
+}
+
+const MOUSE_INTERACTION_LABELS: Record<number, string> = {
+  [RRWEB_MOUSE_CLICK]: "Clicked",
+  [RRWEB_MOUSE_DBLCLICK]: "Double-clicked",
+  [RRWEB_MOUSE_CONTEXT_MENU]: "Right-clicked",
+  [RRWEB_MOUSE_FOCUS]: "Focused",
+  [RRWEB_MOUSE_TOUCH_START]: "Tapped",
+};
+
+const extractReplayActions = (events: eventWithTime[]): ReplayAction[] => {
+  if (events.length < 2) return [];
+  const startTs = events[0].timestamp;
+  const actions: ReplayAction[] = [];
+  let lastInputTs = -Infinity;
+  let lastScrollTs = -Infinity;
+
+  for (const event of events) {
+    const relativeMs = event.timestamp - startTs;
+    const data = event.data as Record<string, unknown>;
+
+    if (event.type === RRWEB_EVENT_META && typeof data.href === "string") {
+      try {
+        const url = new URL(data.href);
+        const displayPath = url.pathname === "/" ? url.hostname : `${url.hostname}${url.pathname}`;
+        actions.push({
+          id: `nav-${event.timestamp}`,
+          label: `Navigated to ${displayPath}`,
+          relativeMs,
+        });
+      } catch {
+        // skip invalid URLs
+      }
+      continue;
+    }
+
+    if (event.type !== RRWEB_EVENT_INCREMENTAL) continue;
+
+    if (data.source === RRWEB_SOURCE_MOUSE_INTERACTION) {
+      const interactionType = data.type as number;
+      const label = MOUSE_INTERACTION_LABELS[interactionType];
+      if (label) {
+        actions.push({ id: `mouse-${interactionType}-${event.timestamp}`, label, relativeMs });
+      }
+      continue;
+    }
+
+    if (data.source === RRWEB_SOURCE_INPUT) {
+      if (event.timestamp - lastInputTs > INPUT_DEBOUNCE_MS) {
+        const rawText = typeof data.text === "string" ? data.text : "";
+        const displayText = rawText.length > 30 ? `${rawText.slice(0, 30)}…` : rawText;
+        actions.push({
+          id: `input-${event.timestamp}`,
+          label: displayText.length > 0 ? `Typed "${displayText}"` : "Typed input",
+          relativeMs,
+        });
+      }
+      lastInputTs = event.timestamp;
+      continue;
+    }
+
+    if (data.source === RRWEB_SOURCE_SCROLL) {
+      if (event.timestamp - lastScrollTs > SCROLL_DEBOUNCE_MS) {
+        actions.push({ id: `scroll-${event.timestamp}`, label: "Scrolled", relativeMs });
+      }
+      lastScrollTs = event.timestamp;
+      continue;
+    }
+
+    if (data.source === RRWEB_SOURCE_VIEWPORT_RESIZE) {
+      const width = data.width as number;
+      const height = data.height as number;
+      actions.push({
+        id: `resize-${event.timestamp}`,
+        label: `Resized to ${width}×${height}`,
+        relativeMs,
+      });
+      continue;
+    }
+
+    if (data.source === RRWEB_SOURCE_MEDIA_INTERACTION) {
+      const mediaType = data.type as number;
+      const label =
+        mediaType === RRWEB_MEDIA_PLAY
+          ? "Played media"
+          : mediaType === RRWEB_MEDIA_PAUSE
+            ? "Paused media"
+            : undefined;
+      if (label) {
+        actions.push({ id: `media-${event.timestamp}`, label, relativeMs });
+      }
+      continue;
+    }
+
+    if (data.source === RRWEB_SOURCE_DRAG) {
+      actions.push({ id: `drag-${event.timestamp}`, label: "Dragged", relativeMs });
+      continue;
+    }
+  }
+
+  return actions;
+};
 
 const getReplayDuration = (replayEvents: eventWithTime[]) => {
   if (replayEvents.length < 2) return 0;
@@ -164,6 +287,7 @@ interface ReplayViewerProps {
   events: eventWithTime[];
   steps?: ViewerRunState;
   live?: boolean;
+  autoPlay?: boolean;
   onAddEventsRef?: (handler: (newEvents: eventWithTime[]) => void) => void;
 }
 
@@ -171,6 +295,7 @@ export const ReplayViewer = ({
   events,
   steps,
   live = false,
+  autoPlay = false,
   onAddEventsRef,
 }: ReplayViewerProps) => {
   const [playbackBarClientReady, setPlaybackBarClientReady] = useState(false);
@@ -381,10 +506,11 @@ export const ReplayViewer = ({
   }, [onAddEventsRef]);
 
   useEffect(() => {
-    if (autoPlayTriggeredRef.current || !live || replayerRef.current || events.length < 2) return;
+    if (autoPlayTriggeredRef.current || events.length < 2) return;
+    if (!live && !autoPlay) return;
     autoPlayTriggeredRef.current = true;
     void playPauseRef.current?.();
-  }, [live, events.length]);
+  }, [live, autoPlay, events.length]);
 
   const setupScalingAndZoom = () => {
     if (!replayRef.current || !backdropRef.current) return undefined;
@@ -545,19 +671,14 @@ export const ReplayViewer = ({
     }
 
     if (clientX > playbackBarRect.right) {
-      playbackBarRubberStretchPx.jump(
-        getPlaybackBarRubberBandStretch(playbackBarRect, clientX, 1),
-      );
+      playbackBarRubberStretchPx.jump(getPlaybackBarRubberBandStretch(playbackBarRect, clientX, 1));
       return;
     }
 
     playbackBarRubberStretchPx.jump(0);
   };
 
-  const finishPlaybackBarPointerInteraction = (
-    target?: HTMLInputElement,
-    pointerId?: number,
-  ) => {
+  const finishPlaybackBarPointerInteraction = (target?: HTMLInputElement, pointerId?: number) => {
     if (!playbackBarPointerActiveRef.current) return;
 
     playbackBarPointerActiveRef.current = false;
@@ -633,10 +754,25 @@ export const ReplayViewer = ({
     await viewerShell.requestFullscreen();
   };
 
-  const totalTime = getReplayDuration(events);
   const replayStartMs =
     events.length > 0 ? events[0].timestamp : (steps?.steps[0]?.startedAtMs ?? 0);
   const hasEvents = events.length > 1;
+  const totalTime = getReplayDuration(events);
+  const replayActions = extractReplayActions(events);
+  const stepActions: ReplayAction[] = (steps?.steps ?? []).flatMap((step, index) => {
+    if (step.startedAtMs === undefined) return [];
+    const relativeMs = Math.max(0, step.startedAtMs - replayStartMs);
+    return [{ id: `step-${step.stepId}`, label: `Step ${index + 1}: ${step.title}`, relativeMs }];
+  });
+  const allActions = [...replayActions, ...stepActions].sort(
+    (left, right) => left.relativeMs - right.relativeMs,
+  );
+  const visibleActions = allActions
+    .filter((action) => {
+      const age = currentTime - action.relativeMs;
+      return age >= 0 && age < NOTIFICATION_WINDOW_MS;
+    })
+    .slice(-NOTIFICATION_MAX_VISIBLE);
   const canPlay = hasEvents;
   const isAtLiveEdge = live && totalTime - currentTime < LIVE_EDGE_THRESHOLD_MS;
   const timeLabel = formatPaperTime(currentTime);
@@ -668,24 +804,25 @@ export const ReplayViewer = ({
   const currentStep = steps && activeStepIndex >= 0 ? steps.steps[activeStepIndex] : undefined;
   const currentStepLabel = currentStep ? `Step ${activeStepIndex + 1}` : "";
   const currentStepTitle = currentStep?.title ?? "";
-  const stepList = steps?.steps.map((step, index) => {
-    const isActive = index === activeStepIndex;
-    const { startMs, endMs } = getStepRelativeTime(step, replayStartMs);
-    const timeMs = startMs ?? endMs;
-    return {
-      stepId: step.stepId,
-      label: `${index + 1}`,
-      title: step.title,
-      isActive,
-      timeMs,
-      dotClassName:
-        step.status === "failed"
-          ? "bg-[color(display-p3_0.988_0.153_0.184)]"
-          : step.status === "passed"
-            ? "bg-[color(display-p3_0.249_0.701_0.193)]"
-            : "bg-[color(display-p3_0.787_0.787_0.787)]",
-    };
-  }) ?? [];
+  const stepList =
+    steps?.steps.map((step, index) => {
+      const isActive = index === activeStepIndex;
+      const { startMs, endMs } = getStepRelativeTime(step, replayStartMs);
+      const timeMs = startMs ?? endMs;
+      return {
+        stepId: step.stepId,
+        label: `${index + 1}`,
+        title: step.title,
+        isActive,
+        timeMs,
+        dotClassName:
+          step.status === "failed"
+            ? "bg-[color(display-p3_0.988_0.153_0.184)]"
+            : step.status === "passed"
+              ? "bg-[color(display-p3_0.249_0.701_0.193)]"
+              : "bg-[color(display-p3_0.787_0.787_0.787)]",
+      };
+    }) ?? [];
   stepNavigationRef.current = (direction) => {
     if (!hasEvents) return;
     const navigableStepIndices = stepList.flatMap((step, index) =>
@@ -693,7 +830,9 @@ export const ReplayViewer = ({
     );
     if (navigableStepIndices.length === 0) return;
 
-    const currentNavigablePosition = navigableStepIndices.findIndex((index) => index === activeStepIndex);
+    const currentNavigablePosition = navigableStepIndices.findIndex(
+      (index) => index === activeStepIndex,
+    );
     if (currentNavigablePosition === -1) {
       if (direction === "down") {
         const firstStepIndex = navigableStepIndices[0];
@@ -740,10 +879,7 @@ export const ReplayViewer = ({
     seekTo(Number(stepTimeMs));
     return true;
   };
-  const finishStepListPointerInteraction = (
-    target?: HTMLDivElement,
-    pointerId?: number,
-  ) => {
+  const finishStepListPointerInteraction = (target?: HTMLDivElement, pointerId?: number) => {
     if (!stepListPointerActiveRef.current) return;
 
     stepListPointerActiveRef.current = false;
@@ -789,8 +925,7 @@ export const ReplayViewer = ({
   );
   const playbackBarMarkerPositions = Array.from(
     { length: playbackBarMarkerCount },
-    (_, index) =>
-      `${(((index + 1) / (playbackBarMarkerCount + 1)) * 100).toFixed(2)}%`,
+    (_, index) => `${(((index + 1) / (playbackBarMarkerCount + 1)) * 100).toFixed(2)}%`,
   );
   const visiblePlaybackBarMarkerPositions = playbackBarMarkerPositions.slice(1);
   const playbackStepMarkers =
@@ -918,12 +1053,33 @@ export const ReplayViewer = ({
             className="absolute inset-0 p-6"
             style={REPLAY_BACKDROP_STYLE}
           >
+            <div
+              className="glow-pulse pointer-events-none absolute inset-0"
+              style={{
+                boxShadow: "inset 0 0 120px 40px rgba(96, 165, 250, 0.35)",
+              }}
+            />
             <MacWindow>
-              <div
-                ref={replayRef}
-                className="relative h-full w-full overflow-hidden"
-              />
+              <div ref={replayRef} className="relative h-full w-full overflow-hidden" />
             </MacWindow>
+          </div>
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-end justify-end gap-2 p-5">
+            <AnimatePresence mode="popLayout">
+              {visibleActions.map((action) => (
+                <motion.div
+                  key={action.id}
+                  layout
+                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                  className="max-w-80 truncate rounded-xl bg-[#1c1c1c] px-4 py-3 text-base font-medium text-white shadow-xl"
+                  style={{ fontFamily: CONTROL_FONT_FAMILY }}
+                >
+                  {action.label}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
         {!hasEvents && (
@@ -932,14 +1088,9 @@ export const ReplayViewer = ({
             style={{ fontFamily: CONTROL_FONT_FAMILY }}
           >
             {live && (
-              <>
-                <div className="flex size-12 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm">
-                  <div className="size-3 animate-pulse rounded-full bg-neutral-400" />
-                </div>
-                <span className="text-sm font-medium text-white/90 drop-shadow-sm">
-                  Waiting for browser session...
-                </span>
-              </>
+              <span className="text-shimmer text-sm font-medium">
+                Waiting for browser session...
+              </span>
             )}
             {!live && (
               <span className="text-sm font-medium text-white/90 drop-shadow-sm">
@@ -951,13 +1102,13 @@ export const ReplayViewer = ({
       </div>
 
       <div
-        className="flex flex-col gap-3 rounded-[28px] px-6 pt-3 pb-5"
+        className={`flex flex-col gap-3 rounded-[28px] pr-6 pt-3 pb-5 ${stepList.length > 0 ? "pl-[295px]" : "pl-6"}`}
         style={{ fontFamily: CONTROL_FONT_FAMILY }}
       >
         <div className="mt-1.5 flex items-center justify-between gap-4 p-0 antialiased [font-synthesis:none]">
           <div className="flex min-w-0 items-center gap-1.5">
             {!currentStepLabel && !currentStepTitle && live && (
-              <div className="h-4.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-base/4.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]">
+              <div className="h-5.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-lg/5.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]">
                 Waiting for steps...
               </div>
             )}
@@ -965,13 +1116,13 @@ export const ReplayViewer = ({
               <Calligraph
                 as="div"
                 autoSize={false}
-                className="h-4.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-base/4.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]"
+                className="h-5.5 shrink-0 font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-lg/5.5 font-medium tracking-[0em] text-[color(display-p3_0.587_0.587_0.587)]"
               >
                 {currentStepLabel}
               </Calligraph>
             )}
             {currentStepTitle && (
-              <div className="min-w-0 truncate font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-base/4.5 font-medium tracking-[0em] text-[color(display-p3_0.188_0.188_0.188)]">
+              <div className="min-w-0 truncate font-['SFProDisplay-Medium','SF_Pro_Display',system-ui,sans-serif] text-lg/5.5 font-medium tracking-[0em] text-[color(display-p3_0.188_0.188_0.188)]">
                 {currentStepTitle}
               </div>
             )}
@@ -994,7 +1145,9 @@ export const ReplayViewer = ({
                 onClick={() => seekTo(totalTime)}
                 className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 transition-opacity hover:bg-red-500/20 active:scale-[0.97]"
               >
-                <span className={`size-1.5 rounded-full bg-red-500 ${isAtLiveEdge ? "animate-pulse" : ""}`} />
+                <span
+                  className={`size-1.5 rounded-full bg-red-500 ${isAtLiveEdge ? "animate-pulse" : ""}`}
+                />
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-red-500">
                   Live
                 </span>
@@ -1072,7 +1225,7 @@ export const ReplayViewer = ({
                     data-step-status-marker={marker.status}
                     aria-label={marker.title}
                     onClick={() => {
-                      seekTo(marker.timeMs)
+                      seekTo(marker.timeMs);
                     }}
                     className="pointer-events-auto absolute top-1/2 z-[15] size-4 -translate-x-1/2 -translate-y-1/2 appearance-none rounded-[4.5px] border-[3px] border-solid border-[color(display-p3_1_1_1)] bg-origin-border p-0 outline-none transition-transform duration-150 ease-out will-change-transform hover:scale-[1.08]"
                     style={{
@@ -1112,7 +1265,7 @@ export const ReplayViewer = ({
               type="button"
               key={`${marker.stepId}-label`}
               onClick={() => {
-                seekTo(marker.timeMs)
+                seekTo(marker.timeMs);
               }}
               disabled={!hasEvents}
               aria-label={`Jump to step ${marker.label}: ${marker.title}`}
