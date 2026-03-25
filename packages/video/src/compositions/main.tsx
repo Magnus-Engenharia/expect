@@ -1,28 +1,24 @@
 import { springTiming, TransitionSeries } from "@remotion/transitions";
 import { slide } from "@remotion/transitions/slide";
-import { Audio, Sequence, staticFile } from "remotion";
+import { AbsoluteFill, Audio, interpolate, Sequence, staticFile } from "remotion";
 import {
   CHAR_FRAMES,
   COMMAND,
-  SCENE_BROWSER_EXECUTION_DURATION_FRAMES,
   SCENE_DIFF_SCAN_DURATION_FRAMES,
-  SCENE_ERROR_LOG_RESOLVED_DURATION_FRAMES,
-  SCENE_RESULTS_DURATION_FRAMES,
-  SCENE_TEST_PLAN_DURATION_FRAMES,
   SCENE_TYPING_DURATION_FRAMES,
   TRANSITION_DURATION_FRAMES,
   TYPING_INITIAL_DELAY_FRAMES,
   VIDEO_FPS,
 } from "../constants";
-import { BrowserExecution } from "../scenes/browser-execution";
 import { DiffScan } from "../scenes/diff-scan";
 import { ErrorLogResolved } from "../scenes/error-log-resolved";
-import { Results } from "../scenes/results";
-import { TestPlan } from "../scenes/test-plan";
 import { TerminalTyping } from "../scenes/terminal-typing";
 
 const MUSIC_START_SECONDS = 27;
 const MUSIC_START_FRAME = MUSIC_START_SECONDS * VIDEO_FPS;
+const MUSIC_VOLUME = 0.15;
+const MUSIC_FADE_IN_SECONDS = 6;
+const MUSIC_FADE_IN_FRAMES = MUSIC_FADE_IN_SECONDS * VIDEO_FPS;
 const TYPING_SOUND_START_SECONDS = 3;
 const TYPING_SOUND_START_FRAME = TYPING_SOUND_START_SECONDS * VIDEO_FPS;
 const TYPING_DURATION_FRAMES = COMMAND.length * CHAR_FRAMES;
@@ -30,7 +26,16 @@ const TYPING_DURATION_FRAMES = COMMAND.length * CHAR_FRAMES;
 export const Main = () => {
   return (
     <>
-      <Audio src={staticFile("music.wav")} startFrom={MUSIC_START_FRAME} />
+      <Audio
+        src={staticFile("music.wav")}
+        startFrom={MUSIC_START_FRAME}
+        volume={(frame) =>
+          MUSIC_VOLUME *
+          interpolate(frame, [0, MUSIC_FADE_IN_FRAMES], [0, 1], {
+            extrapolateRight: "clamp",
+          })
+        }
+      />
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={SCENE_TYPING_DURATION_FRAMES}>
           <TerminalTyping />
@@ -51,19 +56,35 @@ export const Main = () => {
           <DiffScan />
         </TransitionSeries.Sequence>
 
-        <TransitionSeries.Sequence durationInFrames={SCENE_TEST_PLAN_DURATION_FRAMES}>
-          <TestPlan />
+        <TransitionSeries.Sequence
+          durationInFrames={
+            10 * VIDEO_FPS -
+            (SCENE_TYPING_DURATION_FRAMES +
+              SCENE_DIFF_SCAN_DURATION_FRAMES -
+              TRANSITION_DURATION_FRAMES)
+          }
+        >
+          <AbsoluteFill
+            style={{
+              backgroundColor: "black",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                color: "white",
+                fontSize: 80,
+                fontWeight: "bold",
+                letterSpacing: 4,
+              }}
+            >
+              PUT BROWSER HERE
+            </span>
+          </AbsoluteFill>
         </TransitionSeries.Sequence>
 
-        <TransitionSeries.Sequence durationInFrames={SCENE_BROWSER_EXECUTION_DURATION_FRAMES}>
-          <BrowserExecution />
-        </TransitionSeries.Sequence>
-
-        <TransitionSeries.Sequence durationInFrames={SCENE_RESULTS_DURATION_FRAMES}>
-          <Results />
-        </TransitionSeries.Sequence>
-
-        <TransitionSeries.Sequence durationInFrames={SCENE_ERROR_LOG_RESOLVED_DURATION_FRAMES}>
+        <TransitionSeries.Sequence durationInFrames={3 * VIDEO_FPS}>
           <ErrorLogResolved />
         </TransitionSeries.Sequence>
       </TransitionSeries>

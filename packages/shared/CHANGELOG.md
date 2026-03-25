@@ -1,5 +1,11 @@
 # @expect/shared
 
+## 0.0.4
+
+### Patch Changes
+
+- updoot
+
 ## 0.0.3
 
 ### Patch Changes

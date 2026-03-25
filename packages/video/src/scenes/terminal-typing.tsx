@@ -1,6 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import {
-  BACKGROUND_COLOR,
   CHAR_FRAMES,
   COMMAND,
   CURSOR_BLINK_FRAMES,
@@ -34,7 +33,7 @@ export const TerminalTyping = () => {
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: BACKGROUND_COLOR,
+        backgroundColor: "black",
         justifyContent: "center",
         padding: "0 80px",
       }}
