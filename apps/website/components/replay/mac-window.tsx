@@ -1,18 +1,23 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 const TRAFFIC_COLORS = ["#FF5F57", "#FEBC2E", "#28C840"] as const;
 
 const WINDOW_SHADOW = [
-  "color(display-p3 1 1 1) 0px 0px 9px inset",
   "color(display-p3 0 0 0 / 5%) 0px 0px 0px 1px",
   "color(display-p3 0 0 0 / 8%) 0px 4px 24px",
   "color(display-p3 0 0 0 / 4%) 0px 1px 3px",
 ].join(", ");
 
-export const MacWindow = ({ children }: { children: ReactNode }) => (
+export const MacWindow = ({
+  children,
+  surfaceStyle,
+}: {
+  children: ReactNode;
+  surfaceStyle?: CSSProperties;
+}) => (
   <div
     className="relative flex h-full flex-col overflow-hidden rounded-xl bg-white"
-    style={{ boxShadow: WINDOW_SHADOW }}
+    style={{ ...surfaceStyle, boxShadow: WINDOW_SHADOW }}
   >
     <div className="flex items-center gap-2 px-4 py-3">
       <div className="flex items-center gap-[6px]">

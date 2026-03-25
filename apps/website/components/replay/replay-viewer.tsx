@@ -198,6 +198,51 @@ const getReplayDuration = (replayEvents: eventWithTime[]) => {
   return Math.max(replayEvents[replayEvents.length - 1].timestamp - replayEvents[0].timestamp, 0);
 };
 
+const isTransparentBackground = (backgroundColor: string) =>
+  backgroundColor === "rgba(0, 0, 0, 0)" || backgroundColor === "transparent";
+
+const getElementBackground = (
+  element: Element | null | undefined,
+  frameWindow: Window,
+): string | undefined => {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return undefined;
+
+  const computedStyle = frameWindow.getComputedStyle(element);
+  if (
+    computedStyle.backgroundImage === "none" &&
+    isTransparentBackground(computedStyle.backgroundColor)
+  ) {
+    return undefined;
+  }
+
+  return computedStyle.background;
+};
+
+const getReplayFrameBackground = (replayer: Replayer | undefined) => {
+  const iframe = replayer?.iframe;
+  if (!iframe?.contentDocument || !iframe.contentWindow) return undefined;
+
+  const frameDocument = iframe.contentDocument;
+  const frameWindow = iframe.contentWindow;
+  const samplePoints = [
+    { x: 20, y: 20 },
+    {
+      x: 20,
+      y: Math.max(20, frameDocument.documentElement.clientHeight - 20),
+    },
+  ];
+
+  for (const samplePoint of samplePoints) {
+    const sampleElement = frameDocument.elementFromPoint(samplePoint.x, samplePoint.y);
+    const background = getElementBackground(sampleElement, frameWindow);
+    if (background) {
+      return background;
+    }
+  }
+
+  return getElementBackground(frameDocument.body, frameWindow);
+};
+
 const formatPaperTime = (timeMs: number) => formatTime(timeMs).padStart(PAPER_TIME_LENGTH, "0");
 
 const getStepRelativeTime = (step: ViewerStepEvent, replayStartMs: number) => {
@@ -302,6 +347,9 @@ export const ReplayViewer = ({
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const [browserFrameBackground, setBrowserFrameBackground] = useState<string | undefined>(
+    undefined,
+  );
   const playbackBarRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const replayRef = useRef<HTMLDivElement>(null);
@@ -325,6 +373,7 @@ export const ReplayViewer = ({
   const playbackBarRectRef = useRef<DOMRect | undefined>(undefined);
   const playbackBarPointerActiveRef = useRef(false);
   const playbackBarRubberResetRef = useRef<{ stop: () => void } | undefined>(undefined);
+  const browserFrameBackgroundRef = useRef<string | undefined>(undefined);
   const playbackBarRubberStretchPx = useMotionValue(0);
   const playbackBarRubberBandWidth = useTransform(
     playbackBarRubberStretchPx,
@@ -343,9 +392,19 @@ export const ReplayViewer = ({
     cleanupZoomRef.current = undefined;
     replayerRef.current?.destroy();
     replayerRef.current = undefined;
+    browserFrameBackgroundRef.current = undefined;
+    setBrowserFrameBackground(undefined);
   };
 
   const liveStallRef = useRef({ lastTime: -1, count: 0 });
+
+  const syncBrowserFrameBackground = () => {
+    const nextBackground = getReplayFrameBackground(replayerRef.current);
+    if (nextBackground === browserFrameBackgroundRef.current) return;
+
+    browserFrameBackgroundRef.current = nextBackground;
+    setBrowserFrameBackground(nextBackground);
+  };
 
   const startTimer = () => {
     clearInterval(timerRef.current);
@@ -356,6 +415,7 @@ export const ReplayViewer = ({
       if (!replayer) return;
 
       const time = replayer.getCurrentTime();
+      syncBrowserFrameBackground();
       setCurrentTime(time);
 
       if (liveRef.current) {
@@ -630,6 +690,7 @@ export const ReplayViewer = ({
     const startTime = liveRef.current ? replayDuration : Math.min(currentTime, replayDuration);
     setCurrentTime(startTime);
     replayer.play(startTime);
+    syncBrowserFrameBackground();
     setPlaying(true);
     startTimer();
 
@@ -645,11 +706,13 @@ export const ReplayViewer = ({
 
     if (playing) {
       replayer.play(timeMs);
+      syncBrowserFrameBackground();
       startTimer();
       return;
     }
 
     replayer.pause(timeMs);
+    syncBrowserFrameBackground();
   };
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -917,6 +980,8 @@ export const ReplayViewer = ({
     finishStepListPointerInteraction();
   };
   const playbackBarFillVisible = hasEvents && playbackBarValue > 0;
+  const browserFrameSurfaceStyle =
+    browserFrameBackground !== undefined ? { background: browserFrameBackground } : undefined;
   const playbackBarFillClassName =
     playbackBarValue >= playbackBarMax ? "rounded-full" : "rounded-l-full";
   const playbackBarMarkerCount = Math.max(
@@ -1055,7 +1120,7 @@ export const ReplayViewer = ({
                 boxShadow: "inset 0 0 120px 40px rgba(96, 165, 250, 0.35)",
               }}
             />
-            <MacWindow>
+            <MacWindow surfaceStyle={browserFrameSurfaceStyle}>
               <div ref={replayRef} className="relative h-full w-full overflow-hidden" />
             </MacWindow>
           </div>
