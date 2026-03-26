@@ -40,11 +40,14 @@ export const detectPackageManager = (): PackageManager => {
 const detectNonInteractive = (yesFlag: boolean): boolean =>
   yesFlag || isRunningInAgent() || isHeadless();
 
+const INSTALL_TIMEOUT_MS = 120_000;
+
 const tryRun = (command: string): Promise<boolean> =>
   new Promise((resolve) => {
-    exec(command, (error) => {
+    const child = exec(command, { timeout: INSTALL_TIMEOUT_MS }, (error) => {
       resolve(Boolean(!error));
     });
+    child.stdin?.end();
   });
 
 interface InitOptions {
