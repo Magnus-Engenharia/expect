@@ -39,6 +39,26 @@ export const runHeadless = (options: HeadlessRunOptions) =>
         const runStartedAt = Date.now();
         yield* analytics.capture("run:started", { plan_id: "direct" });
         const seenEvents = new Set<string>();
+        const printNewEvents = (executed: ExecutedTestPlan) => {
+          for (const event of executed.events) {
+            if (seenEvents.has(event.id)) continue;
+            seenEvents.add(event.id);
+            switch (event._tag) {
+              case "RunStarted":
+                console.log(`Starting ${event.plan.title}`);
+                break;
+              case "StepStarted":
+                console.log(`${figures.arrowRight} ${event.stepId} ${event.title}`);
+                break;
+              case "StepCompleted":
+                console.log(`  ${figures.tick} ${event.stepId} ${event.summary}`);
+                break;
+              case "StepFailed":
+                console.log(`  ${figures.cross} ${event.stepId} ${event.message}`);
+                break;
+            }
+          }
+        };
         const finalExecuted = yield* executor
           .execute({
             changesFor: options.changesFor,
@@ -47,31 +67,10 @@ export const runHeadless = (options: HeadlessRunOptions) =>
             requiresCookies: false,
           })
           .pipe(
-            Stream.tap((executed) =>
-              Effect.sync(() => {
-                for (const event of executed.events) {
-                  if (seenEvents.has(event.id)) continue;
-                  seenEvents.add(event.id);
-                  switch (event._tag) {
-                    case "RunStarted":
-                      console.log(`Starting ${event.plan.title}`);
-                      break;
-                    case "StepStarted":
-                      console.log(`${figures.arrowRight} ${event.stepId} ${event.title}`);
-                      break;
-                    case "StepCompleted":
-                      console.log(`  ${figures.tick} ${event.stepId} ${event.summary}`);
-                      break;
-                    case "StepFailed":
-                      console.log(`  ${figures.cross} ${event.stepId} ${event.message}`);
-                      break;
-                  }
-                }
-              }),
-            ),
+            Stream.tap((executed) => Effect.sync(() => printNewEvents(executed))),
             Stream.runLast,
             Effect.map((option) =>
-              option._tag === "Some"
+              (option._tag === "Some"
                 ? option.value
                 : new ExecutedTestPlan({
                     id: "" as never,
@@ -88,9 +87,11 @@ export const runHeadless = (options: HeadlessRunOptions) =>
                     rationale: "Direct execution",
                     steps: [],
                     events: [],
-                  }),
+                  })
+              ).finalizeTextBlock(),
             ),
           );
+        printNewEvents(finalExecuted);
 
         const report = yield* reporter.report(finalExecuted);
 
