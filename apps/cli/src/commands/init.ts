@@ -46,7 +46,7 @@ export const detectPackageManager = (): PackageManager => {
 const detectNonInteractive = (yesFlag: boolean): boolean =>
   yesFlag || isRunningInAgent() || isHeadless();
 
-const INSTALL_TIMEOUT_MS = 120_000;
+const INSTALL_TIMEOUT_MS = 10_000;
 
 const tryRun = (command: string): Promise<boolean> =>
   new Promise((resolve) => {
@@ -95,7 +95,7 @@ export const runInit = async (options: InitOptions = {}) => {
 
   if (globalSuccess) {
     globalSpinner.succeed(
-      `Installed! You can now run ${highlighter.info("expect-cli")} from anywhere.`,
+      `Installed! ${highlighter.info("expect-cli")} is now available globally.`,
     );
   } else {
     globalSpinner.fail("Failed to install globally.");
@@ -130,7 +130,22 @@ export const runInit = async (options: InitOptions = {}) => {
   }
 
   logger.break();
-  logger.success("You're all set!");
-  logger.log(`  Run ${highlighter.info("expect-cli")} in any project to start testing.`);
+  logger.success("Setup complete! Here's how to get started:");
+  logger.break();
+  logger.log(`  1. ${highlighter.info("cd")} into your project directory`);
+  logger.log(`  2. Start your dev server (e.g. ${highlighter.dim("npm run dev")})`);
+  logger.log(`  3. Run ${highlighter.info("expect-cli")} to open the interactive test runner`);
+  logger.break();
+  logger.log(`  Or run headlessly from your coding agent:`);
+  logger.break();
+  logger.log(
+    `     ${highlighter.dim("$")} ${highlighter.info('expect-cli -m "test the login flow" -y')}`,
+  );
+  logger.break();
+  logger.log(`  Set ${highlighter.info("EXPECT_BASE_URL")} if your app is not on localhost:3000:`);
+  logger.break();
+  logger.log(
+    `     ${highlighter.dim("$")} ${highlighter.info('EXPECT_BASE_URL=http://localhost:5173 expect-cli -m "test the homepage" -y')}`,
+  );
   logger.break();
 };
