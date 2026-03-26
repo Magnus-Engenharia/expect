@@ -9,10 +9,11 @@ export const reactCompilerPlugin = (filter: RegExp = /\.tsx$/) => ({
     const result = babel.transformSync(code, {
       plugins: [["@babel/plugin-syntax-typescript", { isTSX: true }], BabelPluginReactCompiler],
       filename: id,
+      sourceMaps: true,
       caller: { name: "react-compiler", supportsStaticESM: true },
     });
 
     if (!result?.code) return;
-    return { code: result.code };
+    return { code: result.code, map: result.map };
   },
 });
