@@ -56,6 +56,9 @@ export const runHeadless = (options: HeadlessRunOptions) =>
               case "StepFailed":
                 console.log(`  ${figures.cross} ${event.stepId} ${event.message}`);
                 break;
+              case "StepSkipped":
+                console.log(`  ${figures.arrowRight} ${event.stepId} [skipped] ${event.reason}`);
+                break;
             }
           }
         };

@@ -148,8 +148,9 @@ export const ResultsScreen = ({
             stepElapsedMs !== undefined ? formatElapsedTime(stepElapsedMs) : undefined;
           const stepStatus = report.stepStatuses.get(step.id);
           const isFailed = stepStatus?.status === "failed";
-          const stepColor = isFailed ? COLORS.RED : COLORS.GREEN;
-          const stepIcon = isFailed ? figures.cross : figures.tick;
+          const isSkipped = stepStatus?.status === "skipped";
+          const stepColor = isFailed ? COLORS.RED : isSkipped ? COLORS.YELLOW : COLORS.GREEN;
+          const stepIcon = isFailed ? figures.cross : isSkipped ? figures.arrowRight : figures.tick;
           const num = `${stepIndex + 1}.`;
 
           return (
@@ -165,7 +166,7 @@ export const ResultsScreen = ({
                 </Text>
                 {stepElapsedLabel && <Text color={COLORS.DIM}> {stepElapsedLabel}</Text>}
               </Text>
-              {isFailed && stepStatus.summary && (
+              {(isFailed || isSkipped) && stepStatus?.summary && (
                 <Text color={COLORS.DIM}>
                   {"     "}
                   {stepStatus.summary}

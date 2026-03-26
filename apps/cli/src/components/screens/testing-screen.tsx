@@ -357,6 +357,20 @@ export const TestingScreen = ({
         );
         const toolCalls = getCompletedStepToolCalls(executedPlan.events, stepIndex);
         expandedRows.push(...buildToolCallRows(toolCalls, "     ", `s${stepIndex}`, COLORS));
+      } else if (step.status === "skipped") {
+        expandedRows.push(
+          <Text key={`step-${stepIndex}`}>
+            <Text color={COLORS.DIM}>
+              {"  "}
+              {num}
+            </Text>
+            <Text color={COLORS.YELLOW}>
+              {" "}
+              {figures.arrowRight} {cliTruncate(label, TESTING_TOOL_TEXT_CHAR_LIMIT)}
+            </Text>
+            {stepElapsedLabel && <Text color={COLORS.DIM}> {stepElapsedLabel}</Text>}
+          </Text>,
+        );
       } else {
         expandedRows.push(
           <Text key={`step-${stepIndex}`} color={COLORS.DIM}>
@@ -629,6 +643,22 @@ export const TestingScreen = ({
                         <Text color={COLORS.RED}>
                           {" "}
                           {figures.cross} {cliTruncate(label, TESTING_TOOL_TEXT_CHAR_LIMIT)}
+                        </Text>
+                        {stepElapsedLabel && <Text color={COLORS.DIM}> {stepElapsedLabel}</Text>}
+                      </Text>
+                    );
+                  }
+
+                  if (step.status === "skipped") {
+                    return (
+                      <Text key={step.id}>
+                        <Text color={COLORS.DIM}>
+                          {"  "}
+                          {num}
+                        </Text>
+                        <Text color={COLORS.YELLOW}>
+                          {" "}
+                          {figures.arrowRight} {cliTruncate(label, TESTING_TOOL_TEXT_CHAR_LIMIT)}
                         </Text>
                         {stepElapsedLabel && <Text color={COLORS.DIM}> {stepElapsedLabel}</Text>}
                       </Text>

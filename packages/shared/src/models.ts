@@ -348,7 +348,7 @@ export class FileDiff extends Schema.Class<FileDiff>("@supervisor/FileDiff")({
   diff: Schema.String,
 }) {}
 
-export const StepStatus = Schema.Literals(["pending", "active", "passed", "failed"]);
+export const StepStatus = Schema.Literals(["pending", "active", "passed", "failed", "skipped"]);
 export type StepStatus = typeof StepStatus.Type;
 
 export class TestPlanStep extends Schema.Class<TestPlanStep>("@supervisor/TestPlanStep")({
@@ -492,6 +492,15 @@ export class StepFailed extends Schema.TaggedClass<StepFailed>()("StepFailed", {
   }
 }
 
+export class StepSkipped extends Schema.TaggedClass<StepSkipped>()("StepSkipped", {
+  stepId: StepId,
+  reason: Schema.String,
+}) {
+  get id(): string {
+    return `step-skipped-${this.stepId}`;
+  }
+}
+
 export class ToolCall extends Schema.TaggedClass<ToolCall>()("ToolCall", {
   toolName: Schema.String,
   input: Schema.Unknown,
@@ -593,6 +602,12 @@ const parseMarker = (line: string): ExecutionEvent | undefined => {
       message: second,
     });
   }
+  if (marker === "STEP_SKIPPED") {
+    return new StepSkipped({
+      stepId: StepId.makeUnsafe(first),
+      reason: second,
+    });
+  }
   if (marker === "RUN_COMPLETED") {
     const status = first === "failed" ? ("failed" as const) : ("passed" as const);
     return new RunFinished({ status, summary: second });
@@ -605,6 +620,7 @@ export const ExecutionEvent = Schema.Union([
   StepStarted,
   StepCompleted,
   StepFailed,
+  StepSkipped,
   ToolCall,
   ToolProgress,
   ToolResult,
@@ -623,6 +639,7 @@ export const UpdateContent = Schema.Union([
   StepStarted,
   StepCompleted,
   StepFailed,
+  StepSkipped,
   ToolCall,
   ToolResult,
   AgentThinking,
@@ -905,6 +922,20 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
         ),
       });
     }
+    if (marker._tag === "StepSkipped") {
+      return new ExecutedTestPlan({
+        ...this,
+        steps: this.steps.map((step) =>
+          step.id === marker.stepId
+            ? step.update({
+                status: "skipped",
+                summary: Option.some(marker.reason),
+                endedAt: Option.some(DateTime.nowUnsafe()),
+              })
+            : step,
+        ),
+      });
+    }
     return this;
   }
 
@@ -913,7 +944,9 @@ export class ExecutedTestPlan extends TestPlan.extend<ExecutedTestPlan>(
   }
 
   get completedStepCount(): number {
-    return this.steps.filter((step) => step.status === "passed" || step.status === "failed").length;
+    return this.steps.filter(
+      (step) => step.status === "passed" || step.status === "failed" || step.status === "skipped",
+    ).length;
   }
 
   get lastToolCallDisplayText(): string | undefined {
@@ -932,11 +965,12 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
   /** @todo(rasmus): UNUSED */
   get stepStatuses(): ReadonlyMap<
     StepId,
-    { status: "passed" | "failed" | "not-run"; summary: string }
+    { status: "passed" | "failed" | "skipped" | "not-run"; summary: string }
   > {
-    const statuses = new Map<StepId, { status: "passed" | "failed" | "not-run"; summary: string }>(
-      this.steps.map((step) => [step.id, { status: "not-run", summary: "" }]),
-    );
+    const statuses = new Map<
+      StepId,
+      { status: "passed" | "failed" | "skipped" | "not-run"; summary: string }
+    >(this.steps.map((step) => [step.id, { status: "not-run", summary: "" }]));
 
     for (const event of this.events) {
       if (event._tag === "StepCompleted") {
@@ -948,6 +982,11 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
         statuses.set(event.stepId, {
           status: "failed",
           summary: event.message,
+        });
+      } else if (event._tag === "StepSkipped") {
+        statuses.set(event.stepId, {
+          status: "skipped",
+          summary: event.reason,
         });
       }
     }
@@ -971,14 +1010,19 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
     const failedCount = this.steps.filter(
       (step) => statuses.get(step.id)?.status === "failed",
     ).length;
+    const skippedCount = this.steps.filter(
+      (step) => statuses.get(step.id)?.status === "skipped",
+    ).length;
 
     const icon = this.status === "passed" ? "\u2705" : "\u274C";
+    const summaryParts = [`${passedCount} passed`, `${failedCount} failed`];
+    if (skippedCount > 0) summaryParts.push(`${skippedCount} skipped`);
     const lines = [
       `${icon} ${this.title} \u2014 ${this.status.toUpperCase()}`,
       "",
       this.summary,
       "",
-      `${passedCount} passed, ${failedCount} failed out of ${this.steps.length} steps`,
+      `${summaryParts.join(", ")} out of ${this.steps.length} steps`,
       "",
     ];
 
@@ -986,7 +1030,13 @@ export class TestReport extends ExecutedTestPlan.extend<TestReport>("@supervisor
       const entry = statuses.get(step.id);
       const stepStatus = entry?.status ?? "not-run";
       const stepIcon =
-        stepStatus === "passed" ? "\u2713" : stepStatus === "failed" ? "\u2717" : "\u2013";
+        stepStatus === "passed"
+          ? "\u2713"
+          : stepStatus === "failed"
+            ? "\u2717"
+            : stepStatus === "skipped"
+              ? "\u2192"
+              : "\u2013";
       lines.push(`  ${stepIcon} ${step.title}`);
       if (entry?.summary) {
         lines.push(`    ${entry.summary}`);
