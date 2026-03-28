@@ -26,7 +26,7 @@ Options:
   -m, --message <instruction>   natural language instruction for what to test
   -f, --flow <slug>             reuse a saved flow by slug
   -y, --yes                     skip plan review, run immediately
-  -a, --agent <provider>        agent provider to use (claude or codex)
+  -a, --agent <provider>        agent provider to use (claude, codex, copilot, gemini, or cursor)
   -t, --target <target>         what to test: unstaged, branch, or changes (default: changes)
   --verbose                     enable verbose logging
   -v, --version                 print version
@@ -53,9 +53,23 @@ Set `NO_TELEMETRY=1` to disable analytics events.
  └─────────────┘     └──────────────┘     └──────────────┘     └─────────┘
 ```
 
-Expect reads your unstaged changes or branch diff, sends them to an AI agent (Claude Code or Codex CLI), and generates a step-by-step test plan describing how to validate the changes. You review and approve the plan in an interactive TUI, then the agent executes each step against a live browser - using your real login sessions so there's no manual auth setup. Every session is recorded so you can replay exactly what happened.
+Expect reads your unstaged changes or branch diff, sends them to an AI agent, and generates a step-by-step test plan describing how to validate the changes. You review and approve the plan in an interactive TUI, then the agent executes each step against a live browser - using your real login sessions so there's no manual auth setup. Every session is recorded so you can replay exactly what happened.
 
 Pass `-y` to skip plan review and run headlessly in CI. Exits `0` on success, `1` on failure.
+
+## Supported Agents
+
+Expect works with the following coding agents via the [Agent Client Protocol (ACP)](https://agentclientprotocol.org):
+
+| Agent | Flag | Install |
+|-------|------|---------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `-a claude` | `npm install -g @anthropic-ai/claude-code` |
+| [Codex](https://github.com/openai/codex) | `-a codex` | `npm install -g @openai/codex` |
+| [GitHub Copilot](https://github.com/github/copilot) | `-a copilot` | `npm install -g @github/copilot` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `-a gemini` | `npm install -g @google/gemini-cli` |
+| [Cursor](https://cursor.com) | `-a cursor` | [cursor.com](https://cursor.com) |
+
+Expect auto-detects which agents are installed on your `PATH`. If multiple are available, it defaults to the first one found. Use `-a <provider>` to pick a specific agent.
 
 ## Resources & Contributing Back
 
