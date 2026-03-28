@@ -66,10 +66,7 @@ interface ExecutorAccumState {
   readonly allTerminalSince: number | undefined;
 }
 
-const resolveTerminalTimestamp = (
-  executed: ExecutedTestPlan,
-  previous: number | undefined,
-) => {
+const resolveTerminalTimestamp = (executed: ExecutedTestPlan, previous: number | undefined) => {
   if (!executed.allStepsTerminal) return undefined;
   return previous ?? Date.now();
 };
@@ -181,10 +178,7 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
           }),
           (state, part) => {
             const updated = state.plan.addEvent(part);
-            const terminalTimestamp = resolveTerminalTimestamp(
-              updated,
-              state.allTerminalSince,
-            );
+            const terminalTimestamp = resolveTerminalTimestamp(updated, state.allTerminalSince);
             const finalized =
               terminalTimestamp !== undefined &&
               !updated.hasRunFinished &&
@@ -192,10 +186,7 @@ export class Executor extends ServiceMap.Service<Executor>()("@supervisor/Execut
                 ? updated.synthesizeRunFinished()
                 : updated;
 
-            return [
-              { plan: finalized, allTerminalSince: terminalTimestamp },
-              [finalized],
-            ] as const;
+            return [{ plan: finalized, allTerminalSince: terminalTimestamp }, [finalized]] as const;
           },
         ),
         Stream.takeUntil((executed) => executed.hasRunFinished),

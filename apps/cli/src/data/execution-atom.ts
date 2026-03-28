@@ -230,8 +230,8 @@ export const executeAtomFn = cliAtomRuntime.fn(
                 events: [],
               })
           )
-          .finalizeTextBlock()
-          .synthesizeRunFinished(),
+            .finalizeTextBlock()
+            .synthesizeRunFinished(),
         ),
       );
 
