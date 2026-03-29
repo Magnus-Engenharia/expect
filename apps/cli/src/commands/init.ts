@@ -5,7 +5,7 @@ import pc from "picocolors";
 import { VERSION } from "../constants";
 import { highlighter } from "../utils/highlighter";
 import { logger } from "../utils/logger";
-import { prompts } from "../utils/prompts";
+import { prompts, setOnCancel } from "../utils/prompts";
 import { spinner } from "../utils/spinner";
 import { runAddSkill } from "./add-skill";
 import { runAddGithubAction } from "./add-github-action";
@@ -31,10 +31,39 @@ interface InitOptions {
   yes?: boolean;
 }
 
+const logUsageGuide = () => {
+  logger.break();
+  logger.log("  Here's how to get started:");
+  logger.break();
+  logger.log(`  1. ${highlighter.info("cd")} into your project directory`);
+  logger.log(`  2. Start your dev server (e.g. ${highlighter.dim("npm run dev")})`);
+  logger.log(`  3. Run ${highlighter.info("expect-cli")} to open the interactive test runner`);
+  logger.break();
+  logger.log(`  Or run headlessly from your coding agent:`);
+  logger.break();
+  logger.log(
+    `     ${highlighter.dim("$")} ${highlighter.info('expect-cli -m "test the login flow" -y')}`,
+  );
+  logger.break();
+  logger.log(`  Set ${highlighter.info("EXPECT_BASE_URL")} if your app is not on localhost:3000:`);
+  logger.break();
+  logger.log(
+    `     ${highlighter.dim("$")} ${highlighter.info('EXPECT_BASE_URL=http://localhost:5173 expect-cli -m "test the homepage" -y')}`,
+  );
+  logger.break();
+};
+
 export const runInit = async (options: InitOptions = {}) => {
   const nonInteractive = detectNonInteractive(options.yes ?? false);
   const packageManager = detectPackageManager();
   const installCommand = GLOBAL_INSTALL_COMMANDS[packageManager];
+
+  setOnCancel(() => {
+    logger.break();
+    logger.log("Cancelled.");
+    logUsageGuide();
+    process.exit(0);
+  });
 
   logger.break();
   logger.log(
@@ -113,22 +142,6 @@ export const runInit = async (options: InitOptions = {}) => {
   }
 
   logger.break();
-  logger.success("Setup complete! Here's how to get started:");
-  logger.break();
-  logger.log(`  1. ${highlighter.info("cd")} into your project directory`);
-  logger.log(`  2. Start your dev server (e.g. ${highlighter.dim("npm run dev")})`);
-  logger.log(`  3. Run ${highlighter.info("expect-cli")} to open the interactive test runner`);
-  logger.break();
-  logger.log(`  Or run headlessly from your coding agent:`);
-  logger.break();
-  logger.log(
-    `     ${highlighter.dim("$")} ${highlighter.info('expect-cli -m "test the login flow" -y')}`,
-  );
-  logger.break();
-  logger.log(`  Set ${highlighter.info("EXPECT_BASE_URL")} if your app is not on localhost:3000:`);
-  logger.break();
-  logger.log(
-    `     ${highlighter.dim("$")} ${highlighter.info('EXPECT_BASE_URL=http://localhost:5173 expect-cli -m "test the homepage" -y')}`,
-  );
-  logger.break();
+  logger.success("Setup complete!");
+  logUsageGuide();
 };
