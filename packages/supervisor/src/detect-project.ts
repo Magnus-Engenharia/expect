@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { FRAMEWORK_DEFAULT_PORTS, VITE_CONFIG_EXTENSIONS } from "./constants";
+import { FRAMEWORK_DEFAULT_PORTS } from "./constants";
 
 type Framework =
   | "next"
@@ -51,8 +51,7 @@ const FRAMEWORK_DETECTION_ORDER: Array<[string, Framework]> = [
   ["vite", "vite"],
 ];
 
-export const detectFramework = (projectRoot: string): Framework => {
-  const packageJson = readPackageJson(projectRoot);
+const detectFramework = (packageJson: Record<string, unknown> | undefined): Framework => {
   if (!packageJson) return "unknown";
 
   for (const [dependency, framework] of FRAMEWORK_DETECTION_ORDER) {
@@ -66,11 +65,11 @@ const VITE_BASED_FRAMEWORKS = new Set<Framework>(["vite", "remix", "astro", "sve
 const PORT_FLAG_REGEX = /(?:--port|-p)\s+(\d+)/;
 const VITE_PORT_REGEX = /port\s*:\s*(\d+)/;
 
-export const detectCustomPort = (
+const detectCustomPort = (
   projectRoot: string,
+  packageJson: Record<string, unknown> | undefined,
   framework: Framework,
 ): number | undefined => {
-  const packageJson = readPackageJson(projectRoot);
   if (packageJson) {
     const scripts = packageJson["scripts"];
     if (scripts && typeof scripts === "object") {
@@ -83,16 +82,15 @@ export const detectCustomPort = (
   }
 
   if (VITE_BASED_FRAMEWORKS.has(framework)) {
-    for (const extension of VITE_CONFIG_EXTENSIONS) {
-      const configPath = join(projectRoot, `vite.config.${extension}`);
-      if (!existsSync(configPath)) continue;
-      try {
-        const content = readFileSync(configPath, "utf-8");
+    try {
+      const entries = readdirSync(projectRoot);
+      const viteConfig = entries.find((entry) => entry.startsWith("vite.config."));
+      if (viteConfig) {
+        const content = readFileSync(join(projectRoot, viteConfig), "utf-8");
         const portMatch = VITE_PORT_REGEX.exec(content);
         if (portMatch) return Number(portMatch[1]);
-      } catch {
-        continue;
       }
+    } catch {
     }
   }
 
@@ -101,9 +99,10 @@ export const detectCustomPort = (
 
 export const detectProject = (projectRoot?: string): ProjectDetection => {
   const root = projectRoot ?? process.cwd();
-  const framework = detectFramework(root);
+  const packageJson = readPackageJson(root);
+  const framework = detectFramework(packageJson);
   const defaultPort = FRAMEWORK_DEFAULT_PORTS[framework] ?? 3000;
-  const customPort = detectCustomPort(root, framework);
+  const customPort = detectCustomPort(root, packageJson, framework);
 
   return { framework, defaultPort, customPort };
 };

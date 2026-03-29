@@ -47,5 +47,3 @@ export const FRAMEWORK_DEFAULT_PORTS: Record<string, number> = {
   "create-react-app": 3000,
   unknown: 3000,
 };
-
-export const VITE_CONFIG_EXTENSIONS = ["ts", "js", "mjs", "mts"];
