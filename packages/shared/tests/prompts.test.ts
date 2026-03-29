@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildExecutionPrompt, type ExecutionPromptOptions } from "../src/prompts";
+import {
+  buildExecutionPrompt,
+  buildWatchAssessmentPrompt,
+  type ExecutionPromptOptions,
+  type WatchAssessmentPromptOptions,
+} from "../src/prompts";
 
 const makeDefaultOptions = (
   overrides?: Partial<ExecutionPromptOptions>,
@@ -160,10 +165,69 @@ describe("buildExecutionPrompt", () => {
     expect(prompt).toContain("two independent signals per step");
   });
 
+  it("includes code-level testing fallback guidance", () => {
+    const prompt = buildExecutionPrompt(makeDefaultOptions());
+    expect(prompt).toContain("Code-level testing fallback:");
+    expect(prompt).toContain("built-in shell/bash tool");
+    expect(prompt).toContain("no user-visible surface");
+  });
+
+  it("includes project healthcheck guidance", () => {
+    const prompt = buildExecutionPrompt(makeDefaultOptions());
+    expect(prompt).toContain("Project healthcheck:");
+    expect(prompt).toContain("package.json");
+    expect(prompt).toContain("pnpm-lock.yaml");
+  });
+
   it("includes recovery and rabbit hole guidance", () => {
     const prompt = buildExecutionPrompt(makeDefaultOptions());
     expect(prompt).toContain("Recovery policy");
     expect(prompt).toContain("Avoid rabbit holes");
     expect(prompt).toContain("four attempts fail");
+  });
+});
+
+describe("buildWatchAssessmentPrompt", () => {
+  const makeWatchOptions = (
+    overrides?: Partial<WatchAssessmentPromptOptions>,
+  ): WatchAssessmentPromptOptions => ({
+    instruction: "Test the login flow",
+    changedFiles: [
+      { path: "src/auth/login.ts", status: "M" },
+      { path: "src/auth/signup.ts", status: "A" },
+    ],
+    diffPreview: "diff --git a/src/auth/login.ts\n+export const login = () => {}",
+    ...overrides,
+  });
+
+  it("includes the user instruction", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions());
+    expect(prompt).toContain("Test the login flow");
+  });
+
+  it("includes changed files", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions());
+    expect(prompt).toContain("[M] src/auth/login.ts");
+    expect(prompt).toContain("[A] src/auth/signup.ts");
+  });
+
+  it("includes diff preview", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions());
+    expect(prompt).toContain("export const login = () => {}");
+  });
+
+  it("instructs single-word response", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions());
+    expect(prompt).toContain("run or skip");
+  });
+
+  it("handles empty changed files", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions({ changedFiles: [] }));
+    expect(prompt).toContain("No changed files detected");
+  });
+
+  it("handles empty diff", () => {
+    const prompt = buildWatchAssessmentPrompt(makeWatchOptions({ diffPreview: "" }));
+    expect(prompt).toContain("No diff preview available");
   });
 });

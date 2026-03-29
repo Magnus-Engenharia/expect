@@ -17,6 +17,7 @@ import { useUpdateCheck } from "../../hooks/use-update-check";
 import { Clickable } from "./clickable";
 import { TextShimmer } from "./text-shimmer";
 import { AGENT_PROVIDER_DISPLAY_NAMES } from "@expect/shared/models";
+import { ChangesFor } from "@expect/supervisor";
 import { useAtomValue } from "@effect/atom-react";
 import { agentProviderAtom } from "../../data/runtime";
 
@@ -52,6 +53,21 @@ const useHintSegments = (screen: Screen, gitState: GitState | undefined): HintSe
         },
       ];
       if (gitState?.isGitRepo) {
+        segments.push({
+          key: "ctrl+w",
+          label: "watch",
+          cta: true,
+          onClick: () => {
+            const mainBranch = gitState?.mainBranch ?? "main";
+            setScreen(
+              Screen.Watch({
+                changesFor: ChangesFor.makeUnsafe({ _tag: "Changes", mainBranch }),
+                instruction:
+                  "Test all changes from main in the browser and verify they work correctly.",
+              }),
+            );
+          },
+        });
         segments.push({
           key: "ctrl+p",
           label: "pick pr",
@@ -103,6 +119,18 @@ const useHintSegments = (screen: Screen, gitState: GitState | undefined): HintSe
         },
         { key: "ctrl+o", label: expandLabel, cta: true },
         { key: "esc", label: expanded ? "collapse" : "cancel" },
+      ];
+    }
+    case "Watch": {
+      const watchNotifyLabel = notifications === true ? "notify on" : "notify off";
+      return [
+        {
+          key: "ctrl+n",
+          label: watchNotifyLabel,
+          cta: true,
+          onClick: toggleNotifications,
+        },
+        { key: "esc", label: "stop" },
       ];
     }
     case "Results": {
@@ -194,7 +222,7 @@ export const Modeline = () => {
 
   return (
     <Box flexDirection="column">
-      {screen._tag === "Testing" && (
+      {(screen._tag === "Testing" || screen._tag === "Watch") && (
         <TextShimmer
           text={"─".repeat(columns)}
           baseColor={theme.shimmerBase}
@@ -202,7 +230,9 @@ export const Modeline = () => {
           speed={3}
         />
       )}
-      {screen._tag !== "Testing" && <Text color={theme.border}>{"─".repeat(columns)}</Text>}
+      {screen._tag !== "Testing" && screen._tag !== "Watch" && (
+        <Text color={theme.border}>{"─".repeat(columns)}</Text>
+      )}
       <Box paddingX={1}>
         {actions.map((action, index) => {
           const pill = (
