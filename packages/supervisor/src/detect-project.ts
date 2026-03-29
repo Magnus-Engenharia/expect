@@ -1,4 +1,4 @@
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Schema } from "effect";
 import { join } from "node:path";
 import { FRAMEWORK_DEFAULT_PORTS } from "./constants";
 
@@ -36,16 +36,25 @@ const VITE_BASED_FRAMEWORKS = new Set<Framework>(["vite", "remix", "astro", "sve
 const PORT_FLAG_REGEX = /(?:--port|-p)\s+(\d+)/;
 const VITE_PORT_REGEX = /port\s*:\s*(\d+)/;
 
-const hasDependency = (packageJson: Record<string, unknown>, name: string): boolean => {
-  const deps = packageJson["dependencies"];
-  const devDeps = packageJson["devDependencies"];
-  return Boolean(
-    (deps && typeof deps === "object" && name in deps) ||
-    (devDeps && typeof devDeps === "object" && name in devDeps),
-  );
-};
+const DependencyMap = Schema.Record(Schema.String, Schema.String);
 
-const detectFramework = (packageJson: Record<string, unknown> | undefined): Framework => {
+const PackageJsonSchema = Schema.Struct({
+  dependencies: Schema.optionalKey(DependencyMap),
+  devDependencies: Schema.optionalKey(DependencyMap),
+  scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+});
+
+const PackageJsonFromString = Schema.fromJsonString(PackageJsonSchema);
+
+type PackageJson = typeof PackageJsonSchema.Type;
+
+const hasDependency = (packageJson: PackageJson, name: string): boolean =>
+  Boolean(
+    (packageJson.dependencies && name in packageJson.dependencies) ||
+      (packageJson.devDependencies && name in packageJson.devDependencies),
+  );
+
+const detectFramework = (packageJson: PackageJson | undefined): Framework => {
   if (!packageJson) return "unknown";
 
   for (const [dependency, framework] of FRAMEWORK_DETECTION_ORDER) {
@@ -55,7 +64,9 @@ const detectFramework = (packageJson: Record<string, unknown> | undefined): Fram
   return "unknown";
 };
 
-const readPackageJson = Effect.fn("detectProject.readPackageJson")(function* (projectRoot: string) {
+const readPackageJson = Effect.fn("detectProject.readPackageJson")(function* (
+  projectRoot: string,
+) {
   const fileSystem = yield* FileSystem.FileSystem;
   const packageJsonPath = join(projectRoot, "package.json");
 
@@ -65,20 +76,15 @@ const readPackageJson = Effect.fn("detectProject.readPackageJson")(function* (pr
 
   if (!content) return undefined;
 
-  return yield* Effect.try({
-    try: () => JSON.parse(content) as Record<string, unknown>,
-    catch: () => undefined,
-  });
+  return yield* Schema.decodeEffect(PackageJsonFromString)(content).pipe(
+    Effect.catchTag("SchemaError", Effect.die),
+  );
 });
 
-const detectPortFromDevScript = (
-  packageJson: Record<string, unknown> | undefined,
-): number | undefined => {
-  if (!packageJson) return undefined;
-  const scripts = packageJson["scripts"];
-  if (!scripts || typeof scripts !== "object") return undefined;
-  const devScript = (scripts as Record<string, unknown>)["dev"];
-  if (typeof devScript !== "string") return undefined;
+const detectPortFromDevScript = (packageJson: PackageJson | undefined): number | undefined => {
+  if (!packageJson?.scripts) return undefined;
+  const devScript = packageJson.scripts["dev"];
+  if (!devScript) return undefined;
   const flagMatch = PORT_FLAG_REGEX.exec(devScript);
   if (flagMatch) return Number(flagMatch[1]);
   return undefined;
