@@ -169,7 +169,7 @@ export const WatchScreen = ({
   }, [isWaitingPhase]);
 
   const showNoChangesHint =
-    isWaitingPhase && (waitingTick % WATCH_IDLE_CYCLE_DURATION_S) >= WATCH_IDLE_SPINNER_DURATION_S;
+    isWaitingPhase && waitingTick % WATCH_IDLE_CYCLE_DURATION_S >= WATCH_IDLE_SPINNER_DURATION_S;
 
   const toggleNotifications = usePreferencesStore((state) => state.toggleNotifications);
 
@@ -256,9 +256,7 @@ export const WatchScreen = ({
           </Box>
         )}
         {isWaitingPhase && showNoChangesHint && (
-          <Text color={COLORS.DIM}>
-            {figures.bullet} No testable changes detected
-          </Text>
+          <Text color={COLORS.DIM}>{figures.bullet} No testable changes detected</Text>
         )}
         {phase === "error" && (
           <Text color={COLORS.DIM}>
