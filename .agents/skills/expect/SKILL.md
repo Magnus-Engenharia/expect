@@ -1,6 +1,6 @@
 ---
 name: expect
-description: After every browser-facing code change, automatically run adversarial browser tests. Do not wait for the user to ask — just run it.
+description: "IMPORTANT: After every browser-facing code change, you MUST automatically run adversarial browser tests. Do not wait for the user to ask — just run it."
 license: MIT
 metadata:
   author: millionco
