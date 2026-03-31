@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod/v4";
 import { Effect, type ManagedRuntime } from "effect";
 import { evaluateRuntime } from "../utils/evaluate-runtime";
+import { runAccessibilityAudit } from "../accessibility";
 import { McpSession } from "./mcp-session";
 import { DEFAULT_SWIPE_DURATION_MS } from "../ios/constants";
 import { autoDiscoverCdp } from "../cdp-discovery";
@@ -310,6 +311,40 @@ export const createBrowserMcpServer = <E>(
           const hasMetrics = metrics.fcp || metrics.lcp || metrics.inp;
           if (!hasMetrics) return textResult("No performance metrics available yet.");
           return jsonResult(metrics);
+        }),
+      ),
+  );
+
+  server.registerTool(
+    "accessibility_audit",
+    {
+      title: "Accessibility Audit",
+      description:
+        "Run a WCAG accessibility audit on the current page using two engines (axe-core + IBM Equal Access). Returns violations sorted by severity with CSS selectors, HTML context, WCAG tags, and fix guidance.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        selector: z
+          .string()
+          .optional()
+          .describe("CSS selector to scope the audit to a specific region of the page"),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "WCAG tags to filter by (default: wcag2a, wcag2aa, wcag21a, wcag21aa). Only applies to the axe-core engine.",
+          ),
+      },
+    },
+    ({ selector, tags }) =>
+      runMcp(
+        Effect.gen(function* () {
+          const session = yield* McpSession;
+          const page = yield* session.requirePage();
+          const result = yield* runAccessibilityAudit(page, { selector, tags });
+          if (result.violations.length === 0) {
+            return textResult("No accessibility violations found.");
+          }
+          return jsonResult(result);
         }),
       ),
   );
