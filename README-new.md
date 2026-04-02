@@ -25,9 +25,7 @@ This will guide you through a setup process. Once installed, you can run `/expec
 
 #### 1. How is this different from Puppeteer / Playwright / Cypress?
 
-Before Expect: you wrote Playwright/Cypress scripts by hand, maintained selectors, and wired up assertions yourself.
-
-After Expect: Expect reads your code changes, generates a test plan in plain English, and runs it in a real browser. You never write a test file.
+Instead of writing scripts, maintaining selectors, and wiring up assertions, Expect reads your code changes and tests them in a real browser automatically. It's like having giving your agent QA superpowers.
 
 #### 2. How is this different from my coding agent testing?
 
