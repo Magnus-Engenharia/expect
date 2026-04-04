@@ -270,6 +270,9 @@ export const runHeadless = (options: HeadlessRunOptions) =>
               artifacts.localReplayUrl,
               artifacts.screenshotPaths,
             );
+            for (const screenshotPath of artifacts.screenshotPaths) {
+              process.stdout.write(`Screenshot: ${screenshotPath}\n`);
+            }
           }
 
           if (isGitHubActions) {
