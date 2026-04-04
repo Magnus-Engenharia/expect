@@ -718,7 +718,10 @@ export const TestingScreen = ({
         </Box>
 
         {AsyncResult.builder(executionResult)
-          .onError((error) => <ErrorMessage type="error" error={error} />)
+          .onError((error) => {
+            if (!error) return null;
+            return <ErrorMessage type="error" error={error} />;
+          })
           .onDefect((defect) => (
             <ErrorMessage
               type="defect"
