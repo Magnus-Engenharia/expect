@@ -1947,7 +1947,7 @@ function ThemeToggle({
           haptic("soft");
           setTheme(next);
         }}
-        className="relative !gap-1 !rounded-full !bg-white !p-1 [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:!bg-transparent dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px]"
+        className="relative !gap-0 !rounded-full !bg-white !p-1 [box-shadow:color(display-p3_0_0_0/14%)_0px_0px_0px_0.5px] dark:!bg-transparent dark:[box-shadow:color(display-p3_1_1_1/14%)_0px_0px_0px_0.5px]"
       >
         {indicator && (
           <div
@@ -2102,7 +2102,7 @@ function CommandRow({ command, fade }: { command: string; fade?: boolean }) {
           setTimeout(() => setPressed(false), 200);
           setTimeout(() => setCopied(false), 1500);
         }}
-        className="cursor-pointer hover:opacity-70 transition-opacity duration-75 -m-2 p-2"
+        className="cursor-pointer hover:opacity-70 transition-opacity duration-75 -m-2 p-2 rounded-[6px]"
       >
         <AnimatePresence mode="wait" initial={false}>
           {copied ? (

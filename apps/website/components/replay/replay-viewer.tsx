@@ -67,6 +67,7 @@ const PLAYBACK_BAR_RUBBER_BAND_TRANSITION = {
 const NOTIFICATION_WINDOW_MS = 3000;
 const NOTIFICATION_MAX_VISIBLE = 3;
 const INPUT_DEBOUNCE_MS = 500;
+const INPUT_ACTION_OFFSET_MS = 500;
 const SCROLL_DEBOUNCE_MS = 800;
 const RRWEB_EVENT_INCREMENTAL = 3;
 const RRWEB_EVENT_META = 4;
@@ -142,7 +143,7 @@ const extractReplayActions = (events: eventWithTime[]): ReplayAction[] => {
         actions.push({
           id: `input-${event.timestamp}`,
           label: displayText.length > 0 ? `Typed "${displayText}"` : "Typed input",
-          relativeMs,
+          relativeMs: relativeMs + INPUT_ACTION_OFFSET_MS,
         });
       }
       lastInputTs = event.timestamp;
@@ -1085,7 +1086,11 @@ export const ReplayViewer = ({
           </div>
         )}
         <div className="relative order-1 min-h-0 min-w-0 flex-1 md:order-none">
-          <div className="absolute inset-0 p-2 md:p-6" style={REPLAY_BACKDROP_STYLE}>
+          <div
+            className="absolute inset-0 cursor-pointer p-2 md:p-6"
+            style={REPLAY_BACKDROP_STYLE}
+            onClick={handlePlay}
+          >
             <div
               className="glow-pulse pointer-events-none absolute inset-0"
               style={{
