@@ -34,26 +34,22 @@ Include the changeset file in the same PR as your code changes. Multiple changes
 
 ### 3. Merge to `main`
 
-When your PR merges, the Release workflow (`release.yml`) runs and opens (or updates) a **"Version Packages"** PR. This PR:
+When your PR merges, the Release workflow automatically:
 
-- Consumes all pending `.changeset/*.md` files
-- Bumps `version` in each affected `package.json`
-- Updates `CHANGELOG.md` for each package
+1. Consumes all pending `.changeset/*.md` files
+2. Bumps `version` in each affected `package.json`
+3. Updates `CHANGELOG.md` for each package
+4. Commits the version bump directly to `main`
+5. Publishes to npm with [provenance](https://docs.npmjs.com/generating-provenance-statements)
 
-**Important**: This step does NOT publish to npm. It only prepares the version bump PR.
-
-### 4. Merge the "Version Packages" PR
-
-This triggers the Release workflow again. With no pending changesets, it runs `pnpm release` which builds and publishes to npm with [provenance](https://docs.npmjs.com/generating-provenance-statements).
-
-**This is the step that actually publishes to npm.** Nothing is published until you explicitly merge this PR.
+No review PR — publishing happens immediately on merge.
 
 ## Infrastructure
 
 ### GitHub Actions (`release.yml`)
 
 - Runs on every push to `main`
-- Uses a **GitHub App** (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY` secrets) to author the "Version Packages" PR
+- Uses a **GitHub App** (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY` secrets) to commit version bumps
 - Publishes to npm via **Trusted Publishing** (OIDC) — no npm token needed
 - Attaches SLSA provenance attestations to every publish
 
