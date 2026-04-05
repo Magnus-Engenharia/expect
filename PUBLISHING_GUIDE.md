@@ -1,6 +1,6 @@
 # Publishing Guide
 
-> **Agents**: Do NOT create changesets, bump versions, or publish packages unless a human explicitly asks you to. This guide is for reference only.
+> Agents: Do NOT create changesets, bump versions, or publish packages unless a human explicitly asks you to. This guide is for reference only.
 
 This repo uses [Changesets](https://github.com/changesets/changesets) for versioning and publishing. Releases are fully automated via GitHub Actions with npm Trusted Publishing (OIDC — no long-lived tokens).
 
@@ -49,8 +49,8 @@ No review PR — publishing happens immediately on merge.
 ### GitHub Actions (`release.yml`)
 
 - Runs on every push to `main`
-- Uses a **GitHub App** (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY` secrets) to commit version bumps
-- Publishes to npm via **Trusted Publishing** (OIDC) — no npm token needed
+- Uses a GitHub App (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY` secrets) to commit version bumps
+- Publishes to npm via Trusted Publishing (OIDC) — no npm token needed
 - Attaches SLSA provenance attestations to every publish
 
 ### Required GitHub repo secrets
@@ -61,14 +61,15 @@ No review PR — publishing happens immediately on merge.
 | `RELEASE_APP_ID`          | GitHub App ID for the release bot        |
 | `RELEASE_APP_PRIVATE_KEY` | GitHub App private key (`.pem` contents) |
 
+
 ### npm Trusted Publishing
 
 Each published package must have Trusted Publishing configured on npmjs.com (under package Settings > Trusted Publisher):
 
-- **Repository owner**: `millionco`
-- **Repository name**: `expect`
-- **Workflow filename**: `release.yml`
-- **Environment**: *(blank)*
+- Repository owner: `millionco`
+- Repository name: `expect`
+- Workflow filename: `release.yml`
+- Environment: (blank)
 
 ### Changeset config (`.changeset/config.json`)
 
@@ -102,7 +103,7 @@ If your changes don't affect published packages (e.g., internal refactors, CI ch
 
 ### Adding a new published package
 
-If you add a new package to the monorepo that needs to be published to npm, contact **Aiden Bai** to configure Trusted Publishing for it on npmjs.com. Without this, the CI workflow won't have permission to publish the new package.
+If you add a new package to the monorepo that needs to be published to npm, contact Aiden Bai to configure Trusted Publishing for it on npmjs.com. Without this, the CI workflow won't have permission to publish the new package.
 
 ### Canary releases
 
