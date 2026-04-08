@@ -151,6 +151,15 @@
   }
 }
 
+.home-page-below-hero,
+.home-page-below-hero * {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+}
 
 .replayer-mouse {
   background-image: url("/cursors/default.svg") !important;

@@ -1003,10 +1003,11 @@ export default function HomePage() {
           style={{ background: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.06) 75%, transparent 100%)' }}
         />
       </div>
+      <div className="home-page-below-hero w-full flex flex-col items-center">
       <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
         <div className="flex flex-col gap-[5px] mt-13">
           <div
-            className="w-112.75 tracking-[-0.03em] [white-space-collapse:preserve] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[23px]/9.5 text-[#3c3c3c]"
+            className="w-112.75 [white-space-collapse:preserve] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[23px]/9.5 text-[#3c3c3c]"
             style={{ marginBottom: "3px" }}
           >
             Expect
@@ -1428,6 +1429,7 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
