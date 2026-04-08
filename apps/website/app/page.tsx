@@ -523,7 +523,24 @@ function BrowserPreview({
               <div className="tracking-[-0.03em] [white-space-collapse:preserve] mt-4.5 w-max text-[#474747] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-base/9">
                 login
               </div>
-              <div className="w-52.75 h-7 rounded-full bg-white [box-shadow:#69696920_0px_0px_0px_0.5px] shrink-0" />
+              {/**
+               * from Paper
+               * https://app.paper.design/file/01KN3QGZ2REZDFZ3FZCNWXEANN?page=01KN3QGZ2RGSW995MW6F0D7HSJ&node=5I6-0
+               * on Apr 8, 2026
+               */}
+              <div className="mt-2 flex flex-col gap-3 shrink-0">
+                <div className="flex w-52.75 h-7 shrink-0 items-center overflow-hidden rounded-full bg-[color(display-p3_1_1_1)] px-3 filter-[grayscale(100%)] [box-shadow:#FFFFFF_0px_0px_9px_inset,color(display-p3_0.413_0.413_0.413/32%)_0px_0px_0px_0.5px,color(display-p3_0.768_0.768_0.768/22%)_0px_1px_3px]">
+                  <span className="min-w-0 truncate font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[12.5px] text-[#474747]">
+                    foo@bar.xyz
+                  </span>
+                </div>
+                {/**
+                 * from Paper
+                 * https://app.paper.design/file/01KN3QGZ2REZDFZ3FZCNWXEANN?page=01KN3QGZ2RGSW995MW6F0D7HSJ&node=5IL-0
+                 * on Apr 8, 2026
+                 */}
+                <div className="w-19.5 h-6.25 shrink-0 rounded-full border border-solid border-[color(display-p3_0.358_0.627_1)] bg-[color(display-p3_0.263_0.575_0.997)] [outline:1px_solid_color(display-p3_0.263_0.575_0.997)]" />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
