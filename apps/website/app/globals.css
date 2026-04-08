@@ -258,11 +258,6 @@
   animation: text-shimmer 2s ease-in-out infinite;
 }
 
-.dialkit-root,
-.dialkit-root * {
-  font-family: "Open Runde", system-ui, sans-serif !important;
-}
-
 .no-container-bg {
   --pill-container-bg: transparent;
   --pill-container-border: rgba(0, 0, 0, 0.04);
