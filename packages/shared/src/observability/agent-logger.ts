@@ -9,13 +9,20 @@ export const DebugFileLogger = Logger.formatLogFmt.pipe(Logger.toFile(LOG_FILE))
 const EnsureDebugLogDirectoryLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
-    yield* fileSystem.makeDirectory(path.dirname(LOG_FILE), { recursive: true });
+    yield* fileSystem.makeDirectory(path.dirname(LOG_FILE), {
+      recursive: true,
+    });
     // Add a .gitignore inside the directory to prevent the directory from being committed to git.
     yield* fileSystem.writeFileString(path.join(path.dirname(LOG_FILE), ".gitignore"), "*\n");
   }),
 );
 
 export const DebugFileLoggerLayer = Logger.layer([Logger.consolePretty(), DebugFileLogger]).pipe(
+  Layer.provide(EnsureDebugLogDirectoryLayer),
+  Layer.provide(NodeFileSystem.layer),
+);
+
+export const layerOnlyFileLogger = Logger.layer([Logger.tracerLogger, DebugFileLogger]).pipe(
   Layer.provide(EnsureDebugLogDirectoryLayer),
   Layer.provide(NodeFileSystem.layer),
 );
