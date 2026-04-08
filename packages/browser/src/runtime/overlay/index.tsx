@@ -39,6 +39,24 @@ const TextCarousel = ({ text }: { text: string }) => {
     const current = items[items.length - 1];
     if (text === current.text) return;
 
+    let commonPrefix = 0;
+    const minLength = Math.min(text.length, current.text.length);
+    while (commonPrefix < minLength && text[commonPrefix] === current.text[commonPrefix])
+      commonPrefix++;
+    let commonSuffix = 0;
+    while (
+      commonSuffix < minLength - commonPrefix &&
+      text[text.length - 1 - commonSuffix] === current.text[current.text.length - 1 - commonSuffix]
+    )
+      commonSuffix++;
+    const shared = commonPrefix + commonSuffix;
+    const isTyping = shared >= Math.max(text.length, current.text.length) * 0.5;
+
+    if (isTyping) {
+      setItems([{ text, id: current.id }]);
+      return;
+    }
+
     const id = nextIdRef.current++;
     setItems((previous) => [...previous.slice(-1), { text, id }]);
 
@@ -239,7 +257,7 @@ const AgentOverlay = () => {
                 className="rounded-full py-1.5 px-3.5 text-white font-semibold text-[16.5px] leading-[23px] antialiased animate-[expect-comment-in_0.25s_cubic-bezier(0.22,1,0.36,1)_both]"
                 style={{
                   maxWidth: `${tooltipMaxWidth}px`,
-                  background: "color(display-p3 0 0.464 0.925)",
+                  background: "#000",
                   border: "3px solid white",
                   boxShadow: "0 0 2px rgba(0,0,0,0.22)",
                   fontFamily: "'OpenRunde-Medium','Open_Runde',system-ui,sans-serif",
