@@ -11,6 +11,55 @@ import { Stepper } from "pasito";
 
 import { ClaudeSpinner } from "./claude-spinner";
 
+const STAR_DOT_SIZE = 3;
+const STAR_SPREAD = 5.5;
+const STAR_CELL_SIZE = STAR_DOT_SIZE + STAR_SPREAD * 2;
+const STAR_CENTER = STAR_CELL_SIZE / 2 - STAR_DOT_SIZE / 2;
+
+const STAR_DOTS = [
+  { x: STAR_CENTER, y: 0, delay: 0, duration: 1400 },
+  { x: STAR_CENTER * 2, y: STAR_CENTER, delay: 300, duration: 1700 },
+  { x: STAR_CENTER, y: STAR_CENTER * 2, delay: 700, duration: 1500 },
+  { x: 0, y: STAR_CENTER, delay: 1000, duration: 1600 },
+  { x: STAR_CENTER, y: STAR_CENTER, delay: 500, duration: 2200 },
+];
+
+function StarDots() {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        position: "relative",
+        width: `${STAR_CELL_SIZE}px`,
+        height: `${STAR_CELL_SIZE}px`,
+        flexShrink: 0,
+      }}
+    >
+      {STAR_DOTS.map((dot, index) => {
+        const isCenter = index === 4;
+        return (
+          <span
+            key={index}
+            style={{
+              position: "absolute",
+              left: `${dot.x}px`,
+              top: `${dot.y}px`,
+              width: `${STAR_DOT_SIZE}px`,
+              height: `${STAR_DOT_SIZE}px`,
+              borderRadius: "50%",
+              backgroundColor: "color(display-p3 0.930 0.513 0.112)",
+              animation: isCenter
+                ? `expect-dot-center ${dot.duration}ms ease-in-out infinite`
+                : `expect-dot-orbit ${dot.duration}ms ease-in-out infinite`,
+              animationDelay: `${dot.delay}ms`,
+            }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
 interface AnimationConfig {
   codingDuration: number;
   slideDelay: number;
@@ -50,7 +99,7 @@ const DEFAULT_CONFIG: AnimationConfig = {
   cursorMoveDelay: 1250,
   cursorClickDelay: 550,
   focusDelay: 50,
-  cursorAlertDelay: 800,
+  cursorAlertDelay: 1100,
   fixingDelay: 1400,
   fixDiffDelay: 1800,
   reloadDelay: 600,
@@ -675,8 +724,8 @@ function AnimatedCursor({
           clipRule="evenodd"
           d="M4.17558 3.53185C3.99199 3.463 3.7851 3.50782 3.64646 3.64646C3.50782 3.7851 3.463 3.99199 3.53185 4.17558L7.65685 15.1756C7.7337 15.3805 7.93492 15.5117 8.15345 15.4992C8.37197 15.4868 8.557 15.3336 8.61009 15.1213L9.91232 9.91232L15.1213 8.61009C15.3336 8.557 15.4868 8.37197 15.4992 8.15345C15.5117 7.93492 15.3805 7.7337 15.1756 7.65685L4.17558 3.53185Z"
           animate={{
-            fill: label === "fixed" ? "#28A745" : isAlert ? "#F03E35" : "#3F3F3F",
-            stroke: label === "fixed" ? "#28A745" : isAlert ? "#F03E35" : "#3F3F3F",
+            fill: label === "fixed" ? "#28A745" : isAlert ? "#F03E35" : "#0A0A0A",
+            stroke: label === "fixed" ? "#28A745" : isAlert ? "#F03E35" : "#0A0A0A",
           }}
           strokeWidth="2"
           strokeLinejoin="round"
@@ -726,17 +775,7 @@ function AnimatedCursor({
         animate={{ opacity: labelVisible ? 1 : 0, scale: labelVisible ? 1 : 0.5 }}
         transition={{ duration: config.labelDuration / 1000 }}
       >
-        {label === "security" && (
-          <svg className="size-3.75 animate-spin" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6.5" stroke="#0074F9" strokeOpacity="0.3" strokeWidth="2.5" />
-            <path
-              d="M14.5 8C14.5 4.41015 11.5899 1.5 8 1.5"
-              stroke="#0074F9"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        )}
+        {label === "security" && <StarDots />}
         {isAlert && (
           <svg className="size-3.75" viewBox="0 0 16 16" fill="none">
             <path
@@ -915,7 +954,7 @@ export default function HomePage() {
               "linear-gradient(to right, transparent 0%, rgba(255,255,255,0.5) 15%, rgba(255,255,255,0.5) 85%, transparent 100%)",
           }}
         />
-        <div className="w-112.75 relative">
+        <div className="w-full max-w-112.75 relative overflow-hidden">
           <div className="scale-[1.15] origin-top-left">
             <TerminalIllustration />
           </div>
@@ -932,12 +971,13 @@ export default function HomePage() {
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
           <div className="flex flex-col gap-[5px] mt-13">
             <div
-              className="w-112.75 [white-space-collapse:preserve] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[23px]/9.5 text-[#3c3c3c]"
-              style={{ marginBottom: "3px" }}
+              data-nudge-target
+              className="[white-space-collapse:preserve] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[23px]/9.5 text-[#2c2c2c]"
+              style={{ marginBottom: "3px", color: "#2c2c2c" }}
             >
               Expect
             </div>
-            <div className="[letter-spacing:0em] w-102 [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[17px]/[25px] text-[#707070]">
+            <div className="[letter-spacing:0em] max-w-102 [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[17px]/[25px] text-[#707070]">
               A skill for testing your agent&apos;s code in a real browser.
             </div>
           </div>
@@ -949,7 +989,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-2.75 mt-6">
             <div
               onClick={handleSelectCommand}
-              className="[font-synthesis:none] flex w-112.75 h-22.25 flex-col rounded-[14px] pt-2.5 pr-3.5 pb-3.5 pl-3.75 gap-5 [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased cursor-text"
+              className="[font-synthesis:none] flex w-full h-22.25 flex-col rounded-[14px] pt-2.5 pr-3.5 pb-3.5 pl-3.75 gap-5 [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased cursor-text"
               style={{
                 backgroundImage:
                   "linear-gradient(in oklab 180deg, oklab(100% 0 0) 45.83%, oklab(97.8% 0 0) 46.26%)",
