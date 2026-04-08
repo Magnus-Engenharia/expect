@@ -185,8 +185,7 @@ const AgentOverlay = () => {
                   background: "#161616",
                   border: "3px solid white",
                   boxShadow: "0 0 2px rgba(0,0,0,0.22)",
-                  fontFamily:
-                    "'OpenRunde-Medium','Open_Runde',system-ui,sans-serif",
+                  fontFamily: "'OpenRunde-Medium','Open_Runde',system-ui,sans-serif",
                   fontSynthesis: "none",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
